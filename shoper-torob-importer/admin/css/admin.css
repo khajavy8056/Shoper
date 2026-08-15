@@ -211,3 +211,144 @@
 @keyframes shoper-spin { to { transform: rotate(360deg); } }
 
 #shoper-test-conn { margin-top: 6px; }
+
+/* ==========================================================================
+   نوار پیشنهاد نام محصول (autocomplete)
+   ========================================================================== */
+
+.shoper-suggest-wrap {
+	position: relative;
+	display: inline-block;
+	width: 100%;
+	max-width: 100%;
+}
+
+.shoper-suggest {
+	position: absolute;
+	top: 100%;
+	right: 0;
+	left: 0;
+	z-index: 100000;
+	max-height: 340px;
+	overflow-y: auto;
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	border-top: none;
+	border-radius: 0 0 4px 4px;
+	box-shadow: 0 6px 18px rgba(0, 0, 0, .12);
+	text-align: right;
+}
+
+.shoper-suggest-item {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 8px 10px;
+	cursor: pointer;
+	border-bottom: 1px solid #f0f0f1;
+}
+
+.shoper-suggest-item:last-child {
+	border-bottom: none;
+}
+
+.shoper-suggest-item:hover,
+.shoper-suggest-item.active {
+	background: #f0f6fc;
+}
+
+.shoper-suggest-thumb {
+	width: 40px;
+	height: 40px;
+	object-fit: contain;
+	flex: 0 0 40px;
+	background: #fafafa;
+	border: 1px solid #f0f0f1;
+	border-radius: 4px;
+}
+
+.shoper-suggest-thumb-empty {
+	display: inline-block;
+}
+
+.shoper-suggest-text {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.shoper-suggest-name {
+	font-size: 13px;
+	line-height: 1.5;
+	color: #1d2327;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.shoper-suggest-name mark {
+	background: #fcf0cd;
+	color: inherit;
+	padding: 0 1px;
+	border-radius: 2px;
+}
+
+.shoper-suggest-meta {
+	font-size: 11px;
+	color: #787c82;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.shoper-suggest-price {
+	font-size: 12px;
+	color: #2271b1;
+	white-space: nowrap;
+	flex: 0 0 auto;
+}
+
+.shoper-suggest-loading,
+.shoper-suggest-empty {
+	padding: 10px 12px;
+	font-size: 12px;
+	color: #787c82;
+}
+
+/* ==========================================================================
+   جدول فروشندگان در پیش‌نمایش
+   ========================================================================== */
+
+.shoper-sellers-preview {
+	width: 100%;
+	border-collapse: collapse;
+	margin: 6px 0;
+	font-size: 12px;
+}
+
+.shoper-sellers-preview th,
+.shoper-sellers-preview td {
+	padding: 6px 8px;
+	border: 1px solid #e5e5e5;
+	text-align: right;
+}
+
+.shoper-sellers-preview thead th {
+	background: #f6f7f7;
+	font-weight: 600;
+}
+
+.shoper-sellers-preview tr.primary {
+	background: #f0f6fc;
+}
+
+.shoper-badge {
+	display: inline-block;
+	background: #2271b1;
+	color: #fff;
+	font-size: 10px;
+	padding: 1px 6px;
+	border-radius: 10px;
+	margin-right: 4px;
+}

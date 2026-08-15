@@ -3,7 +3,7 @@
  * Plugin Name:       Shoper – درون‌ریز محصول از ترب
  * Plugin URI:        https://github.com/khajavy8056/Shoper
  * Description:       با نوشتن نام محصول یا چسباندن لینک ترب، اطلاعات کامل محصول (نام، توضیحات، تصاویر و تمام مشخصات فنی به‌صورت ویژگی‌های مجزا) را از ترب دریافت و یک محصول کامل ووکامرس بسازید.
- * Version:           1.0.0
+ * Version:           1.1.0
  * Author:            Shoper
  * Author URI:        https://github.com/khajavy8056/Shoper
  * License:           GPL v2 or later
@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // تعریف ثابت‌های افزونه.
-define( 'SHOPER_VERSION', '1.0.0' );
+define( 'SHOPER_VERSION', '1.1.0' );
 define( 'SHOPER_PLUGIN_FILE', __FILE__ );
 define( 'SHOPER_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SHOPER_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -107,6 +107,7 @@ if ( ! class_exists( 'Shoper_Torob_Importer' ) ) {
 			require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-torob-client.php';
 			require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-image-handler.php';
 			require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-attribute-handler.php';
+			require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-seller-aggregator.php';
 			require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-product-builder.php';
 			require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-ajax.php';
 			require_once SHOPER_PLUGIN_DIR . 'admin/class-shoper-admin.php';
@@ -171,6 +172,8 @@ function shoper_activate() {
 		'import_gallery'   => 'yes',
 		'set_first_as_feat'=> 'yes',
 		'price_behavior'   => 'cheapest', // cheapest | none.
+		'seller_limit'     => 3,          // چند فروشنده بررسی شود.
+		'seller_strategy'  => 'score',    // score | cheapest | merge.
 		'user_agent'       => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
 		'request_timeout'  => 25,
 	);
