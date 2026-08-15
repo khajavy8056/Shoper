@@ -1,0 +1,354 @@
+/**
+ * استایل‌های ادمین Shoper
+ *
+ * @package Shoper
+ */
+
+.shoper-wrap { direction: rtl; }
+
+.shoper-layout {
+	display: grid;
+	grid-template-columns: 1fr 320px;
+	gap: 20px;
+	margin-top: 20px;
+}
+@media (max-width: 960px) {
+	.shoper-layout { grid-template-columns: 1fr; }
+}
+
+.shoper-card {
+	background: #fff;
+	border: 1px solid #dcdcde;
+	border-radius: 8px;
+	padding: 18px 20px;
+	margin-bottom: 20px;
+	box-shadow: 0 1px 1px rgba(0,0,0,0.03);
+}
+.shoper-card h2 { margin-top: 0; }
+
+.shoper-input-row {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	flex-wrap: wrap;
+	margin: 12px 0;
+}
+.shoper-input-row input { flex: 1; min-width: 260px; }
+
+.shoper-mode-toggle label { margin-left: 16px; font-weight: 600; }
+
+.shoper-results { margin-top: 16px; }
+
+.shoper-result-item {
+	display: flex;
+	gap: 12px;
+	padding: 12px;
+	border: 1px solid #e0e0e0;
+	border-radius: 6px;
+	margin-bottom: 8px;
+	cursor: pointer;
+	transition: background 0.15s, border-color 0.15s;
+	align-items: center;
+}
+.shoper-result-item:hover {
+	background: #f0f6fc;
+	border-color: #2271b1;
+}
+.shoper-result-item.selected {
+	background: #e6f0fa;
+	border-color: #2271b1;
+}
+.shoper-result-item img {
+	width: 64px;
+	height: 64px;
+	object-fit: contain;
+	border-radius: 4px;
+	background: #f8f8f8;
+}
+.shoper-result-item .shoper-ri-info { flex: 1; }
+.shoper-result-item .shoper-ri-name { font-weight: 600; margin-bottom: 4px; }
+.shoper-result-item .shoper-ri-meta { color: #666; font-size: 12px; }
+.shoper-result-item .shoper-ri-price { color: #2271b1; font-weight: bold; white-space: nowrap; }
+
+.shoper-preview { margin-top: 16px; }
+
+.shoper-preview-header {
+	display: flex;
+	gap: 16px;
+	margin-bottom: 16px;
+}
+.shoper-preview-header img {
+	width: 180px;
+	height: 180px;
+	object-fit: contain;
+	border: 1px solid #eee;
+	border-radius: 6px;
+	background: #fafafa;
+}
+.shoper-preview-gallery {
+	display: flex;
+	gap: 6px;
+	flex-wrap: wrap;
+	margin-top: 8px;
+}
+.shoper-preview-gallery img {
+	width: 56px;
+	height: 56px;
+	object-fit: contain;
+	border: 1px solid #eee;
+	border-radius: 4px;
+}
+
+.shoper-field-group { margin-bottom: 14px; }
+.shoper-field-group label { display: block; font-weight: 600; margin-bottom: 4px; }
+.shoper-field-group input[type="text"],
+.shoper-field-group textarea { width: 100%; }
+.shoper-field-group textarea { min-height: 140px; font-family: Tahoma, sans-serif; }
+
+.shoper-specs-list {
+	max-height: 320px;
+	overflow-y: auto;
+	border: 1px solid #e0e0e0;
+	border-radius: 6px;
+	padding: 8px;
+	background: #fafafa;
+}
+.shoper-spec-item {
+	display: flex;
+	align-items: center;
+	padding: 6px 8px;
+	border-bottom: 1px solid #eee;
+	gap: 8px;
+}
+.shoper-spec-item:last-child { border-bottom: none; }
+.shoper-spec-item input[type="checkbox"] { margin: 0 6px 0 0; }
+.shoper-spec-item .shoper-spec-key {
+	font-weight: 600;
+	width: 40%;
+	color: #1d2327;
+}
+.shoper-spec-item .shoper-spec-val { color: #50575e; font-size: 13px; }
+
+.shoper-create-row {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-top: 18px;
+	padding-top: 16px;
+	border-top: 1px solid #eee;
+	gap: 12px;
+	flex-wrap: wrap;
+}
+
+.shoper-status {
+	margin-top: 12px;
+	padding: 10px 12px;
+	border-radius: 4px;
+	display: none;
+}
+.shoper-status.loading {
+	display: block;
+	background: #f0f6fc;
+	border: 1px solid #72aee6;
+	color: #0a4b78;
+}
+.shoper-status.success {
+	display: block;
+	background: #edfaef;
+	border: 1px solid #00a32a;
+	color: #0a5d1f;
+}
+.shoper-status.error {
+	display: block;
+	background: #fcf0f1;
+	border: 1px solid #d63638;
+	color: #8a1f23;
+}
+.shoper-status .spinner {
+	float: none;
+	visibility: visible;
+	margin: 0 6px 0 0;
+	vertical-align: middle;
+}
+
+.shoper-success-box {
+	padding: 16px;
+	background: #edfaef;
+	border: 1px solid #00a32a;
+	border-radius: 6px;
+	margin-top: 12px;
+}
+.shoper-success-box a.button { margin-left: 8px; }
+
+.shoper-help ul { margin: 0; padding-right: 20px; }
+.shoper-help li { margin-bottom: 6px; line-height: 1.7; }
+.shoper-help code { background: #f0f0f1; padding: 2px 6px; border-radius: 3px; }
+
+/* متاباکس در صفحه ویرایش محصول */
+.shoper-metabox .shoper-field { margin: 8px 0; }
+.shoper-metabox .shoper-hint { color: #50575e; font-size: 12px; line-height: 1.6; }
+.shoper-metabox .shoper-result-item { padding: 8px; }
+.shoper-metabox .shoper-result-item img { width: 40px; height: 40px; }
+.shoper-metabox .shoper-result-item .shoper-ri-name { font-size: 12px; }
+.shoper-metabox .shoper-result-item .shoper-ri-price { font-size: 11px; }
+
+.shoper-metabox .shoper-preview { font-size: 12px; }
+.shoper-metabox .shoper-preview-header img { width: 100px; height: 100px; }
+.shoper-metabox .shoper-specs-list { max-height: 180px; }
+.shoper-metabox .shoper-spec-item { padding: 4px 6px; font-size: 11px; }
+
+.shoper-loading-inline {
+	display: inline-block;
+	width: 14px;
+	height: 14px;
+	border: 2px solid #ccc;
+	border-top-color: #2271b1;
+	border-radius: 50%;
+	animation: shoper-spin 0.7s linear infinite;
+	vertical-align: middle;
+	margin-left: 6px;
+}
+@keyframes shoper-spin { to { transform: rotate(360deg); } }
+
+#shoper-test-conn { margin-top: 6px; }
+
+/* ==========================================================================
+   نوار پیشنهاد نام محصول (autocomplete)
+   ========================================================================== */
+
+.shoper-suggest-wrap {
+	position: relative;
+	display: inline-block;
+	width: 100%;
+	max-width: 100%;
+}
+
+.shoper-suggest {
+	position: absolute;
+	top: 100%;
+	right: 0;
+	left: 0;
+	z-index: 100000;
+	max-height: 340px;
+	overflow-y: auto;
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	border-top: none;
+	border-radius: 0 0 4px 4px;
+	box-shadow: 0 6px 18px rgba(0, 0, 0, .12);
+	text-align: right;
+}
+
+.shoper-suggest-item {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 8px 10px;
+	cursor: pointer;
+	border-bottom: 1px solid #f0f0f1;
+}
+
+.shoper-suggest-item:last-child {
+	border-bottom: none;
+}
+
+.shoper-suggest-item:hover,
+.shoper-suggest-item.active {
+	background: #f0f6fc;
+}
+
+.shoper-suggest-thumb {
+	width: 40px;
+	height: 40px;
+	object-fit: contain;
+	flex: 0 0 40px;
+	background: #fafafa;
+	border: 1px solid #f0f0f1;
+	border-radius: 4px;
+}
+
+.shoper-suggest-thumb-empty {
+	display: inline-block;
+}
+
+.shoper-suggest-text {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.shoper-suggest-name {
+	font-size: 13px;
+	line-height: 1.5;
+	color: #1d2327;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.shoper-suggest-name mark {
+	background: #fcf0cd;
+	color: inherit;
+	padding: 0 1px;
+	border-radius: 2px;
+}
+
+.shoper-suggest-meta {
+	font-size: 11px;
+	color: #787c82;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.shoper-suggest-price {
+	font-size: 12px;
+	color: #2271b1;
+	white-space: nowrap;
+	flex: 0 0 auto;
+}
+
+.shoper-suggest-loading,
+.shoper-suggest-empty {
+	padding: 10px 12px;
+	font-size: 12px;
+	color: #787c82;
+}
+
+/* ==========================================================================
+   جدول فروشندگان در پیش‌نمایش
+   ========================================================================== */
+
+.shoper-sellers-preview {
+	width: 100%;
+	border-collapse: collapse;
+	margin: 6px 0;
+	font-size: 12px;
+}
+
+.shoper-sellers-preview th,
+.shoper-sellers-preview td {
+	padding: 6px 8px;
+	border: 1px solid #e5e5e5;
+	text-align: right;
+}
+
+.shoper-sellers-preview thead th {
+	background: #f6f7f7;
+	font-weight: 600;
+}
+
+.shoper-sellers-preview tr.primary {
+	background: #f0f6fc;
+}
+
+.shoper-badge {
+	display: inline-block;
+	background: #2271b1;
+	color: #fff;
+	font-size: 10px;
+	padding: 1px 6px;
+	border-radius: 10px;
+	margin-right: 4px;
+}
