@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shoper — درون‌ریز محصول از ترب برای ووکامرس</title>
+<style>
+  :root {
+    --primary: #7f54b3;
+    --primary-dark: #674399;
+    --primary-light: #f4edff;
+    --blue: #2271b1;
+    --green: #00a32a;
+    --green-bg: #edfaef;
+    --red: #d63638;
+    --orange: #dba617;
+    --gray-50: #f6f7f7;
+    --gray-100: #f0f0f1;
+    --gray-200: #dcdcde;
+    --gray-400: #c3c4c7;
+    --gray-600: #646970;
+    --gray-800: #2c3338;
+    --gray-900: #1d2327;
+    --radius: 10px;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,.06);
+    --shadow-md: 0 4px 12px rgba(0,0,0,.08);
+    --shadow-lg: 0 12px 32px rgba(0,0,0,.12);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: Tahoma, "Vazirmatn", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #f0f0f1;
+    color: var(--gray-900);
+    line-height: 1.7;
+    font-size: 14px;
+  }
+
+  /* ====== هدر سایت ====== */
+  .topbar {
+    background: linear-gradient(135deg, #674399 0%, #7f54b3 50%, #9b6ccf 100%);
+    color: #fff;
+    padding: 14px 0;
+    box-shadow: var(--shadow-md);
+  }
+  .topbar-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 12px;
+    font-size: 20px; font-weight: 700;
+  }
+  .brand .logo {
+    width: 42px; height: 42px;
+    background: #fff;
+    border-radius: 10px;
+    display: grid; place-items: center;
+    font-size: 22px;
+    color: var(--primary);
+  }
+  .topbar-actions a {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: #fff; color: var(--primary-dark);
+    padding: 10px 22px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 700;
+    transition: transform .15s, box-shadow .15s;
+    box-shadow: 0 2px 6px rgba(0,0,0,.15);
+  }
+  .topbar-actions a:hover { transform: translateY(-2px); box-shadow: 0 6px 14px rgba(0,0,0,.2); }
+
+  /* ====== بنر معرفی ====== */
+  .hero {
+    max-width: 1200px;
+    margin: 30px auto 0;
+    padding: 0 20px;
+  }
+  .hero-card {
+    background: #fff;
+    border-radius: var(--radius);
+    padding: 32px;
+    box-shadow: var(--shadow-sm);
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 30px;
+    align-items: center;
+  }
+  @media (max-width: 800px) { .hero-card { grid-template-columns: 1fr; } }
+  .hero h1 {
+    margin: 0 0 12px;
+    font-size: 28px;
+    color: var(--gray-900);
+    line-height: 1.4;
+  }
+  .hero h1 .accent { color: var(--primary); }
+  .hero p.lead {
+    font-size: 15px; color: var(--gray-600); margin: 0 0 20px;
+  }
+  .hero-features {
+    list-style: none; padding: 0; margin: 0 0 24px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  }
+  .hero-features li {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; color: var(--gray-800);
+  }
+  .hero-features li::before {
+    content: "✓";
+    width: 22px; height: 22px; flex-shrink: 0;
+    background: var(--green-bg); color: var(--green);
+    border-radius: 50%;
+    display: grid; place-items: center;
+    font-weight: 700; font-size: 12px;
+  }
+  .hero-cta { display: flex; gap: 12px; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 12px 24px;
+    border-radius: 8px;
+    border: 2px solid transparent;
+    font-weight: 700; font-size: 14px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all .15s;
+    font-family: inherit;
+  }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:hover { background: var(--primary-dark); transform: translateY(-1px); box-shadow: var(--shadow-md); }
+  .btn-outline { background: #fff; color: var(--primary); border-color: var(--primary); }
+  .btn-outline:hover { background: var(--primary-light); }
+  .btn-lg { padding: 14px 30px; font-size: 15px; }
+
+  .hero-visual {
+    background: linear-gradient(135deg, #f4edff, #fff);
+    border: 1px solid #e6d9f5;
+    border-radius: var(--radius);
+    padding: 24px;
+    text-align: center;
+  }
+  .hero-visual .flow {
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .flow-step {
+    background: #fff;
+    border: 1px solid var(--gray-200);
+    border-radius: 8px;
+    padding: 12px 16px;
+    display: flex; align-items: center; gap: 12px;
+    text-align: right;
+    box-shadow: var(--shadow-sm);
+  }
+  .flow-step .num {
+    width: 32px; height: 32px; flex-shrink: 0;
+    background: var(--primary); color: #fff;
+    border-radius: 50%;
+    display: grid; place-items: center;
+    font-weight: 700;
+  }
+  .flow-arrow { color: var(--primary); font-size: 20px; }
+
+  /* ====== تب‌های دمو ====== */
+  .demo-section {
+    max-width: 1200px;
+    margin: 30px auto;
+    padding: 0 20px;
+  }
+  .section-title {
+    font-size: 22px; margin: 0 0 6px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .section-sub { color: var(--gray-600); margin: 0 0 20px; font-size: 14px; }
+
+  .tabs {
+    display: flex; gap: 4px;
+    border-bottom: 2px solid var(--gray-200);
+    margin-bottom: 0;
+  }
+  .tab {
+    padding: 12px 22px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--gray-600);
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    transition: all .15s;
+  }
+  .tab:hover { color: var(--primary); }
+  .tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+  .browser-frame {
+    background: #fff;
+    border: 1px solid var(--gray-200);
+    border-radius: 0 0 var(--radius) var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+  }
+  .browser-bar {
+    background: var(--gray-100);
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--gray-200);
+    display: flex; align-items: center; gap: 10px;
+    font-size: 12px; color: var(--gray-600);
+  }
+  .browser-dots { display: flex; gap: 5px; }
+  .browser-dots span { width: 11px; height: 11px; border-radius: 50%; background: var(--gray-400); }
+  .browser-dots span:nth-child(1) { background: #ff5f57; }
+  .browser-dots span:nth-child(2) { background: #febc2e; }
+  .browser-dots span:nth-child(3) { background: #28c840; }
+  .browser-url {
+    flex: 1; background: #fff; padding: 5px 12px; border-radius: 14px;
+    border: 1px solid var(--gray-200); direction: ltr; text-align: left;
+    color: var(--gray-600);
+  }
+  .browser-content { padding: 24px; background: #f0f0f1; min-height: 500px; }
+
+  /* ====== استایل‌های دمو (مشابه افزونه) ====== */
+  .shoper-card {
+    background: #fff; border: 1px solid var(--gray-200);
+    border-radius: var(--radius); padding: 20px; margin-bottom: 18px;
+  }
+  .shoper-card h3 { margin: 0 0 12px; font-size: 16px; }
+  .shoper-input-row { display: flex; gap: 8px; margin-bottom: 14px; }
+  .shoper-input-row input[type="text"],
+  .shoper-input-row input[type="url"] {
+    flex: 1; padding: 10px 14px;
+    border: 1px solid var(--gray-400);
+    border-radius: 6px;
+    font-family: inherit; font-size: 14px;
+  }
+  .shoper-input-row input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px rgba(127,84,179,.15); }
+  .btn-search {
+    background: var(--primary); color: #fff;
+    border: none; padding: 0 24px;
+    border-radius: 6px; cursor: pointer;
+    font-family: inherit; font-weight: 700; font-size: 14px;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn-search:hover { background: var(--primary-dark); }
+  .btn-search:disabled { opacity: .6; cursor: not-allowed; }
+
+  .mode-toggle { display: flex; gap: 16px; margin-bottom: 12px; }
+  .mode-toggle label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-weight: 600; }
+
+  .result-item {
+    display: flex; gap: 12px; padding: 12px;
+    border: 1px solid var(--gray-200); border-radius: 8px;
+    margin-bottom: 8px; cursor: pointer; transition: all .15s;
+    align-items: center;
+  }
+  .result-item:hover { background: var(--primary-light); border-color: var(--primary); }
+  .result-item.selected { background: #e6d9f5; border-color: var(--primary); }
+  .result-item img { width: 60px; height: 60px; object-fit: contain; background: #fafafa; border-radius: 4px; }
+  .ri-info { flex: 1; }
+  .ri-name { font-weight: 700; margin-bottom: 4px; }
+  .ri-meta { color: var(--gray-600); font-size: 12px; }
+  .ri-price { color: var(--primary); font-weight: 700; white-space: nowrap; }
+
+  .preview-header { display: flex; gap: 18px; margin-bottom: 16px; flex-wrap: wrap; }
+  .preview-img {
+    width: 160px; height: 160px; object-fit: contain;
+    background: #fafafa; border: 1px solid var(--gray-200); border-radius: 6px;
+  }
+  .gallery-thumbs { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .gallery-thumbs img { width: 52px; height: 52px; object-fit: contain; border: 1px solid var(--gray-200); border-radius: 4px; }
+
+  .field-group { margin-bottom: 14px; }
+  .field-group label { display: block; font-weight: 700; margin-bottom: 5px; font-size: 13px; }
+  .field-group input[type=text], .field-group textarea {
+    width: 100%; padding: 8px 12px; border: 1px solid var(--gray-400);
+    border-radius: 4px; font-family: inherit; font-size: 13px;
+  }
+  .field-group textarea { min-height: 110px; }
+
+  .specs-list {
+    max-height: 280px; overflow-y: auto;
+    border: 1px solid var(--gray-200); border-radius: 6px;
+    background: #fafafa;
+  }
+  .spec-item {
+    display: flex; align-items: center; padding: 7px 10px;
+    border-bottom: 1px solid #eee; gap: 8px;
+  }
+  .spec-item:last-child { border-bottom: none; }
+  .spec-item label { display: flex; align-items: center; gap: 8px; width: 100%; margin: 0; cursor: pointer; }
+  .spec-key { font-weight: 600; width: 38%; color: var(--gray-900); font-size: 13px; }
+  .spec-val { color: var(--gray-600); font-size: 12px; }
+
+  .status {
+    margin-top: 12px; padding: 10px 14px; border-radius: 6px;
+    display: none; font-size: 13px;
+  }
+  .status.loading { display: block; background: #f0f6fc; border: 1px solid #72aee6; color: #0a4b78; }
+  .status.success { display: block; background: var(--green-bg); border: 1px solid var(--green); color: #0a5d1f; }
+  .status.error { display: block; background: #fcf0f1; border: 1px solid var(--red); color: #8a1f23; }
+
+  .spinner {
+    display: inline-block; width: 14px; height: 14px;
+    border: 2px solid currentColor; border-top-color: transparent;
+    border-radius: 50%; animation: spin .7s linear infinite;
+    vertical-align: middle; margin-left: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .success-box {
+    background: var(--green-bg); border: 1px solid var(--green);
+    border-radius: 8px; padding: 18px; margin-top: 14px;
+  }
+  .success-box h4 { margin: 0 0 8px; color: #0a5d1f; }
+  .success-box p { margin: 4px 0; font-size: 13px; }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* متاباکس در صفحه ویرایش محصول */
+  .wp-product-layout {
+    display: grid; grid-template-columns: 1fr 300px; gap: 18px;
+  }
+  @media (max-width: 800px) { .wp-product-layout { grid-template-columns: 1fr; } }
+  .wp-main-col {
+    background: #fff; border: 1px solid var(--gray-200);
+    border-radius: var(--radius); padding: 18px;
+  }
+  .wp-main-col .fake-input {
+    width: 100%; padding: 10px; border: 1px solid var(--gray-400);
+    border-radius: 4px; margin-bottom: 10px; background: #fafafa;
+    color: var(--gray-600);
+  }
+  .wp-main-col .fake-editor {
+    min-height: 180px; border: 1px solid var(--gray-400);
+    border-radius: 4px; padding: 14px; background: #fff;
+    color: var(--gray-800); line-height: 1.8;
+  }
+  .wp-main-col .fake-editor table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  .wp-main-col .fake-editor th, .wp-main-col .fake-editor td {
+    border: 1px solid #eee; padding: 6px 10px; text-align: right; font-size: 12px;
+  }
+  .wp-main-col .fake-editor th { background: #f8f8f8; width: 35%; }
+
+  .sidebar-metabox {
+    background: #fff; border: 1px solid var(--gray-200);
+    border-radius: var(--radius); padding: 16px;
+    height: fit-content;
+  }
+  .sidebar-metabox h4 {
+    margin: 0 0 10px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--gray-200); font-size: 14px;
+  }
+
+  /* ====== جدول ویژگی‌های ساخته‌شده ====== */
+  .attributes-table {
+    width: 100%; border-collapse: collapse; font-size: 13px;
+    background: #fff;
+  }
+  .attributes-table th, .attributes-table td {
+    border: 1px solid var(--gray-200);
+    padding: 8px 10px; text-align: right;
+  }
+  .attributes-table th { background: var(--gray-100); }
+  .attributes-table .pa-slug { direction: ltr; text-align: left; font-family: monospace; color: var(--primary); font-size: 11px; }
+  .attributes-table .check { color: var(--green); font-weight: bold; }
+
+  /* ====== باکس دانلود ====== */
+  .download-section {
+    max-width: 1200px; margin: 40px auto; padding: 0 20px;
+  }
+  .download-card {
+    background: linear-gradient(135deg, #674399 0%, #7f54b3 100%);
+    border-radius: var(--radius);
+    padding: 40px;
+    color: #fff;
+    text-align: center;
+    box-shadow: var(--shadow-lg);
+  }
+  .download-card h2 { margin: 0 0 10px; font-size: 26px; }
+  .download-card p { margin: 0 0 24px; font-size: 15px; opacity: .92; max-width: 600px; margin-right: auto; margin-left: auto; }
+  .download-card .btn-download {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: #fff; color: var(--primary-dark);
+    padding: 16px 40px;
+    border-radius: 10px;
+    font-size: 17px; font-weight: 800;
+    text-decoration: none;
+    transition: transform .15s, box-shadow .15s;
+    box-shadow: 0 6px 20px rgba(0,0,0,.2);
+  }
+  .download-card .btn-download:hover { transform: translateY(-3px); box-shadow: 0 10px 26px rgba(0,0,0,.28); }
+  .download-meta {
+    margin-top: 18px; font-size: 13px; opacity: .85;
+    display: flex; justify-content: center; gap: 24px; flex-wrap: wrap;
+  }
+  .download-meta span { display: inline-flex; align-items: center; gap: 6px; }
+
+  /* ====== فوتر ====== */
+  footer {
+    background: var(--gray-900); color: #c3c4c7;
+    padding: 30px 20px; text-align: center; margin-top: 40px;
+    font-size: 13px;
+  }
+  footer a { color: #c3a6e8; text-decoration: none; }
+  footer a:hover { color: #fff; }
+
+  .tech-badges {
+    display: flex; gap: 10px; justify-content: center;
+    flex-wrap: wrap; margin-top: 20px;
+  }
+  .tech-badges span {
+    background: rgba(255,255,255,.1);
+    padding: 6px 14px; border-radius: 20px;
+    font-size: 12px;
+  }
+
+  /* small badges in preview */
+  .badge {
+    display: inline-block; padding: 2px 9px; border-radius: 12px;
+    font-size: 11px; font-weight: 600;
+  }
+  .badge-green { background: var(--green-bg); color: var(--green); }
+  .badge-purple { background: var(--primary-light); color: var(--primary-dark); }
+  .badge-blue { background: #e6f0fa; color: var(--blue); }
+
+  .checkbox-toggle { accent-color: var(--primary); width: 16px; height: 16px; }
+</style>
+</head>
+<body>
+
+<!-- ========== هدر ========== -->
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <div class="logo">🛒</div>
+      <div>Shoper <span style="font-size:13px;opacity:.9;font-weight:400;">— درون‌ریز محصول از ترب</span></div>
+    </div>
+    <div class="topbar-actions">
+      <a href="#download">⬇ دانلود افزونه</a>
+    </div>
+  </div>
+</div>
+
+<!-- ========== بنر ========== -->
+<section class="hero">
+  <div class="hero-card">
+    <div>
+      <h1>با یک نام یا لینک، <span class="accent">محصول کامل ووکامرس</span> را خودکار بسازید</h1>
+      <p class="lead">
+        Shoper نام محصول یا لینک ترب را می‌گیرد، عنوان، توضیحات، گالری تصاویر و
+        <strong>تمام مشخصات فنی</strong> را هوشمندانه استخراج می‌کند و هر مشخصه را به‌صورت
+        یک <strong>ویژگی (Attribute) مجزا</strong> در ووکامرس ثبت می‌کند.
+      </p>
+      <ul class="hero-features">
+        <li>جستجو با نام محصول</li>
+        <li>پشتیبانی از لینک ترب</li>
+        <li>گالری کامل تصاویر</li>
+        <li>هر مشخصه یک ویژگی</li>
+        <li>دانلود تصاویر در هاست شما</li>
+        <li>پیش‌نمایش قبل از ساخت</li>
+        <li>جلوگیری از تکرار</li>
+        <li>دکمه در صفحه افزودن محصول</li>
+      </ul>
+      <div class="hero-cta">
+        <a href="#demo" class="btn btn-primary btn-lg">▶ مشاهده‌ی دمای تعاملی</a>
+        <a href="#download" class="btn btn-outline btn-lg">⬇ دانلود افزونه</a>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="flow">
+        <div class="flow-step"><div class="num">۱</div><div>تایپ نام محصول یا چسباندن لینک ترب</div></div>
+        <div class="flow-arrow" style="text-align:center;">▼</div>
+        <div class="flow-step"><div class="num">۲</div><div>انتخاب محصول از نتایج + پیش‌نمایش</div></div>
+        <div class="flow-arrow" style="text-align:center;">▼</div>
+        <div class="flow-step"><div class="num">۳</div><div>تصاویر دانلود و مشخصات به‌عنوان ویژگی ثبت می‌شوند</div></div>
+        <div class="flow-arrow" style="text-align:center;">▼</div>
+        <div class="flow-step"><div class="num">۴</div><div>محصول آماده در ووکامرس ✅</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== دموی تعاملی ========== -->
+<section class="demo-section" id="demo">
+  <h2 class="section-title">🎯 دموی تعاملی</h2>
+  <p class="section-sub">می‌توانید همین‌جا عملکرد افزونه را امتحان کنید. این دقیقاً همان چیزی است که در پیشخوان ووکامرس خواهید دید.</p>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="tab-main">صفحه‌ی اصلی Shoper</button>
+    <button class="tab" data-tab="tab-edit">دکمه در صفحه‌ی افزودن محصول</button>
+    <button class="tab" data-tab="tab-attrs">نتیجه: ویژگی‌های ساخته‌شده</button>
+  </div>
+
+  <div class="browser-frame">
+    <div class="browser-bar">
+      <div class="browser-dots"><span></span><span></span><span></span></div>
+      <div class="browser-url" id="browserUrl">yoursite.com/wp-admin/admin.php?page=shoper</div>
+    </div>
+    <div class="browser-content">
+
+      <!-- ============ تب ۱: صفحه‌ی اصلی ============ -->
+      <div class="tab-panel active" id="tab-main">
+        <div class="shoper-card">
+          <h3>🔍 ۱. جستجوی محصول در ترب</h3>
+          <div class="mode-toggle">
+            <label><input type="radio" name="demo_mode" value="query" checked> جستجو با نام</label>
+            <label><input type="radio" name="demo_mode" value="url"> لینک محصول</label>
+          </div>
+          <div class="shoper-input-row">
+            <input type="text" id="demo-query" placeholder="مثال: گوشی سامسونگ S25 Ultra (هر چیزی تایپ کنید)">
+            <button class="btn-search" id="demo-search-btn">🔍 جستجو</button>
+          </div>
+          <div id="demo-results"></div>
+          <div id="demo-status" class="status"></div>
+        </div>
+
+        <div class="shoper-card" id="demo-preview-card" style="display:none;">
+          <h3>👁 ۲. پیش‌نمایش و ویرایش</h3>
+          <p class="ri-meta" style="margin-top:-6px;margin-bottom:14px;">
+            تیک مشخصات فنی‌ای را که می‌خواهید به‌عنوان ویژگی ساخته شوند بزنید.
+            هر کدام به‌صورت یک <span class="badge badge-purple">Attribute</span> مجزا در تب ویژگی‌ها قرار می‌گیرد.
+          </p>
+          <div id="demo-preview"></div>
+          <div style="margin-top:16px;padding-top:14px;border-top:1px solid #eee;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+            <label>وضعیت انتشار:
+              <select style="padding:6px 10px;border-radius:4px;border:1px solid #c3c4c7;">
+                <option>پیش‌نویس</option>
+                <option>منتشر شده</option>
+              </select>
+            </label>
+            <button class="btn btn-primary btn-lg" id="demo-create-btn" style="display:none;">✅ ساخت محصول در ووکامرس</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ تب ۲: صفحه ویرایش محصول ============ -->
+      <div class="tab-panel" id="tab-edit">
+        <p class="ri-meta" style="margin-top:0;">
+          در صفحه‌ی <strong>محصولات ← افزودن جدید</strong>، یک جعبه‌ی کناری با عنوان
+          <span class="badge badge-purple">🛒 پر کردن از ترب</span> اضافه می‌شود.
+          کافی است جستجو کنید و دکمه‌ی «پر کردن این محصول» را بزنید تا تمام فیلدهای همان صفحه پر شوند.
+        </p>
+        <div class="wp-product-layout">
+          <div class="wp-main-col">
+            <div class="fake-input" id="edit-title">عنوان محصول اینجا پر می‌شود...</div>
+            <div class="fake-editor" id="edit-desc">
+              توضیحات محصول (شامل معرفی، جدول مشخصات کلیدی، جدول مشخصات فنی و بهترین قیمت) اینجا قرار می‌گیرد...
+            </div>
+          </div>
+          <aside>
+            <div class="sidebar-metabox">
+              <h4>🛒 پر کردن از ترب (Shoper)</h4>
+              <input type="text" class="fake-input" placeholder="نام محصول..." id="meta-query" style="margin-bottom:8px;">
+              <button class="btn-search" style="width:100%;justify-content:center;padding:8px;" id="meta-search-btn">🔍 جستجو</button>
+              <div id="meta-results" style="margin-top:10px;"></div>
+              <div id="meta-status" class="status"></div>
+              <button class="btn btn-primary" id="meta-fill-btn" style="width:100%;margin-top:10px;display:none;padding:10px;">✅ پر کردن این محصول</button>
+            </div>
+          </aside>
+        </div>
+      </div>
+
+      <!-- ============ تب ۳: نتیجه ============ -->
+      <div class="tab-panel" id="tab-attrs">
+        <div class="shoper-card" style="margin:0;">
+          <h3>📋 نمونه ویژگی‌هایی که برای یک گوشی موبایل ساخته می‌شوند</h3>
+          <p class="ri-meta" style="margin-top:-6px;">
+            هر سطر یک <strong>attribute سراسری</strong> در ووکامرس است (اگر وجود نداشته باشد خودکار ساخته می‌شود).
+            این یعنی در فیلتر فروشگاه هم قابل استفاده خواهند بود.
+          </p>
+          <table class="attributes-table">
+            <thead>
+              <tr><th>نام ویژگی (نمایشی)</th><th>Slug (لاتین)</th><th>مقدار</th><th>وضعیت</th></tr>
+            </thead>
+            <tbody id="attrs-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ========== باکس دانلود ========== -->
+<section class="download-section" id="download">
+  <div class="download-card">
+    <div style="font-size:48px;margin-bottom:10px;">📦</div>
+    <h2>افزونه را دانلود و در ووکامرس نصب کنید</h2>
+    <p>
+      فایل ZIP آماده‌ی نصب است. از مسیر <strong>افزونه‌ها ← افزودن ← بارگذاری افزونه</strong>
+      آن را نصب و فعال کنید. سپس به منوی <strong>ووکامرس ← Shoper (از ترب)</strong> بروید.
+    </p>
+    <a href="../shoper-torob-importer.zip" class="btn-download" download>
+      ⬇ دانلود shoper-torob-importer.zip
+    </a>
+    <div class="download-meta">
+      <span>📦 نسخه ۱.۰.۰</span>
+      <span>📐 حدود ۳۸ کیلوبایت</span>
+      <span>🔌 سازگار با ووکامرس ۵.۰ تا ۹.۳+</span>
+      <span>🟢 پشتیبانی از HPOS</span>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div>ساخته‌شده با ❤️ برای ووکامرس فارسی — Shoper</div>
+  <div class="tech-badges">
+    <span>PHP 7.4+</span>
+    <span>WordPress 5.8+</span>
+    <span>WooCommerce 5.0+</span>
+    <span>سازگار با آخرین نسخه‌ها</span>
+  </div>
+</footer>
+
+<script>
+/* ============================================================
+   داده‌ی نمونه (برگرفته از API واقعی ترب)
+   ============================================================ */
+const DEMO_PRODUCTS = [
+  {
+    prk: "527b4e87-sample",
+    name1: "شارژر سامسونگ مدل EP-TA45 توان 45 وات",
+    name2: "Samsung 45W Travel Charger",
+    price: 2580000, priceText: "۲٫۵۸۰٫۰۰۰ تومان", shopText: "در ۱۵۵ فروشگاه",
+    image: "https://image.torob.com/base/images/RM/UZ/RMUZb-AayehdptmO.jpg",
+    gallery: [
+      "https://image.torob.com/base/images/RM/UZ/RMUZb-AayehdptmO.jpg",
+      "https://image.torob.com/base/images/CZ/Dy/CZDypDjQji0syXe6.avif"
+    ],
+    description: "شارژر اصلی سامسونگ با توان ۴۵ وات و پشتیبانی از فناوری Super Fast Charging 2.0، مناسب گوشی‌های سری گلکسی.",
+    specs: {
+      "برند":"Samsung","مدل":"EP-TA45","توان خروجی":"45 وات","نوع اتصال":"Type-C",
+      "ولتاژ ورودی":"100-240V","جریان خروجی":"3A","فناوری شارژ سریع":"Super Fast Charging 2.0",
+      "طول کابل":"1 متر","گارانتی":"18 ماهه شرکتی","وزن":"95 گرم"
+    }
+  },
+  {
+    prk: "153df520-sample",
+    name1: "گوشی موبایل سامسونگ گلکسی S25 FE 5G ظرفیت 256 رم 8 گیگابایت (ویتنام)",
+    name2: "Samsung Galaxy S25 FE 5G 256/8GB (Vietnam)",
+    price: 139000000, priceText: "۱۳۹٫۰۰۰٫۰۰۰ تومان", shopText: "در ۱۴۰ فروشگاه",
+    image: "https://image.torob.com/base/images/Jg/MD/JgMDpX4-IbV1Igji.webp",
+    gallery: [
+      "https://image.torob.com/base/images/Jg/MD/JgMDpX4-IbV1Igji.webp",
+      "https://image.torob.com/base/images/xF/UZ/xFUZ1PV10x0gDVG7.webp",
+      "https://image.torob.com/base/images/g-/_8/g-_8wjmo3JUWurC-.webp",
+      "https://image.torob.com/base/images/ag/-v/ag-vF7b9vwm7qMxC.webp",
+      "https://image.torob.com/base/images/3i/Zo/3iZo3vjr--q8dpE4.webp",
+      "https://image.torob.com/base/images/58/sK/58sK16oHARBxmzLc.webp"
+    ],
+    description: "گلکسی S25 FE با طراحی سبک، نمایشگر ۱۲۰ هرتزی، دوربین ۵۰ مگاپیکسلی و تراشه‌ی به‌روز سامسونگ، تجربه‌ی یک پرچمدار اقتصادی را ارائه می‌دهد.",
+    specs: {
+      "برند":"Samsung","مدل":"Galaxy S25 FE","وزن":"190 گرم","ابعاد":"156 × 74 × 7.8 میلی‌متر",
+      "جنس بدنه":"شیشه و آلومینیوم","رنگ":"آبی تیره","پردازنده":"Exynos 2400e","نوع شنا":"Octa-core",
+      "تعداد هسته":"8 هسته","فرکانس پردازنده":"2.9 گیگاهرتز","پردازنده گرافیکی":"Xclipse 940",
+      "حافظه داخلی":"256 گیگابایت","حافظه RAM":"8 گیگابایت","پشتیبانی از کارت حافظه":"ندارد",
+      "اندازه صفحه نمایش":"6.7 اینچ","نوع صفحه نمایش":"Super AMOLED","رزولوشن":"2340 × 1080",
+      "تراکم پیکسل":"393 ppi","نرخ نوسازی تصویر":"120 هرتز","محافظ صفحه":"Gorilla Glass Victus",
+      "دوربین اصلی":"50 مگاپیکسل","دوربین اولتراواید":"12 مگاپیکسل","دوربین تله‌فوتو":"8 مگاپیکسل",
+      "فیلم‌برداری":"4K@60fps","دوربین سلفی":"10 مگاپیکسل","ظرفیت باتری":"4500 میلی‌آمپر ساعت",
+      "شارژ سریع":"25 وات","شارژ بی‌سیم":"15 وات","سیستم‌عامل":"Android 15 (One UI 7)",
+      "شبکه‌های ارتباطی":"5G, 4G LTE","Wi-Fi":"Wi-Fi 6E","بلوتوث":"5.3","NFC":"دارد",
+      "درگاه ارتباطی":"USB Type-C","حسگر اثر انگشت":"زیر صفحه","تشخیص چهره":"دارد",
+      "گواهی ضدآب":"IP67","گارانتی":"18 ماهه شرکتی"
+    }
+  },
+  {
+    prk: "9bcf3364-sample",
+    name1: "گوشی موبایل سامسونگ گلکسی S26 Ultra 5G ظرفیت 256 رم 12 گیگابایت",
+    name2: "Samsung Galaxy S26 Ultra 512/12GB",
+    price: 265900000, priceText: "۲۶۵٫۹۰۰٫۰۰۰ تومان", shopText: "در ۹۸ فروشگاه",
+    image: "https://image.torob.com/base/images/ig/uG/iguGCcfuIatx1Qeo.webp",
+    gallery: [
+      "https://image.torob.com/base/images/ig/uG/iguGCcfuIatx1Qeo.webp",
+      "https://image.torob.com/base/images/o7/i8/o7i8s9kA3-B4LQct.webp",
+      "https://image.torob.com/base/images/VH/zw/VHzw-f3QePrBkcnE.webp"
+    ],
+    description: "گلکسی S26 Ultra با قلم S Pen، دوربین ۲۰۰ مگاپیکسلی، نمایشگر 144 هرتزی و بدنه‌ی تیتانیومی، قدرتمندترین گوشی سامسونگ است.",
+    specs: {
+      "برند":"Samsung","مدل":"Galaxy S26 Ultra","وزن":"221 گرم","جنس بدنه":"تیتانیوم",
+      "پردازنده":"Snapdragon 8 Elite","نوع شنا":"Octa-core (3nm)","تعداد هسته":"8 هسته",
+      "پردازنده گرافیکی":"Adreno 830","حافظه داخلی":"512 گیگابایت","حافظه RAM":"12 گیگابایت",
+      "اندازه صفحه نمایش":"6.9 اینچ","نوع صفحه نمایش":"Dynamic AMOLED 2X","نرخ نوسازی تصویر":"144 هرتز",
+      "دوربین اصلی":"200 مگاپیکسل","ظرفیت باتری":"5500 میلی‌آمپر ساعت","شارژ سریع":"45 وات",
+      "سیستم‌عامل":"Android 16","گواهی ضدآب":"IP68","گارانتی":"18 ماهه شرکتی"
+    }
+  }
+];
+
+/* پیش‌تعریف جدول تب ۳ */
+function fillAttrsTable(specs){
+  const tbody = document.getElementById('attrs-table-body');
+  tbody.innerHTML = '';
+  const map = {
+    "برند":"brand","مدل":"model","وزن":"weight","پردازنده":"processor","نوع شنا":"chipset-architecture",
+    "حافظه داخلی":"storage","حافظه RAM":"ram","اندازه صفحه نمایش":"screen-size",
+    "نوع صفحه نمایش":"screen-type","دوربین اصلی":"main-camera","ظرفیت باتری":"battery-capacity",
+    "شارژ سریع":"fast-charging","سیستم‌عامل":"os","بلوتوث":"bluetooth","گواهی ضدآب":"water-resistance"
+  };
+  Object.entries(specs).forEach(([k,v])=>{
+    const slug = map[k] || ('spec-' + btoa(unescape(encodeURIComponent(k))).slice(0,8).toLowerCase());
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${k}</td><td class="pa-slug">pa_${slug}</td><td>${v}</td><td class="check">✓ ساخته شد</td>`;
+    tbody.appendChild(tr);
+  });
+}
+fillAttrsTable(DEMO_PRODUCTS[1].specs);
+
+/* ============================================================
+   ابزارها
+   ============================================================ */
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+function esc(s){ const d=document.createElement('div'); d.textContent=s==null?'':s; return d.innerHTML; }
+function numFormat(n){ return String(n).replace(/\B(?=(\d{3})+(?!\d))/g,'٬'); }
+function setStatus(el, msg, type){
+  el.className = 'status ' + (type||'');
+  el.innerHTML = msg;
+}
+function galleryHtml(g){ return g.map(u=>`<img src="${u}" alt="">`).join(''); }
+
+function renderResults(container, products, onSelect){
+  container.innerHTML = products.map((p,i)=>`
+    <div class="result-item" data-idx="${i}">
+      <img src="${p.image}" alt="">
+      <div class="ri-info">
+        <div class="ri-name">${esc(p.name1)}</div>
+        <div class="ri-meta">${esc(p.name2)} | ${esc(p.shopText)} | ${p.gallery.length} تصویر</div>
+      </div>
+      <div class="ri-price">${esc(p.priceText)}</div>
+    </div>`).join('');
+  container.querySelectorAll('.result-item').forEach(el=>{
+    el.addEventListener('click',()=>{
+      container.querySelectorAll('.result-item').forEach(x=>x.classList.remove('selected'));
+      el.classList.add('selected');
+      onSelect(products[+el.dataset.idx]);
+    });
+  });
+}
+
+function renderPreview(p){
+  $('#demo-preview').innerHTML = `
+    <div class="preview-header">
+      <img class="preview-img" src="${p.image}" alt="">
+      <div style="flex:1;min-width:240px;">
+        <div class="field-group">
+          <label>نام محصول</label>
+          <input type="text" id="pv-name" value="${esc(p.name1)}">
+        </div>
+        <div class="field-group">
+          <label>نام انگلیسی</label>
+          <input type="text" value="${esc(p.name2)}" readonly>
+        </div>
+        <div class="field-group">
+          <label>قیمت (ارزان‌ترین فروشنده از ${esc(p.shopText)})</label>
+          <input type="text" value="${numFormat(p.price)} تومان" readonly>
+        </div>
+        <div>
+          <span class="badge badge-purple">${p.gallery.length} تصویر در گالری</span>
+          <span class="badge badge-blue">${Object.keys(p.specs).length} مشخصه فنی</span>
+          <span class="badge badge-green">دانلود در Media Library</span>
+        </div>
+        <div class="gallery-thumbs">${galleryHtml(p.gallery)}</div>
+      </div>
+    </div>
+    <div class="field-group">
+      <label>توضیحات (شامل جدول مشخصات — قابل ویرایش)</label>
+      <textarea id="pv-desc">${esc(p.description)}
+
+[جدول کامل مشخصات فنی در اینجا درج می‌شود]</textarea>
+    </div>
+    <div class="field-group">
+      <label>مشخصات فنی — هر کدام یک ویژگی مجزا (${Object.keys(p.specs).length})</label>
+      <div class="specs-list">
+        ${Object.entries(p.specs).map(([k,v],i)=>`
+          <div class="spec-item">
+            <label><input type="checkbox" class="spec-check" value="${esc(k)}" checked>
+              <span class="spec-key">${esc(k)}</span>
+              <span class="spec-val">${esc(v)}</span>
+            </label>
+          </div>`).join('')}
+      </div>
+    </div>`;
+  $('#demo-preview-card').style.display = 'block';
+  $('#demo-create-btn').style.display = 'inline-flex';
+  $('#demo-preview-card').scrollIntoView({behavior:'smooth', block:'start'});
+  fillAttrsTable(p.specs);
+}
+
+/* ============================================================
+   رویدادهای تب
+   ============================================================ */
+$$('.tab').forEach(t=>{
+  t.addEventListener('click',()=>{
+    $$('.tab').forEach(x=>x.classList.remove('active'));
+    $$('.tab-panel').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    $('#'+t.dataset.tab).classList.add('active');
+    const urls = {
+      'tab-main':'yoursite.com/wp-admin/admin.php?page=shoper',
+      'tab-edit':'yoursite.com/wp-admin/post-new.php?post_type=product',
+      'tab-attrs':'yoursite.com/wp-admin/edit.php?post_type=product&page=product_attributes'
+    };
+    $('#browserUrl').textContent = urls[t.dataset.tab];
+  });
+});
+
+/* ============================================================
+   تب ۱: جستجو و ساخت
+   ============================================================ */
+function doSearch(btn, query, resultsEl, statusEl, onResult){
+  if(!query.trim()){ setStatus(statusEl,'لطفاً نام محصول را وارد کنید.','error'); return; }
+  btn.disabled = true;
+  setStatus(statusEl,'<span class="spinner"></span> در حال جستجو در ترب...','loading');
+  setTimeout(()=>{
+    btn.disabled = false;
+    setStatus(statusEl,'','');
+    resultsEl.innerHTML = '';
+    renderResults(resultsEl, DEMO_PRODUCTS, onResult);
+  }, 700);
+}
+
+$('#demo-search-btn').addEventListener('click',()=>{
+  doSearch($('#demo-search-btn'), $('#demo-query').value, $('#demo-results'), $('#demo-status'), p=>{
+    renderPreview(p);
+  });
+});
+$('#demo-query').addEventListener('keypress',e=>{ if(e.key==='Enter') $('#demo-search-btn').click(); });
+
+let selectedProduct = null;
+$('#demo-create-btn').addEventListener('click',()=>{
+  const btn = $('#demo-create-btn');
+  btn.disabled = true;
+  setStatus($('#demo-status'),'<span class="spinner"></span> در حال ساخت محصول در ووکامرس...','loading');
+  setTimeout(()=>{
+    const checked = $$('.spec-check:checked').length;
+    btn.disabled = false;
+    setStatus($('#demo-status'),
+      `<div class="success-box">
+        <h4>✅ محصول با موفقیت ساخته شد!</h4>
+        <p>تعداد ویژگی‌های ثبت‌شده: <strong>${checked}</strong></p>
+        <p>تصاویر: <strong>گالری کامل به Media Library دانلود و به محصول وصل شد.</strong></p>
+        <p>وضعیت: <strong>پیش‌نویس</strong> (می‌توانید قبل از انتشار ویرایش کنید)</p>
+        <p style="margin-top:8px;"><a class="btn btn-primary" href="#">ویرایش محصول</a></p>
+      </div>`,'success');
+    btn.style.display = 'none';
+  }, 900);
+});
+
+/* ============================================================
+   تب ۲: متاباکس ویرایش محصول
+   ============================================================ */
+$('#meta-search-btn').addEventListener('click',()=>{
+  doSearch($('#meta-search-btn'), $('#meta-query').value || 's25', $('#meta-results'), $('#meta-status'), p=>{
+    selectedProduct = p;
+    $('#meta-fill-btn').style.display = 'block';
+    setStatus($('#meta-status'),
+      `<strong>${esc(p.name1)}</strong> انتخاب شد. روی «پر کردن این محصول» بزنید.`, 'success');
+  });
+});
+
+$('#meta-fill-btn').addEventListener('click',()=>{
+  if(!selectedProduct) return;
+  const btn = $('#meta-fill-btn');
+  btn.disabled = true;
+  setStatus($('#meta-status'),'<span class="spinner"></span> در حال پر کردن محصول...','loading');
+  setTimeout(()=>{
+    $('#edit-title').textContent = selectedProduct.name1;
+    $('#edit-desc').innerHTML =
+      '<p>'+esc(selectedProduct.description)+'</p>'+
+      '<h4>مشخصات فنی</h4>'+
+      '<table>'+
+        Object.entries(selectedProduct.specs).slice(0,8).map(([k,v])=>
+          '<tr><th>'+esc(k)+'</th><td>'+esc(v)+'</td></tr>').join('')+
+      '</table>'+
+      '<p style="margin-top:12px;color:#00a32a;">✅ تمام فیلدها پر شد. تصاویر به Media Library دانلود و به محصول وصل شد.</p>';
+    setStatus($('#meta-status'),'✅ محصول پر شد! برای ذخیره‌ی نهایی، دکمه‌ی «به‌روزرسانی» را بزنید.','success');
+    btn.disabled = false;
+    fillAttrsTable(selectedProduct.specs);
+  }, 900);
+});
+
+/* رادیوی حالت ورودی در دموی اصلی */
+$$('input[name="demo_mode"]').forEach(r=>{
+  r.addEventListener('change',()=>{
+    if(r.value==='url'){
+      $('#demo-query').type='url';
+      $('#demo-query').placeholder='https://torob.com/p/...';
+    } else {
+      $('#demo-query').type='text';
+      $('#demo-query').placeholder='مثال: گوشی سامسونگ S25 Ultra';
+    }
+  });
+});
+</script>
+
+</body>
+</html>

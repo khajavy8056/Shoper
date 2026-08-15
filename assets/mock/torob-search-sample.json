@@ -1,0 +1,88 @@
+{
+  "count": 1243,
+  "results": [
+    {
+      "random_key": "153df520-3821-4053-ba6c-b55dbdd32f1a",
+      "name1": "گوشی سامسونگ (ویتنام) S25 FE 5G | حافظه 256 رم 8 گیگابایت",
+      "name1_max_lines": 3,
+      "name2": "Samsung Galaxy S25 FE 5G (Vietnam) 256/8 GB",
+      "more_info_url": "https://api.torob.com/v4/base-product/details/?source=next_desktop&discover_method=browse&search_id=TEST_SID_001&prk=153df520-3821-4053-ba6c-b55dbdd32f1a",
+      "web_client_absolute_url": "/p/153df520-3821-4053-ba6c-b55dbdd32f1a/",
+      "price": 139000000,
+      "price_prefix": "cheapest",
+      "price_text": "از ۱۳۹٫۰۰۰٫۰۰۰ تومان",
+      "price_text_mode": "active",
+      "shop_text": "در ۱۴۰ فروشگاه",
+      "stock_status": "",
+      "is_adv": false,
+      "card_type": "default",
+      "image_url": "https://image.torob.com/base/images/Jg/MD/JgMDpX4-IbV1Igji.webp",
+      "image_count": 6,
+      "media_urls": [
+        { "type": "image", "url": "https://image.torob.com/base/images/Jg/MD/JgMDpX4-IbV1Igji.webp" },
+        { "type": "image", "url": "https://image.torob.com/base/images/xF/UZ/xFUZ1PV10x0gDVG7.webp" },
+        { "type": "image", "url": "https://image.torob.com/base/images/g-/_8/g-_8wjmo3JUWurC-.webp" },
+        { "type": "image", "url": "https://image.torob.com/base/images/ag/-v/ag-vF7b9vwm7qMxC.webp" },
+        { "type": "image", "url": "https://image.torob.com/base/images/3i/Zo/3iZo3vjr--q8dpE4.webp" },
+        { "type": "image", "url": "https://image.torob.com/base/images/58/sK/58sK16oHARBxmzLc.webp" }
+      ],
+      "has_wiki": true,
+      "is_authentic": false,
+      "badges": [],
+      "discount_info": []
+    },
+    {
+      "random_key": "9bcf3364-2387-42ab-b712-bfc6c429ab07",
+      "name1": "گوشی سامسونگ S26 Ultra 5G | حافظه 256 رم 12 گیگابایت",
+      "name1_max_lines": 3,
+      "name2": "Samsung Galaxy S26 Ultra 5G 256/12 GB",
+      "more_info_url": "https://api.torob.com/v4/base-product/details/?source=next_desktop&discover_method=browse&search_id=TEST_SID_001&prk=9bcf3364-2387-42ab-b712-bfc6c429ab07",
+      "web_client_absolute_url": "/p/9bcf3364-2387-42ab-b712-bfc6c429ab07/",
+      "price": 265900000,
+      "price_prefix": "cheapest",
+      "price_text": "از ۲۶۵٫۹۰۰٫۰۰۰ تومان",
+      "price_text_mode": "active",
+      "shop_text": "در ۹۸ فروشگاه",
+      "is_adv": false,
+      "image_url": "https://image.torob.com/base/images/ig/uG/iguGCcfuIatx1Qeo.webp",
+      "image_count": 7,
+      "media_urls": [
+        { "type": "image", "url": "https://image.torob.com/base/images/ig/uG/iguGCcfuIatx1Qeo.webp" },
+        { "type": "image", "url": "https://image.torob.com/base/images/o7/i8/o7i8s9kA3-B4LQct.webp" },
+        { "type": "image", "url": "https://image.torob.com/base/images/VH/zw/VHzw-f3QePrBkcnE.webp" }
+      ],
+      "has_wiki": false,
+      "is_authentic": false,
+      "badges": [],
+      "discount_info": []
+    },
+    {
+      "random_key": "527b4e87-284b-4ad6-ade7-35af9656205b",
+      "name1": "شارژر سامسونگ مدل EP-TA845 توان 45 وات سه پین همراه کابل",
+      "name1_max_lines": 3,
+      "name2": "Charger Samsung EP-TA845 45W Three Pin With Cable",
+      "more_info_url": "https://api.torob.com/v4/base-product/details/?source=next_desktop&discover_method=browse&search_id=TEST_SID_001&prk=527b4e87-284b-4ad6-ade7-35af9656205b",
+      "web_client_absolute_url": "/p/527b4e87-284b-4ad6-ade7-35af9656205b/",
+      "price": 2580000,
+      "price_prefix": "cheapest",
+      "price_text": "از ۲٫۵۸۰٫۰۰۰ تومان",
+      "price_text_mode": "active",
+      "shop_text": "در ۱۵۵ فروشگاه",
+      "is_adv": true,
+      "image_url": "https://image.torob.com/base/images/RM/UZ/RMUZb-AayehdptmO.jpg",
+      "image_count": 2,
+      "media_urls": [
+        { "type": "image", "url": "https://image.torob.com/base/images/RM/UZ/RMUZb-AayehdptmO.jpg" },
+        { "type": "image", "url": "https://image.torob.com/base/images/CZ/Dy/CZDypDjQji0syXe6.avif" }
+      ],
+      "has_wiki": true,
+      "is_authentic": true,
+      "badges": [],
+      "discount_info": []
+    }
+  ],
+  "next": "https://api.torob.com/v4/base-product/search/?page=1&size=5&query=s25%20ultra",
+  "categories": [
+    { "id": "94", "slug": "گوشی-موبایل-mobile", "title": "گوشی موبایل", "cat_id": 94 }
+  ]
+}
