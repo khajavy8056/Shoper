@@ -211,3 +211,277 @@
 @keyframes shoper-spin { to { transform: rotate(360deg); } }
 
 #shoper-test-conn { margin-top: 6px; }
+
+/* ==========================================================================
+   نوار پیشنهاد نام محصول (autocomplete)
+   ========================================================================== */
+
+.shoper-suggest-wrap {
+	position: relative;
+	display: inline-block;
+	width: 100%;
+	max-width: 100%;
+}
+
+.shoper-suggest {
+	position: absolute;
+	top: 100%;
+	right: 0;
+	left: 0;
+	z-index: 100000;
+	max-height: 340px;
+	overflow-y: auto;
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	border-top: none;
+	border-radius: 0 0 4px 4px;
+	box-shadow: 0 6px 18px rgba(0, 0, 0, .12);
+	text-align: right;
+}
+
+.shoper-suggest-item {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 8px 10px;
+	cursor: pointer;
+	border-bottom: 1px solid #f0f0f1;
+}
+
+.shoper-suggest-item:last-child {
+	border-bottom: none;
+}
+
+.shoper-suggest-item:hover,
+.shoper-suggest-item.active {
+	background: #f0f6fc;
+}
+
+.shoper-suggest-thumb {
+	width: 40px;
+	height: 40px;
+	object-fit: contain;
+	flex: 0 0 40px;
+	background: #fafafa;
+	border: 1px solid #f0f0f1;
+	border-radius: 4px;
+}
+
+.shoper-suggest-thumb-empty {
+	display: inline-block;
+}
+
+.shoper-suggest-text {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.shoper-suggest-name {
+	font-size: 13px;
+	line-height: 1.5;
+	color: #1d2327;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.shoper-suggest-name mark {
+	background: #fcf0cd;
+	color: inherit;
+	padding: 0 1px;
+	border-radius: 2px;
+}
+
+.shoper-suggest-meta {
+	font-size: 11px;
+	color: #787c82;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.shoper-suggest-price {
+	font-size: 12px;
+	color: #2271b1;
+	white-space: nowrap;
+	flex: 0 0 auto;
+}
+
+.shoper-suggest-loading,
+.shoper-suggest-empty {
+	padding: 10px 12px;
+	font-size: 12px;
+	color: #787c82;
+}
+
+/* ==========================================================================
+   جدول فروشندگان در پیش‌نمایش
+   ========================================================================== */
+
+.shoper-sellers-preview {
+	width: 100%;
+	border-collapse: collapse;
+	margin: 6px 0;
+	font-size: 12px;
+}
+
+.shoper-sellers-preview th,
+.shoper-sellers-preview td {
+	padding: 6px 8px;
+	border: 1px solid #e5e5e5;
+	text-align: right;
+}
+
+.shoper-sellers-preview thead th {
+	background: #f6f7f7;
+	font-weight: 600;
+}
+
+.shoper-sellers-preview tr.primary {
+	background: #f0f6fc;
+}
+
+.shoper-badge {
+	display: inline-block;
+	background: #2271b1;
+	color: #fff;
+	font-size: 10px;
+	padding: 1px 6px;
+	border-radius: 10px;
+	margin-right: 4px;
+}
+
+/* ------------------------------------------------------------------ */
+/* نوار مراحل (Stepper)                                                */
+/* ------------------------------------------------------------------ */
+.shoper-stepper {
+	display: flex;
+	gap: 6px;
+	margin-bottom: 16px;
+	background: #f6f7f7;
+	border: 1px solid #e5e5e5;
+	border-radius: 6px;
+	padding: 8px;
+}
+.shoper-step {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex: 1;
+	padding: 8px 10px;
+	border-radius: 4px;
+	cursor: pointer;
+	background: #fff;
+	border: 1px solid #e5e5e5;
+	color: #50575e;
+	font-weight: 600;
+	transition: all .15s;
+}
+.shoper-step.is-active {
+	background: #2271b1;
+	border-color: #2271b1;
+	color: #fff;
+}
+.shoper-step.is-done {
+	background: #edfaef;
+	border-color: #b8e6bf;
+	color: #1a7f37;
+}
+.shoper-step-num {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	border-radius: 50%;
+	background: #e5e5e5;
+	color: #50575e;
+	font-size: 12px;
+	flex: 0 0 auto;
+}
+.shoper-step.is-active .shoper-step-num,
+.shoper-step.is-done .shoper-step-num {
+	background: rgba(255, 255, 255, .85);
+}
+.shoper-step-count {
+	margin-left: auto;
+	background: #fff;
+	border: 1px solid #c5d9ed;
+	color: #2271b1;
+	font-size: 11px;
+	padding: 0 7px;
+	border-radius: 10px;
+}
+
+/* ------------------------------------------------------------------ */
+/* انتخاب تصاویر                                                       */
+/* ------------------------------------------------------------------ */
+.shoper-img-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+	gap: 10px;
+}
+.shoper-img-item {
+	border: 1px solid #e5e5e5;
+	border-radius: 6px;
+	overflow: hidden;
+	background: #fafafa;
+}
+.shoper-img-thumb {
+	height: 120px;
+	overflow: hidden;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: #fff;
+}
+.shoper-img-thumb img {
+	max-width: 100%;
+	max-height: 100%;
+	object-fit: contain;
+}
+.shoper-img-controls {
+	padding: 6px 8px;
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	font-size: 12px;
+}
+.shoper-img-controls label {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	margin: 0;
+	cursor: pointer;
+}
+
+/* ------------------------------------------------------------------ */
+/* نوار پیشرفت                                                         */
+/* ------------------------------------------------------------------ */
+.shoper-progress {
+	margin-top: 16px;
+	padding: 12px;
+	border: 1px solid #e5e5e5;
+	border-radius: 6px;
+	background: #fafafa;
+}
+.shoper-progress-track {
+	height: 14px;
+	background: #e5e5e5;
+	border-radius: 8px;
+	overflow: hidden;
+}
+.shoper-progress-bar {
+	height: 100%;
+	width: 0;
+	background: linear-gradient(90deg, #2271b1, #00a32a);
+	border-radius: 8px;
+	transition: width .4s ease;
+}
+.shoper-progress-label {
+	margin-top: 6px;
+	font-size: 12px;
+	color: #50575e;
+}
