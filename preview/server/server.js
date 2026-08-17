@@ -414,6 +414,96 @@ const handlers = {
 		}
 	},
 
+	/**
+	 * شبیه‌سازی «پر کردن محصول موجود» از متاباکس صفحه‌ی ویرایش محصول.
+	 *
+	 * آینه‌ی Shoper_Product_Builder::fill_product. در وردپرس واقعی این داده‌ها
+	 * مستقیماً روی WC_Product موجود نوشته می‌شود؛ اینجا فقط نشان می‌دهیم هر
+	 * داده به کدام فیلد ووکامرس می‌رود.
+	 */
+	async shoper_fill(params, res) {
+		const postId = parseInt(params.get('post_id') || '0', 10);
+		const prk = (params.get('prk') || '').trim();
+		if (!postId || !prk) return fail(res, 'شناسه محصول یا post_id نامعتبر است.');
+
+		const mode = params.get('data_mode') || 'auto';
+		const limit = parseInt(params.get('seller_limit') || '3', 10);
+		const strategy = params.get('seller_strategy') || 'score';
+
+		let selectedImages = null;
+		try {
+			const raw = params.get('selected_images');
+			if (raw) selectedImages = JSON.parse(raw);
+		} catch (e) { /* ignore */ }
+		let featuredImage = parseInt(params.get('featured_image') || '0', 10);
+		if (isNaN(featuredImage)) featuredImage = 0;
+
+		const seoTitle = params.get('seo_title') || '';
+		const seoDesc = params.get('seo_desc') || '';
+		let tags = null;
+		try {
+			const raw = params.get('tags');
+			if (raw) tags = JSON.parse(raw);
+		} catch (e) { /* ignore */ }
+
+		try {
+			const out = await getDetails(prk, params.get('search_id') || '', mode);
+			const data = out.data;
+			data.aggregate = logic.aggregate(data.sellers, limit, strategy);
+			if (data.aggregate.price) data.price = data.aggregate.price;
+
+			const built = logic.buildAttributes(data.specs);
+			const description = logic.buildDescriptionHtml(data);
+			const shortDescription = logic.buildShortDescription(data);
+			const seo = logic.buildSeo(data);
+			const finalTitle = seoTitle || seo.title;
+			const finalDesc = seoDesc || seo.description;
+			const finalTags = (Array.isArray(tags) && tags.length) ? tags : seo.tags;
+
+			const total = (data.gallery || []).length;
+			let indices = [];
+			if (Array.isArray(selectedImages) && selectedImages.length) {
+				indices = selectedImages.filter((i) => Number.isInteger(i) && i >= 0 && i < total);
+			} else {
+				indices = [];
+				for (let i = 0; i < total; i++) indices.push(i);
+			}
+			if (!indices.includes(featuredImage)) featuredImage = indices[0];
+			const fileBase = logic.fileBase(data.name1);
+			const filenames = indices.map((_, idx) => fileBase + '-' + (idx + 1));
+			const keptUrls = indices.map((i) => data.gallery[i]);
+
+			ok(res, {
+				simulated: true,
+				message: 'محصول با موفقیت از ترب پر شد. برای ذخیره‌ی نهایی دکمه‌ی «به‌روزرسانی» را بزنید.',
+				post_id: postId,
+				specs_count: Object.keys(data.specs).length,
+				attr_errors: built.errors,
+				reload: true,
+				filenames,
+				// فیلدهای ووکامرس که پر می‌شوند:
+				wc_fields: {
+					title: data.name1,                                  // ← فیلد عنوان محصول
+					short_description: shortDescription,                // ← تب «توضیح کوتاه»
+					description,                                        // ← تب «توضیحات»
+					regular_price: data.price,                          // ← فیلد قیمت عادی (General)
+					sku: 'TRB-' + data.random_key,                      // ← فیلد SKU (Inventory)
+					attributes: built.attrs,                            // ← تب «ویژگی‌ها»
+					images: {
+						featured: keptUrls[0] || '',                     // ← تصویر شاخص
+						gallery: keptUrls.slice(1),                      // ← گالری
+						filenames,
+					},
+					tags: finalTags,                                    // ← برچسب‌های محصول (product_tag)
+					seo: { title: finalTitle, description: finalDesc }, // ← متادیتای سئو / Yoast
+				},
+				_source: out.source,
+			});
+		} catch (err) {
+			fail(res, err.message);
+		}
+	},
+
 	async shoper_test_connection(params, res) {
 		const mode = params.get('data_mode') || 'auto';
 		if (mode === 'fixture') {

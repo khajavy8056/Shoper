@@ -6,6 +6,7 @@
   "scripts": {
     "preview": "node preview/server/server.js",
     "test": "node preview/test-ui.js",
+    "test:editor": "node preview/test-editor.js",
     "verify": "node preview/verify-create.js",
     "build": "node scripts/build.js"
   },
