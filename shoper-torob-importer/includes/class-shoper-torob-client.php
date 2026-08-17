@@ -27,6 +27,7 @@ class Shoper_Torob_Client {
 	const API_BASE   = 'https://api.torob.com';
 	const SEARCH_URL = '/v4/base-product/search/';
 	const DETAIL_URL = '/v4/base-product/details/';
+	const DETAIL_CLICK_URL = '/v4/base-product/details-log-click/';
 
 	/**
 	 * منبع داده: direct | mock.
@@ -174,17 +175,36 @@ class Shoper_Torob_Client {
 	/**
 	 * دریافت جزئیات کامل یک محصول.
 	 *
-	 * تست زنده نشان داد search_id اجباری نیست؛ اگر موجود بود ارسال می‌شود.
+	 * چند استراتژی به ترتیب امتحان می‌شوند تا اولین مورد موفق برگردد.
+	 * این کار خطای «کد 490» (پاسخ غیرمنتظره از ترب) را که معمولاً به‌خاطر
+	 * search_id نادرست/منقضی یا مسدودسازی موقتی رخ می‌دهد، دور می‌زند:
 	 *
-	 * @param string $prk       شناسه‌ی محصول (random_key).
-	 * @param string $search_id شناسه‌ی جستجو (اختیاری).
+	 *   ۱) لینک کامل more_info_url (دقیقاً همان آدرسی که ترب در نتایج جستجو داد).
+	 *   ۲) اندپوینت details با prk + source (+ search_id در صورت وجود).
+	 *   ۳) اندپوینت details بدون search_id (تست زنده نشان داد کار می‌کند).
+	 *   ۴) اندپوینت details-log-click (به search_id نیاز ندارد).
+	 *
+	 * @param string $prk           شناسه‌ی محصول (random_key).
+	 * @param string $search_id     شناسه‌ی جستجو (اختیاری).
+	 * @param string $more_info_url لینک کامل جزئیات برگردانده‌شده در نتایج جستجو.
 	 * @return array|WP_Error
 	 */
-	public function details( $prk, $search_id = '' ) {
+	public function details( $prk, $search_id = '', $more_info_url = '' ) {
 		if ( 'mock' === $this->source ) {
 			return $this->load_mock( 'torob-details-sample.json' );
 		}
 
+		$candidates = array();
+
+		// ۱) لینک کامل more_info_url — مطمئن‌ترین روش چون تمام پارامترها را دارد.
+		if ( $more_info_url && $this->is_details_url( $more_info_url ) ) {
+			$normalized = $this->normalize_api_url( $more_info_url );
+			if ( $normalized ) {
+				$candidates[] = $normalized;
+			}
+		}
+
+		// ۲) اندپوینت استاندارد details با prk + source (+ search_id در صورت وجود).
 		$args = array(
 			'prk'    => $prk,
 			'source' => 'next_desktop',
@@ -192,13 +212,40 @@ class Shoper_Torob_Client {
 		if ( ! empty( $search_id ) ) {
 			$args['search_id'] = $search_id;
 		}
+		$candidates[] = add_query_arg( $args, self::API_BASE . self::DETAIL_URL );
 
-		$url  = add_query_arg( $args, self::API_BASE . self::DETAIL_URL );
-		$data = $this->request( $url );
-		if ( is_wp_error( $data ) ) {
-			return $data;
+		// ۳) اندپوینت details بدون search_id (تست زنده تأیید کرده که کار می‌کند).
+		$candidates[] = add_query_arg(
+			array(
+				'prk'    => $prk,
+				'source' => 'next_desktop',
+			),
+			self::API_BASE . self::DETAIL_URL
+		);
+
+		// ۴) اندپوینت details-log-click — جایگزین بدون نیاز به search_id.
+		$candidates[] = add_query_arg(
+			array(
+				'prk'             => $prk,
+				'source'          => 'next_desktop',
+				'discover_method' => 'browse',
+				'_bt__experiment' => '',
+			),
+			self::API_BASE . self::DETAIL_CLICK_URL
+		);
+
+		$candidates = array_values( array_unique( $candidates ) );
+		$last       = null;
+
+		foreach ( $candidates as $url ) {
+			$data = $this->request( $url );
+			if ( ! is_wp_error( $data ) ) {
+				return $this->normalize_details( $data );
+			}
+			$last = $data;
 		}
-		return $this->normalize_details( $data );
+
+		return $last;
 	}
 
 	/**
@@ -230,6 +277,41 @@ class Shoper_Torob_Client {
 	 */
 	public function get_details_from_url( $page_url ) {
 		return $this->details_from_url( $page_url );
+	}
+
+	/**
+	 * بررسی اینکه URL داده‌شده متعلق به اندپوینت جزئیات ترب است.
+	 *
+	 * @param string $url لینک.
+	 * @return bool
+	 */
+	private function is_details_url( $url ) {
+		return false !== strpos( (string) $url, '/base-product/details' );
+	}
+
+	/**
+	 * تبدیل لینک نسبی API به آدرس کامل.
+	 *
+	 * more_info_url در نتایج جستجو گاهی مطلق (https://api.torob.com/...)
+	 * و گاهی نسبی (/v4/base-product/details/...) است.
+	 *
+	 * @param string $url لینک مطلق یا نسبی.
+	 * @return string
+	 */
+	private function normalize_api_url( $url ) {
+		$url = trim( (string) $url );
+		if ( preg_match( '#^https?://#i', $url ) ) {
+			// فقط دامنه‌های مجاز ترب (جلوگیری از SSRF).
+			$host = wp_parse_url( $url, PHP_URL_HOST );
+			if ( ! $host || ! preg_match( '#(^|\.)torob\.(com|ir)$#i', $host ) ) {
+				return '';
+			}
+			return $url;
+		}
+		if ( 0 === strpos( $url, '/' ) ) {
+			return self::API_BASE . $url;
+		}
+		return self::API_BASE . '/' . $url;
 	}
 
 	/* --------------------------------------------------------------------- */
@@ -271,6 +353,9 @@ class Shoper_Torob_Client {
 
 		if ( 429 === $code ) {
 			return new WP_Error( 'rate_limited', 'ترب تعداد درخواست‌ها را محدود کرده است. کمی بعد دوباره تلاش کنید.' );
+		}
+		if ( 403 === $code || 490 === $code ) {
+			return new WP_Error( 'blocked', 'ترب این درخواست را مسدود کرد. افزونه روش دیگری را امتحان می‌کند.' );
 		}
 		if ( 200 !== $code ) {
 			return new WP_Error( 'http_error', "پاسخ غیرمنتظره از ترب (کد $code)." );

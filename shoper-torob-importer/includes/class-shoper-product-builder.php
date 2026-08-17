@@ -79,15 +79,18 @@ class Shoper_Product_Builder {
 	/**
 	 * گرفتن داده‌ی کامل برای پیش‌نمایش.
 	 *
-	 * @param string $prk       شناسه.
-	 * @param string $search_id شناسه جستجو.
+	 * @param string $prk           شناسه.
+	 * @param string $search_id     شناسه جستجو.
+	 * @param string $more_info_url لینک کامل جزئیات (از نتایج جستجو).
 	 * @return array|WP_Error
 	 */
-	public function preview( $prk, $search_id = '' ) {
-		$data = $this->client->details( $prk, $search_id );
+	public function preview( $prk, $search_id = '', $more_info_url = '' ) {
+		$data = $this->client->details( $prk, $search_id, $more_info_url );
 		if ( is_wp_error( $data ) ) {
 			return $data;
 		}
+		// نگه‌داشتن لینک جزئیات برای استفاده‌ی مجدد در مرحله‌ی ساخت/پر کردن.
+		$data['more_info_url'] = $more_info_url;
 		return $this->finalize( $data );
 	}
 

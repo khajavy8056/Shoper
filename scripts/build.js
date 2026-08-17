@@ -13,7 +13,7 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-const VERSION = process.env.SHOPER_VERSION || '1.2.0';
+const VERSION = process.env.SHOPER_VERSION || '1.2.1';
 const ROOT = path.resolve(__dirname, '..');
 const PLUGIN_DIR = path.join(ROOT, 'shoper-torob-importer');
 const BUILD_DIR = path.join(ROOT, 'build');

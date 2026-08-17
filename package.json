@@ -1,6 +1,6 @@
 {
   "name": "shoper-preview",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "private": true,
   "description": "سرور پیش‌نمایش و تست افزونه‌ی Shoper (درون‌ریز محصول از ترب برای ووکامرس)",
   "scripts": {
