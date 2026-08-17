@@ -16,8 +16,7 @@ if ( isset( $_POST['shoper_save_settings'] ) && check_admin_referer( 'shoper_set
 		'shoper_product_status' => isset( $_POST['product_status'] ) ? sanitize_text_field( wp_unslash( $_POST['product_status'] ) ) : 'draft',
 		'shoper_import_gallery' => isset( $_POST['import_gallery'] ) ? 'yes' : 'no',
 		'shoper_price_behavior' => isset( $_POST['price_behavior'] ) ? sanitize_text_field( wp_unslash( $_POST['price_behavior'] ) ) : 'cheapest',
-		'shoper_seller_limit'   => isset( $_POST['seller_limit'] ) ? max( 1, min( 10, absint( $_POST['seller_limit'] ) ) ) : 3,
-		'shoper_seller_strategy' => isset( $_POST['seller_strategy'] ) ? sanitize_text_field( wp_unslash( $_POST['seller_strategy'] ) ) : 'score',
+		'shoper_proxy_url'      => isset( $_POST['proxy_url'] ) ? esc_url_raw( wp_unslash( $_POST['proxy_url'] ) ) : '',
 	);
 	foreach ( $options as $k => $v ) {
 		update_option( $k, $v );
@@ -28,9 +27,8 @@ if ( isset( $_POST['shoper_save_settings'] ) && check_admin_referer( 'shoper_set
 $data_source    = get_option( 'shoper_data_source', 'direct' );
 $product_status = get_option( 'shoper_product_status', 'draft' );
 $import_gallery = get_option( 'shoper_import_gallery', 'yes' );
-$price_behavior  = get_option( 'shoper_price_behavior', 'cheapest' );
-$seller_limit    = (int) get_option( 'shoper_seller_limit', 3 );
-$seller_strategy = get_option( 'shoper_seller_strategy', 'score' );
+$price_behavior = get_option( 'shoper_price_behavior', 'cheapest' );
+$proxy_url = get_option( 'shoper_proxy_url', '' );
 ?>
 <div class="wrap shoper-wrap" dir="rtl">
 	<h1 class="wp-heading-inline">🛒 Shoper — درون‌ریز محصول از ترب</h1>
@@ -41,10 +39,7 @@ $seller_strategy = get_option( 'shoper_seller_strategy', 'score' );
 			<div class="shoper-card">
 				<h2>۱. جستجوی محصول در ترب</h2>
 				<p class="description">
-					بخشی از نام محصول را بنویسید — لازم نیست نام کامل را بدانید.
-					نوار کشویی، <strong>نام کامل</strong> محصولات را پیشنهاد می‌دهد
-					(با کلیدهای ↑ ↓ حرکت کنید و با Enter انتخاب کنید).
-					می‌توانید لینک مستقیم محصول ترب را هم بچسبانید.
+					نام محصول را بنویسید تا از ترب پیدا کنیم. می‌توانید لینک مستقیم محصول ترب را هم بچسبانید.
 				</p>
 
 				<div class="shoper-field shoper-mode-toggle">
@@ -103,6 +98,7 @@ $seller_strategy = get_option( 'shoper_seller_strategy', 'score' );
 								</select>
 							</td>
 						</tr>
+						<tr><th>پروکسی ترب</th><td><input type="url" class="regular-text" name="proxy_url" value="<?php echo esc_attr( $proxy_url ); ?>" placeholder="http://user:pass@proxy.example:8080"><p class="description">اختیاری؛ برای خطای 490 از پروکسی خروجی مناسب استفاده کنید.</p></td></tr>
 						<tr>
 							<th>وضعیت پیش‌فرض</th>
 							<td>
@@ -118,26 +114,6 @@ $seller_strategy = get_option( 'shoper_seller_strategy', 'score' );
 								<select name="price_behavior">
 									<option value="cheapest" <?php selected( $price_behavior, 'cheapest' ); ?>>ارزان‌ترین فروشنده</option>
 									<option value="none" <?php selected( $price_behavior, 'none' ); ?>>بدون قیمت</option>
-								</select>
-							</td>
-						</tr>
-						<tr>
-							<th>تعداد فروشنده</th>
-							<td>
-								<input type="number" name="seller_limit" min="1" max="10" style="width:70px;"
-									value="<?php echo esc_attr( $seller_limit ); ?>">
-								<p class="description" style="margin:4px 0 0;">
-									اطلاعات فقط از این تعداد فروشنده‌ی برتر جمع‌آوری می‌شود، نه از همه‌ی فروشگاه‌ها.
-								</p>
-							</td>
-						</tr>
-						<tr>
-							<th>معیار انتخاب</th>
-							<td>
-								<select name="seller_strategy">
-									<option value="score" <?php selected( $seller_strategy, 'score' ); ?>>معتبرترین (امتیاز بالاتر)</option>
-									<option value="cheapest" <?php selected( $seller_strategy, 'cheapest' ); ?>>ارزان‌ترین موجود</option>
-									<option value="merge" <?php selected( $seller_strategy, 'merge' ); ?>>ترکیب هوشمند</option>
 								</select>
 							</td>
 						</tr>

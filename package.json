@@ -1,17 +1,6 @@
 {
-  "name": "shoper-preview",
-  "version": "1.2.1",
+  "name": "shoper-torob-importer",
+  "version": "1.2.2",
   "private": true,
-  "description": "سرور پیش‌نمایش و تست افزونه‌ی Shoper (درون‌ریز محصول از ترب برای ووکامرس)",
-  "scripts": {
-    "preview": "node preview/server/server.js",
-    "test": "node preview/test-ui.js",
-    "test:editor": "node preview/test-editor.js",
-    "verify": "node preview/verify-create.js",
-    "build": "node scripts/build.js"
-  },
-  "devDependencies": {
-    "jsdom": "^24.1.0",
-    "jquery": "3.7.1"
-  }
+  "scripts": { "build": "node scripts/build.js" }
 }
