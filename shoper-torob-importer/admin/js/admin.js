@@ -126,7 +126,7 @@
 			$(document).on('click', '.shoper-result-item', function () {
 				var $item = $(this);
 				$item.addClass('selected').siblings().removeClass('selected');
-				self.preview($item.data('prk'), $item.data('searchid'));
+				self.preview($item.data('prk'), $item.data('searchid'), $item.data('moreinfo'));
 			});
 
 			this.$createBtn.on('click', function (e) {
@@ -483,7 +483,8 @@
 			for (var i = 0; i < items.length; i++) {
 				var it = items[i];
 				html += '<div class="shoper-result-item" data-prk="' + this.esc(it.random_key) + '" '
-					+ 'data-searchid="' + this.esc(it.search_id) + '">';
+					+ 'data-searchid="' + this.esc(it.search_id) + '" '
+					+ 'data-moreinfo="' + this.esc(it.more_info_url) + '">';
 				if (it.image_url) {
 					html += '<img src="' + this.esc(it.image_url) + '" alt="">';
 				}
@@ -508,14 +509,18 @@
 			this.$results.html(html).show();
 		},
 
-		preview: function (prk, searchId) {
+		preview: function (prk, searchId, moreInfo) {
 			var self = this;
 			if (!prk) return;
 			this.status(ShoperData.i18n.loading, 'loading');
 			this.$results.find('.shoper-result-item').removeClass('selected');
 			this.$results.find('[data-prk="' + prk + '"]').addClass('selected');
 
-			this.ajax('shoper_preview', { prk: prk, search_id: searchId || '' }, function (data) {
+			this.ajax('shoper_preview', {
+				prk: prk,
+				search_id: searchId || '',
+				more_info_url: moreInfo || ''
+			}, function (data) {
 				self.clearStatus();
 				self.currentData = data;
 				self.selectedPid = prk;
@@ -660,6 +665,7 @@
 			// اطلاعات مخفی.
 			html += '<input type="hidden" id="shoper-p-prk" value="' + this.esc(d.random_key) + '">';
 			html += '<input type="hidden" id="shoper-p-searchid" value="' + this.esc(d.search_id || '') + '">';
+			html += '<input type="hidden" id="shoper-p-moreinfo" value="' + this.esc(d.more_info_url || '') + '">';
 
 			this.$preview.html(html);
 
@@ -850,6 +856,7 @@
 			var payload = {
 				prk: prk,
 				search_id: $('#shoper-p-searchid').val(),
+				more_info_url: $('#shoper-p-moreinfo').val(),
 				name: $('#shoper-p-name').val(),
 				description: $('#shoper-p-desc').val(),
 				specs: JSON.stringify(specs),
@@ -905,6 +912,7 @@
 			var postId = this.$postId.val();
 			var prk = $('#shoper-p-prk').val() || this.selectedPid;
 			var searchId = $('#shoper-p-searchid').val() || '';
+			var moreInfo = $('#shoper-p-moreinfo').val() || '';
 
 			if (!postId) {
 				this.status('برای پر کردن، ابتدا محصول را به‌صورت پیش‌نویس ذخیره کنید.', 'error');
@@ -932,6 +940,7 @@
 				post_id: postId,
 				prk: prk,
 				search_id: searchId,
+				more_info_url: moreInfo,
 				selected_images: JSON.stringify(imgSel.selected || []),
 				featured_image: imgSel.featured || 0,
 				seo_title: seoTitle,

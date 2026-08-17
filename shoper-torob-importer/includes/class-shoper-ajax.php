@@ -111,15 +111,16 @@ class Shoper_Ajax {
 	public function preview() {
 		$this->guard();
 
-		$prk       = isset( $_POST['prk'] ) ? sanitize_text_field( wp_unslash( $_POST['prk'] ) ) : '';
-		$search_id = isset( $_POST['search_id'] ) ? sanitize_text_field( wp_unslash( $_POST['search_id'] ) ) : '';
+		$prk           = isset( $_POST['prk'] ) ? sanitize_text_field( wp_unslash( $_POST['prk'] ) ) : '';
+		$search_id     = isset( $_POST['search_id'] ) ? sanitize_text_field( wp_unslash( $_POST['search_id'] ) ) : '';
+		$more_info_url = isset( $_POST['more_info_url'] ) ? sanitize_text_field( wp_unslash( $_POST['more_info_url'] ) ) : '';
 
 		if ( ! $prk ) {
 			wp_send_json_error( array( 'message' => 'شناسه محصول نامعتبر است.' ) );
 		}
 
 		$builder = new Shoper_Product_Builder();
-		$result  = $builder->preview( $prk, $search_id );
+		$result  = $builder->preview( $prk, $search_id, $more_info_url );
 
 		if ( is_wp_error( $result ) ) {
 			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
@@ -135,9 +136,10 @@ class Shoper_Ajax {
 	public function create() {
 		$this->guard();
 
-		$prk       = isset( $_POST['prk'] ) ? sanitize_text_field( wp_unslash( $_POST['prk'] ) ) : '';
-		$search_id = isset( $_POST['search_id'] ) ? sanitize_text_field( wp_unslash( $_POST['search_id'] ) ) : '';
-		$name      = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '';
+		$prk           = isset( $_POST['prk'] ) ? sanitize_text_field( wp_unslash( $_POST['prk'] ) ) : '';
+		$search_id     = isset( $_POST['search_id'] ) ? sanitize_text_field( wp_unslash( $_POST['search_id'] ) ) : '';
+		$more_info_url = isset( $_POST['more_info_url'] ) ? sanitize_text_field( wp_unslash( $_POST['more_info_url'] ) ) : '';
+		$name          = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '';
 		$status    = isset( $_POST['status'] ) ? sanitize_text_field( wp_unslash( $_POST['status'] ) ) : '';
 		$desc      = isset( $_POST['description'] ) ? wp_kses_post( wp_unslash( $_POST['description'] ) ) : '';
 		$specs_raw = isset( $_POST['specs'] ) ? wp_unslash( $_POST['specs'] ) : '';
@@ -170,7 +172,7 @@ class Shoper_Ajax {
 		}
 
 		$builder = new Shoper_Product_Builder();
-		$data    = $builder->preview( $prk, $search_id );
+		$data    = $builder->preview( $prk, $search_id, $more_info_url );
 		if ( is_wp_error( $data ) ) {
 			wp_send_json_error( array( 'message' => $data->get_error_message() ) );
 		}
@@ -238,9 +240,10 @@ class Shoper_Ajax {
 	public function fill() {
 		$this->guard();
 
-		$post_id   = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
-		$prk       = isset( $_POST['prk'] ) ? sanitize_text_field( wp_unslash( $_POST['prk'] ) ) : '';
-		$search_id = isset( $_POST['search_id'] ) ? sanitize_text_field( wp_unslash( $_POST['search_id'] ) ) : '';
+		$post_id       = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
+		$prk           = isset( $_POST['prk'] ) ? sanitize_text_field( wp_unslash( $_POST['prk'] ) ) : '';
+		$search_id     = isset( $_POST['search_id'] ) ? sanitize_text_field( wp_unslash( $_POST['search_id'] ) ) : '';
+		$more_info_url = isset( $_POST['more_info_url'] ) ? sanitize_text_field( wp_unslash( $_POST['more_info_url'] ) ) : '';
 
 		// انتخاب تصاویر + سئو (همان‌طور که در صفحه‌ی اصلی افزونه هست).
 		$selected     = null;
@@ -268,7 +271,7 @@ class Shoper_Ajax {
 		}
 
 		$builder = new Shoper_Product_Builder();
-		$data    = $builder->preview( $prk, $search_id );
+		$data    = $builder->preview( $prk, $search_id, $more_info_url );
 		if ( is_wp_error( $data ) ) {
 			wp_send_json_error( array( 'message' => $data->get_error_message() ) );
 		}
