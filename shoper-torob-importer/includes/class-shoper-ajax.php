@@ -142,6 +142,29 @@ class Shoper_Ajax {
 		$desc      = isset( $_POST['description'] ) ? wp_kses_post( wp_unslash( $_POST['description'] ) ) : '';
 		$specs_raw = isset( $_POST['specs'] ) ? wp_unslash( $_POST['specs'] ) : '';
 
+		// انتخاب تصاویر توسط کاربر: ایندکس‌هایی که نگه داشته شوند + ایندکس تصویر اصلی.
+		$selected_raw = isset( $_POST['selected_images'] ) ? wp_unslash( $_POST['selected_images'] ) : '';
+		$featured_raw = isset( $_POST['featured_image'] ) ? absint( $_POST['featured_image'] ) : 0;
+		$selected     = null;
+		if ( '' !== $selected_raw ) {
+			$dec = json_decode( $selected_raw, true );
+			if ( is_array( $dec ) ) {
+				$selected = array_map( 'absint', $dec );
+			}
+		}
+
+		// سئو: تیتر، توضیح متا و برچسب‌ها.
+		$seo_title = isset( $_POST['seo_title'] ) ? sanitize_text_field( wp_unslash( $_POST['seo_title'] ) ) : '';
+		$seo_desc  = isset( $_POST['seo_desc'] ) ? sanitize_textarea_field( wp_unslash( $_POST['seo_desc'] ) ) : '';
+		$tags_raw  = isset( $_POST['tags'] ) ? wp_unslash( $_POST['tags'] ) : '';
+		$tags      = null;
+		if ( '' !== $tags_raw ) {
+			$dec = json_decode( $tags_raw, true );
+			if ( is_array( $dec ) ) {
+				$tags = array_map( 'sanitize_text_field', $dec );
+			}
+		}
+
 		if ( ! $prk ) {
 			wp_send_json_error( array( 'message' => 'شناسه محصول نامعتبر است.' ) );
 		}
@@ -177,6 +200,21 @@ class Shoper_Ajax {
 		if ( $status ) {
 			$args['status'] = $status;
 		}
+		if ( $selected ) {
+			$args['selected_images'] = $selected;
+		}
+		if ( $featured_raw >= 0 ) {
+			$args['featured_image'] = $featured_raw;
+		}
+		if ( $seo_title ) {
+			$args['seo_title'] = $seo_title;
+		}
+		if ( $seo_desc ) {
+			$args['seo_desc'] = $seo_desc;
+		}
+		if ( $tags ) {
+			$args['tags'] = $tags;
+		}
 
 		$result = $builder->create_product( $data, $args );
 
@@ -204,6 +242,27 @@ class Shoper_Ajax {
 		$prk       = isset( $_POST['prk'] ) ? sanitize_text_field( wp_unslash( $_POST['prk'] ) ) : '';
 		$search_id = isset( $_POST['search_id'] ) ? sanitize_text_field( wp_unslash( $_POST['search_id'] ) ) : '';
 
+		// انتخاب تصاویر + سئو (همان‌طور که در صفحه‌ی اصلی افزونه هست).
+		$selected     = null;
+		$selected_raw = isset( $_POST['selected_images'] ) ? wp_unslash( $_POST['selected_images'] ) : '';
+		if ( '' !== $selected_raw ) {
+			$dec = json_decode( $selected_raw, true );
+			if ( is_array( $dec ) ) {
+				$selected = array_map( 'absint', $dec );
+			}
+		}
+		$featured_raw = isset( $_POST['featured_image'] ) ? absint( $_POST['featured_image'] ) : 0;
+		$seo_title    = isset( $_POST['seo_title'] ) ? sanitize_text_field( wp_unslash( $_POST['seo_title'] ) ) : '';
+		$seo_desc     = isset( $_POST['seo_desc'] ) ? sanitize_textarea_field( wp_unslash( $_POST['seo_desc'] ) ) : '';
+		$tags         = null;
+		$tags_raw     = isset( $_POST['tags'] ) ? wp_unslash( $_POST['tags'] ) : '';
+		if ( '' !== $tags_raw ) {
+			$dec = json_decode( $tags_raw, true );
+			if ( is_array( $dec ) ) {
+				$tags = array_map( 'sanitize_text_field', $dec );
+			}
+		}
+
 		if ( ! $post_id || ! $prk ) {
 			wp_send_json_error( array( 'message' => 'شناسه محصول یا post_id نامعتبر است.' ) );
 		}
@@ -214,7 +273,24 @@ class Shoper_Ajax {
 			wp_send_json_error( array( 'message' => $data->get_error_message() ) );
 		}
 
-		$result = $builder->fill_product( $post_id, $data );
+		$args = array();
+		if ( $selected ) {
+			$args['selected_images'] = $selected;
+		}
+		if ( $featured_raw >= 0 ) {
+			$args['featured_image'] = $featured_raw;
+		}
+		if ( $seo_title ) {
+			$args['seo_title'] = $seo_title;
+		}
+		if ( $seo_desc ) {
+			$args['seo_desc'] = $seo_desc;
+		}
+		if ( $tags ) {
+			$args['tags'] = $tags;
+		}
+
+		$result = $builder->fill_product( $post_id, $data, $args );
 
 		if ( is_wp_error( $result ) ) {
 			wp_send_json_error( array( 'message' => $result->get_error_message() ) );

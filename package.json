@@ -1,11 +1,12 @@
 {
   "name": "shoper-preview",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "description": "سرور پیش‌نمایش و تست افزونه‌ی Shoper (درون‌ریز محصول از ترب برای ووکامرس)",
   "scripts": {
     "preview": "node preview/server/server.js",
-    "test": "node preview/test-ui.js"
+    "test": "node preview/test-ui.js",
+    "build": "node scripts/build.js"
   },
   "devDependencies": {
     "jsdom": "^24.1.0",

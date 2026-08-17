@@ -97,6 +97,10 @@ class Shoper_Torob_Client {
 		$suggestions = array();
 		$seen        = array();
 		foreach ( (array) $search['results'] as $item ) {
+			// فروشندگان تبلیغاتی را در پیشنهادها نشان نده.
+			if ( ! empty( $item['is_adv'] ) ) {
+				continue;
+			}
 			$name = isset( $item['name1'] ) ? trim( $item['name1'] ) : '';
 			if ( '' === $name || isset( $seen[ $name ] ) ) {
 				continue;
@@ -344,6 +348,7 @@ class Shoper_Torob_Client {
 			'gallery'       => $gallery,
 			'page_url'      => ! empty( $item['web_client_absolute_url'] ) ? 'https://torob.com' . $item['web_client_absolute_url'] : '',
 			'more_info_url' => $more_url,
+			'is_adv'        => ! empty( $item['is_adv'] ),
 		);
 	}
 

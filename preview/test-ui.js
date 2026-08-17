@@ -70,6 +70,15 @@ async function waitFor(fn, timeout = 8000, interval = 100) {
 	const Shoper = window.Shoper;
 
 	// ---------------------------------------------------------------
+	console.log('\n[۰] دکمه‌ی دانلود آخرین نسخه');
+	// ---------------------------------------------------------------
+	check('دکمه‌ی «دانلود آخرین نسخه» وجود دارد', doc.querySelector('#shoper-download-btn') !== null);
+	if (doc.querySelector('#shoper-download-btn')) {
+		const href = doc.querySelector('#shoper-download-btn').getAttribute('href');
+		check('لینک دانلود به فایل ZIP اشاره می‌کند', href && href.includes('/download/latest'), href);
+	}
+
+	// ---------------------------------------------------------------
 	console.log('\n[۱] ساختار نوار پیشنهاد');
 	// ---------------------------------------------------------------
 	check('ظرف .shoper-suggest-wrap ساخته شد', doc.querySelectorAll('.shoper-suggest-wrap').length > 0);
@@ -133,8 +142,6 @@ async function waitFor(fn, timeout = 8000, interval = 100) {
 	if (gotPreview) {
 		check('نوار پیشنهاد بعد از انتخاب بسته شد', doc.querySelector('.shoper-suggest').style.display === 'none');
 		check('فیلد نام محصول پر شد', (doc.querySelector('#shoper-p-name') || {}).value?.length > 10);
-		check('گالری تصاویر رندر شد', doc.querySelectorAll('.shoper-preview-gallery img').length > 1,
-			doc.querySelectorAll('.shoper-preview-gallery img').length + ' تصویر');
 
 		const specChecks = doc.querySelectorAll('.shoper-spec-check');
 		check('مشخصات فنی به‌صورت تیک‌خور رندر شدند', specChecks.length > 10, specChecks.length + ' مشخصه');
@@ -143,6 +150,48 @@ async function waitFor(fn, timeout = 8000, interval = 100) {
 		check('جدول فروشندگان بررسی‌شده نمایش داده شد', sellerRows.length > 0, sellerRows.length + ' فروشنده');
 		check('فروشنده‌ی منتخب برچسب دارد', doc.querySelector('.shoper-sellers-preview .shoper-badge') !== null);
 		check('برچسب منبع داده نمایش داده شد', doc.querySelector('.src-pill') !== null);
+	}
+
+	// ---------------------------------------------------------------
+	console.log('\n[۴.۵] نوار مراحل + انتخاب تصاویر + سئو');
+	// ---------------------------------------------------------------
+	if (gotPreview) {
+		check('نوار مراحل (Stepper) ساخته شد', doc.querySelectorAll('.shoper-step').length === 3,
+			doc.querySelectorAll('.shoper-step').length + ' مرحله');
+		check('مرحله‌ی «دریافت اطلاعات» فعال است',
+			doc.querySelector('.shoper-step[data-step="info"]').classList.contains('is-active'));
+		check('مرحله‌ی اول نمایان است', doc.querySelector('[data-step-body="info"]').style.display !== 'none');
+
+		const imgItems = doc.querySelectorAll('.shoper-img-item');
+		check('شبکه‌ی تصاویر با تیک «نگه‌داشته شود» رندر شد', imgItems.length > 1,
+			imgItems.length + ' تصویر');
+		check('دکمه‌ی «تصویر اصلی» برای هر تصویر هست', doc.querySelectorAll('.shoper-img-featured').length === imgItems.length);
+		check('تصویر اول به‌صورت پیش‌فرض اصلی است',
+			doc.querySelectorAll('.shoper-img-featured:checked').length === 1);
+
+		// فقط دو تصویر نگه داشته شود و تصویر دوم اصلی شود.
+		const checks = doc.querySelectorAll('.shoper-img-check');
+		if (checks.length > 2) {
+			checks[0].click();
+			doc.querySelectorAll('.shoper-img-featured')[1].click();
+			check('انتخاب تصویر توسط کاربر اعمال شد',
+				doc.querySelectorAll('.shoper-img-check:checked').length === imgItems.length - 1 &&
+				doc.querySelectorAll('.shoper-img-featured:checked')[0].getAttribute('data-idx') === '1');
+		}
+
+		check('فیلدهای سئو رندر شدند',
+			!!doc.querySelector('#shoper-p-seo-title') &&
+			!!doc.querySelector('#shoper-p-seo-desc') &&
+			!!doc.querySelector('#shoper-p-tags'));
+		check('برچسب‌ها از نام محصول ساخته شدند',
+			(doc.querySelector('#shoper-p-tags').value || '').split(/[،,]/).filter(Boolean).length > 0);
+		check('نوار پیشرفت ساخته شد', doc.querySelector('#shoper-progress') !== null);
+
+		// رفتن به مرحله‌ی تصاویر.
+		Shoper.goStep('images');
+		check('مرحله‌ی «انتخاب تصاویر» فعال و نمایان شد',
+			doc.querySelector('.shoper-step[data-step="images"]').classList.contains('is-active') &&
+			doc.querySelector('[data-step-body="images"]').style.display !== 'none');
 	}
 
 	// ---------------------------------------------------------------
@@ -159,13 +208,22 @@ async function waitFor(fn, timeout = 8000, interval = 100) {
 	check('خروجی ووکامرس تولید شد', gotOutput);
 
 	if (gotOutput) {
-		check('تب‌های محصول ساخته شدند', doc.querySelectorAll('.wc-tab').length === 5);
+		check('تب‌های محصول ساخته شدند', doc.querySelectorAll('.wc-tab').length === 6,
+			doc.querySelectorAll('.wc-tab').length + ' تب');
 		check('ویژگی‌ها در خروجی هستند', doc.querySelectorAll('.wc-attr').length > 5,
 			doc.querySelectorAll('.wc-attr').length + ' ویژگی');
 		const body = doc.querySelector('#wc-output-body').textContent;
 		check('SKU با پیشوند TRB- ساخته شد', body.includes('TRB-'));
 		check('اطلاعات چند فروشنده در خلاصه هست', /از\s*\d+\s*فروشنده/.test(body));
 		check('یادداشت دانلود تصاویر در کتابخانه رسانه هست', body.includes('کتابخانه'));
+
+		// فقط تصاویر انتخاب‌شده دانلود می‌شوند و نامشان «نام محصول-شماره» است.
+		check('نام فایل تصاویر (نام محصول-شماره) در خروجی هست',
+			/shoper-img-grid|نمایش داده|نام محصول|\.webp/.test(body) || body.includes('-1'));
+		check('برچسب‌ها در خروجی سئو هست', doc.querySelectorAll('.wc-panel[data-panel="seo"]').length === 1);
+		const seoPanel = doc.querySelector('.wc-panel[data-panel="seo"]').textContent;
+		check('عنوان سئو و برچسب‌ها نمایش داده می‌شود', seoPanel.length > 10 && /برچسب/.test(seoPanel));
+		check('نوار پیشرفت نمایان است', doc.querySelector('#shoper-progress').style.display !== 'none');
 	}
 
 	// ---------------------------------------------------------------

@@ -117,6 +117,7 @@ function extractSearchItem(item) {
 		gallery: extractGallery(item),
 		page_url: item.web_client_absolute_url ? 'https://torob.com' + item.web_client_absolute_url : '',
 		more_info_url: moreUrl,
+		is_adv: !!item.is_adv,
 	};
 }
 
@@ -466,6 +467,11 @@ const SLUG_MAP = {
 	'گنجایش باتری': 'battery-capacity', 'ظرفیت باتری': 'battery-capacity',
 	'سیستم عامل': 'os', 'سیم‌کارت': 'sim', 'سیم کارت': 'sim',
 	'گواهی ضدآب': 'water-resistance', 'بلندگو': 'speaker',
+	'کیفیت دوربین جلو': 'front-camera-quality', 'کیفیت دوربین اصلی': 'main-camera-quality',
+	'کشور ROM': 'rom-country', 'وضعیت رجیستر': 'registration-status',
+	'وضعیت فعال بودن': 'activation-status', 'سال تولید': 'production-year',
+	'پشتیبانی از کارت حافظه': 'memory-card', 'اقلام همراه': 'box-contents',
+	'اصالت کالا': 'authenticity', 'پردازنده مرکزی': 'cpu', 'نسخه سیستم عامل': 'os-version',
 };
 
 function slugify(name) {
@@ -512,6 +518,58 @@ function buildAttributes(specs) {
 	return { attrs, errors };
 }
 
+/* -------------------------------------------------------------------------- */
+/* سئو و برچسب (آینه‌ی Shoper_Product_Builder::build_seo)                        */
+/* -------------------------------------------------------------------------- */
+
+function buildSeo(data) {
+	const title = data.name1 || '';
+	const parts = [];
+	if (data.name2) parts.push(String(data.name2));
+	let i = 0;
+	for (const [k, v] of Object.entries(data.key_specs || {})) {
+		if (i++ >= 5) break;
+		parts.push(`${k}: ${v}`);
+	}
+	let desc = parts.join(' | ');
+	if (desc.length > 155) desc = desc.slice(0, 152) + '…';
+
+	const tags = [];
+	const seen = {};
+	const cands = [];
+	if (data.name1) cands.push(String(data.name1));
+	if (data.name2) cands.push(String(data.name2));
+	if (data.specs) {
+		['برند', 'مدل', 'سازنده'].forEach((key) => {
+			if (data.specs[key]) cands.push(String(data.specs[key]));
+		});
+	}
+	for (const c of cands) {
+		for (const t of String(c).split(/[|\/،,]+/)) {
+			const clean = t.trim();
+			if (clean && !seen[clean]) {
+				seen[clean] = true;
+				tags.push(clean);
+				if (tags.length >= 12) break;
+			}
+		}
+		if (tags.length >= 12) break;
+	}
+
+	return { title, description: desc, tags };
+}
+
+/**
+ * نام پایه برای فایل تصویر (آینه‌ی Shoper_Image_Handler::base_filename).
+ */
+function fileBase(title) {
+	const base = String(title || '')
+		.replace(/[\/\\]+/g, '-')
+		.replace(/\s+/g, '-')
+		.replace(/^-+|-+$/g, '');
+	return base || 'shoper-product';
+}
+
 module.exports = {
 	normalizeSearch,
 	normalizeDetails,
@@ -519,6 +577,8 @@ module.exports = {
 	buildDescriptionHtml,
 	buildShortDescription,
 	buildAttributes,
+	buildSeo,
+	fileBase,
 	numberFormatFa,
 	escHtml,
 };
