@@ -2,7 +2,8 @@
 
 > تاریخ: ۲۰۲۶-۰۸-۱۸
 > شاخه: `arena/01a01165-shoper`
-> وضعیت: ✅ تأییدشده — ۴۵ تست رابط کاربری پاس، آرشیو ZIP آماده‌ی نصب
+> نویسنده: **Khajavi** — https://github.com/khajavy8056
+> وضعیت: ✅ تأییدشده — ۱۱۶ تست (۴۵ + ۴۲ + ۲۹) پاس، آرشیو ZIP آماده‌ی نصب
 
 ---
 
@@ -161,9 +162,31 @@
 
 ### آرشیو قابل‌نصب
 ```
-build/shoper-torob-importer-1.2.0.zip  (53 KB)
+build/shoper-torob-importer-1.2.0.zip  (54 KB)
 ```
 محتوا: پوشه‌ی `shoper-torob-importer/` در ریشه (برای `wp-content/plugins/`).
+
+---
+
+## ۵.۵ تأیید بسته‌ی نصب (Install Package Check)
+
+برای اطمینان از «نصب بدون مشکل»، بسته‌ی ZIP بررسی شد:
+
+| بررسی | نتیجه |
+|---|---|
+| یکپارچگی فایل ZIP (`unzip -t`) | ✅ سالم |
+| فایل اصلی افزونه `shoper-torob-importer.php` در ریشه‌ی پوشه | ✅ موجود |
+| هدر استاندارد وردپرس (Plugin Name / Version / Author / Author URI / License) | ✅ معتبر |
+| همه‌ی فایل‌های `includes()` و views/css/js ارجاع‌شده | ✅ موجود |
+| فایل‌های mock و `uninstall.php` | ✅ موجود |
+| پوشه‌ی `languages/` (با `index.php` برای جلوگیری از listing) | ✅ موجود |
+| تعادل ساختاری آکولاد/پرانتز همه‌ی فایل‌های PHP | ✅ بدون خطا |
+| گارد `ABSPATH` در همه‌ی فایل‌ها (به‌جز uninstall که با `WP_UNINSTALL_PLUGIN` است) | ✅ |
+| محافظت nonce + مجوز در همه‌ی اکشن‌های AJAX | ✅ |
+| نویسنده/طراح = Khajavi + لینک گیت‌هاب | ✅ |
+
+محتوا برای نصب در `wp-content/plugins/` به‌درستی ساختاردهی شده است (پوشه‌ی
+`shoper-torob-importer/` در ریشه‌ی ZIP).
 
 ---
 

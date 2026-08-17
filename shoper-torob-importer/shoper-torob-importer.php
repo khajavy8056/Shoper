@@ -4,8 +4,8 @@
  * Plugin URI:        https://github.com/khajavy8056/Shoper
  * Description:       با نوشتن نام محصول یا چسباندن لینک ترب، اطلاعات کامل محصول (نام، توضیحات، تصاویر و تمام مشخصات فنی به‌صورت ویژگی‌های مجزا) را از ترب دریافت و یک محصول کامل ووکامرس بسازید.
  * Version:           1.2.0
- * Author:            Shoper
- * Author URI:        https://github.com/khajavy8056/Shoper
+ * Author:            Khajavi
+ * Author URI:        https://github.com/khajavy8056
  * License:           GPL v2 or later
  * Text Domain:       shoper
  * Domain Path:       /languages

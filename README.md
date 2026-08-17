@@ -143,3 +143,13 @@ preview/                        پیش‌نمایش و تست
 - [`FEASIBILITY.md`](FEASIBILITY.md) — امکان‌سنجی
 - [`LIVE_TEST_RESULTS.md`](LIVE_TEST_RESULTS.md) — نتایج تست زنده‌ی API
 - [`DIGIKALA_REFERENCE_ANALYSIS.md`](DIGIKALA_REFERENCE_ANALYSIS.md) — مقایسه با افزونه‌ی مرجع
+
+---
+
+## طراح و سازنده
+
+**Khajavi** — [github.com/khajavy8056](https://github.com/khajavy8056)
+
+مخزن افزونه: [github.com/khajavy8056/Shoper](https://github.com/khajavy8056/Shoper)
+
+> نسخه‌ی نهایی و فایل نصب (ZIP) در بخش **Releases** همین مخزن منتشر می‌شود.

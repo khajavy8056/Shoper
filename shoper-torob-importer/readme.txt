@@ -1,5 +1,5 @@
 === Shoper – درون‌ریز محصول از ترب ===
-Contributors: shoper
+Contributors: khajavi
 Tags: woocommerce, torob, product import, درون‌ریز محصول, ترب
 Requires at least: 5.8
 Tested up to: 6.6
@@ -8,6 +8,8 @@ WC requires at least: 5.0
 WC tested up to: 9.3
 Stable tag: 1.2.0
 License: GPLv2 or later
+Author: Khajavi
+Author URI: https://github.com/khajavy8056
 
 با نوشتن نام محصول یا چسباندن لینک ترب، اطلاعات کامل محصول (نام، توضیحات، گالری تصاویر و تمام مشخصات فنی به‌صورت ویژگی‌های مجزا) را از ترب دریافت و یک محصول کامل ووکامرس بسازید.
 
