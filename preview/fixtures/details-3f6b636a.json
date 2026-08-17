@@ -1,0 +1,132 @@
+{
+  "_comment": "پاسخ واقعی api.torob.com details برای X-Inova S25 Ultra Mini — ۲۰۲۶-۰۸-۱۶ (محصول کم‌فروشنده، ۳ فروشنده واقعی)",
+  "random_key": "3f6b636a-cd3b-49ae-b2c0-b8def912b175",
+  "name1": "گوشی ایکس اینووا S25 Ultra Mini | حافظه 64 رم 4 گیگابایت",
+  "name2": "Xinova S25 Ultra Mini 64/4 GB",
+  "price": 10440000,
+  "price_text": "از ۱۰٫۴۴۰٫۰۰۰ تومان",
+  "shop_text": "در ۳ فروشگاه",
+  "min_price": 10440000,
+  "max_price": 14695200,
+  "image_url": "https://image.torob.com/base/images/Ff/eH/FfeHW2o2OSAqeJDS.jpg",
+  "web_client_absolute_url": "/p/3f6b636a-cd3b-49ae-b2c0-b8def912b175/",
+  "more_info_url": "https://api.torob.com/v4/base-product/details/?search_id=&prk=3f6b636a-cd3b-49ae-b2c0-b8def912b175",
+  "media_urls": [
+    { "type": "image", "url": "https://image.torob.com/base/images/Ff/eH/FfeHW2o2OSAqeJDS.jpg" },
+    { "type": "image", "url": "https://image.torob.com/base/images/x7/g5/x7g5m7ZGdCQviA4Q.jpg" },
+    { "type": "image", "url": "https://image.torob.com/base/images/IK/sE/IKsE4NSWOudQy4cu.jpg" },
+    { "type": "image", "url": "https://image.torob.com/base/images/qe/L8/qeL8dvygG1_BvGhz.jpg" },
+    { "type": "image", "url": "https://image.torob.com/base/images/Lc/VO/LcVOZUD_xOFkOFhv.webp" },
+    { "type": "image", "url": "https://image.torob.com/base/images/Ne/bc/NebcO6tzAOMvOr5U.jpg" },
+    { "type": "image", "url": "https://image.torob.com/base/images/lL/JN/lLJNg4R1lW1_9dbk.jpg" }
+  ],
+  "breadcrumbs": [
+    { "id": 0, "title": "ترب", "cat_id": 0 },
+    { "id": 175, "title": "موبایل و کالای دیجیتال", "cat_id": 175 },
+    { "id": 94, "title": "گوشی موبایل", "cat_id": 94 }
+  ],
+  "products_info": {
+    "title": "فروشنده‌ها",
+    "result": [
+      {
+        "availability": true,
+        "name1": "گوشی طرح S25 Ultra مدل +X25 mini | برند x-inova | حافظه 64 رم 4 گیگابایت رجیسترشده",
+        "name2": "اصل | ضمانت سلامت فیزیکی و اصالت کالا",
+        "shop_name": "بلبل استور",
+        "shop_name2": "سقز",
+        "shop_id": 109120,
+        "price": 10440000,
+        "price_text": "۱۰٫۴۴۰٫۰۰۰ تومان",
+        "shop_score": 5,
+        "is_adv": false,
+        "last_price_change_date": "۱۵ ساعت پیش",
+        "guarantee_info": { "status": "enabled" },
+        "postage_fee": "",
+        "score_info": { "score": 5.0, "score_text": "★۵ (۲ سال در ترب)" },
+        "more_info": {
+          "same_day_delivery": "امکان تحویل در همان روز برای ارومیه، بانه، بناب، بوکان، تبریز، سقز، سنندج، مریوان با هماهنگی",
+          "shipping_types": ["باربری های درون شهری یا برون شهری", "شرکتهای پست خصوصی نظیر تیپاکس", "پست"],
+          "heavy_items": "برای ارسال کالاهای سنگین تماس بگیرید",
+          "delivery_info": "برای کالاهای سنگین ارسال بار توسط باربری و پایانه‌های مسافربری را داریم."
+        }
+      },
+      {
+        "availability": true,
+        "name1": "گوشی ایکس اینووا S25 Ultra Mini | حافظه 64 رم 4 گیگابایت | پک کامل دو سیمکارته «ریجستر شده دایمی» - مشکی",
+        "name2": "۷ روز مهلت تست و ضمانت اصالت و سلامت فیزیکی کالا",
+        "shop_name": "بانه گجت استور",
+        "shop_name2": "بانه",
+        "shop_id": 285695,
+        "price": 10490000,
+        "price_text": "۱۰٫۴۹۰٫۰۰۰ تومان",
+        "shop_score": 5,
+        "is_adv": false,
+        "last_price_change_date": "دیروز",
+        "guarantee_info": { "status": "disabled" },
+        "postage_fee": "هزینه ارسال ۱۰۰٫۰۰۰ تومان",
+        "score_info": { "score": 5.0, "score_text": "★۵ (۱۰ ماه در ترب)" },
+        "more_info": {
+          "same_day_delivery": "امکان تحویل در همان روز برای تهران با هماهنگی",
+          "shipping_types": ["باربری های درون شهری یا برون شهری", "شرکتهای پست خصوصی نظیر تیپاکس", "پست"]
+        }
+      },
+      {
+        "availability": true,
+        "name1": "گوشی مینی سامسونگ S25 Ultra برند X-inova / حافظه 64 گیگ و رم 4 گیگابایت (تحت لیسانس آلمان)",
+        "name2": "",
+        "shop_name": "باسلام",
+        "shop_name2": "قم، تورک استور جلالی",
+        "shop_id": 305912,
+        "price": 14695200,
+        "price_text": "۱۴٫۶۹۵٫۲۰۰ تومان",
+        "shop_score": 5,
+        "is_adv": false,
+        "last_price_change_date": "۲ ساعت پیش",
+        "guarantee_info": { "status": "disabled" },
+        "postage_fee": "",
+        "score_info": { "score": 5, "score_text": "بازارگاه (۸ سال در ترب)" },
+        "more_info": {
+          "shipping_types": ["باربری های درون شهری یا برون شهری", "شرکتهای پست خصوصی نظیر تیپاکس", "پست", "پیک"],
+          "delivery_info": "محصولات فراوانی در باسلام شامل «ارسال رایگان» هستند."
+        }
+      }
+    ]
+  },
+  "structural_specs": {
+    "headers": [
+      {
+        "header": "مشخصات کلی",
+        "specs": {
+          "رنگ": "مشکی",
+          "برند": "X‑Inova",
+          "نسخه سیستم عامل": "13",
+          "مقدار رم": "4 گیگابایت",
+          "حافظه داخلی": "64 گیگابایت",
+          "پشتیبانی از کارت حافظه": "microSD",
+          "صفحه نمایش": "اچ دی",
+          "اندازه صفحه نمایش": "4 اینچ",
+          "سیستم عامل": "Android",
+          "دوربین": "13 مگاپیکسل",
+          "دوربین سلفی": "5 مگاپیکسل",
+          "پردازنده‌ مرکزی": "4 هسته ای 1.5 گیگاهرتزی",
+          "قابلیت پشتیبانی از سیم کارت": "دو سیم کارت",
+          "وضعیت رجیستر": "ریجیستر شده",
+          "اقلام همراه": "قاب ژله ای / ایرپاد / بندگردنی / شارژر",
+          "اصالت کالا": "اصل"
+        }
+      }
+    ]
+  },
+  "key_specs": [
+    {
+      "header": "مشخصات کلیدی",
+      "items": [
+        { "key": "حافظه داخلی", "value": ["64 گیگابایت"] },
+        { "key": "حافظه RAM", "value": ["4 گیگابایت"] },
+        { "key": "اندازه صفحه نمایش", "value": ["۴ اینچ"] },
+        { "key": "کیفیت دوربین جلو", "value": ["۵ مگاپیکسل"] },
+        { "key": "سیم کارت", "value": ["2 سیم کارت"] }
+      ]
+    }
+  ]
+}

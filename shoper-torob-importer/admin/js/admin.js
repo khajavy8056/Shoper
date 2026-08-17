@@ -10,10 +10,19 @@
 		currentData: null,
 		selectedPid: null,
 
+		// وضعیت نوار پیشنهاد (autocomplete).
+		sugTimer: null,
+		sugXhr: null,
+		sugItems: [],
+		sugIndex: -1,
+		sugOpen: false,
+		sugLastTerm: '',
+
 		init: function () {
 			this.cache();
 			if (this.$body.length) {
 				this.bind();
+				this.buildSuggestBox();
 			}
 		},
 
@@ -53,11 +62,59 @@
 				}
 			});
 
+			// --- نوار پیشنهاد نام محصول (autocomplete) ---
+			// کاربر لازم نیست نام کامل را بداند؛ با تایپ بخشی از نام،
+			// نام‌های کامل زیر فیلد پیشنهاد می‌شوند.
+			this.$queryInput.on('input', function () {
+				self.onQueryInput($(this).val());
+			});
+
+			// ناوبری با کیبورد در لیست پیشنهاد.
+			this.$queryInput.on('keydown', function (e) {
+				if (!self.sugOpen) {
+					return;
+				}
+				if (e.which === 40) {          // ↓
+					e.preventDefault();
+					self.moveSuggest(1);
+				} else if (e.which === 38) {   // ↑
+					e.preventDefault();
+					self.moveSuggest(-1);
+				} else if (e.which === 27) {   // Esc
+					self.closeSuggest();
+				} else if (e.which === 13 && self.sugIndex >= 0) { // Enter روی یک پیشنهاد
+					e.preventDefault();
+					self.chooseSuggest(self.sugIndex);
+				}
+			});
+
+			this.$queryInput.on('focus', function () {
+				if (self.sugItems.length && $(this).val().trim().length >= 2) {
+					self.openSuggest();
+				}
+			});
+
+			// کلیک روی یک پیشنهاد.
+			$(document).on('mousedown', '.shoper-suggest-item', function (e) {
+				e.preventDefault();
+				self.chooseSuggest($(this).index());
+			});
+
+			// بستن با کلیک بیرون.
+			$(document).on('click', function (e) {
+				if (!$(e.target).closest('.shoper-suggest-wrap, #shoper-query').length) {
+					self.closeSuggest();
+				}
+			});
+
 			// جستجو با Enter.
 			this.$queryInput.on('keypress', function (e) {
 				if (e.which === 13) {
 					e.preventDefault();
-					self.search();
+					if (self.sugIndex < 0) {
+						self.closeSuggest();
+						self.search();
+					}
 				}
 			});
 
@@ -91,6 +148,254 @@
 
 		getMode: function () {
 			return $('input[name="shoper_input_mode"]:checked, input[name="shoper_mode"]:checked').val() || 'query';
+		},
+
+		/* ------------------------------------------------------------------
+		 * نوار پیشنهاد نام محصول (autocomplete)
+		 * ------------------------------------------------------------------ */
+
+		/**
+		 * ساخت ظرف نوار پیشنهاد، دقیقاً زیر فیلد جستجو.
+		 */
+		buildSuggestBox: function () {
+			if (!this.$queryInput.length) {
+				return;
+			}
+			// ظرف با position:relative تا لیست زیر فیلد بچسبد.
+			if (!this.$queryInput.parent().hasClass('shoper-suggest-wrap')) {
+				this.$queryInput.wrap('<span class="shoper-suggest-wrap"></span>');
+			}
+			this.$suggest = $('<div class="shoper-suggest" role="listbox"></div>')
+				.appendTo(this.$queryInput.parent())
+				.hide();
+
+			this.$queryInput.attr({
+				'autocomplete': 'off',
+				'role': 'combobox',
+				'aria-autocomplete': 'list',
+				'aria-expanded': 'false'
+			});
+		},
+
+		/**
+		 * هر بار که کاربر تایپ می‌کند (با debounce).
+		 *
+		 * @param {string} term عبارت فعلی.
+		 */
+		onQueryInput: function (term) {
+			var self = this;
+			term = (term || '').trim();
+
+			if (this.sugTimer) {
+				clearTimeout(this.sugTimer);
+			}
+
+			// کمتر از ۲ نویسه ارزش درخواست ندارد.
+			if (term.length < 2) {
+				this.closeSuggest();
+				this.sugItems = [];
+				return;
+			}
+
+			// اگر عبارت تغییری نکرده، دوباره درخواست نده.
+			if (term === this.sugLastTerm && this.sugItems.length) {
+				this.openSuggest();
+				return;
+			}
+
+			// ۲۵۰ms صبر تا کاربر دست از تایپ بردارد.
+			this.sugTimer = setTimeout(function () {
+				self.fetchSuggest(term);
+			}, 250);
+		},
+
+		/**
+		 * گرفتن پیشنهادها از سرور.
+		 *
+		 * @param {string} term عبارت.
+		 */
+		fetchSuggest: function (term) {
+			var self = this;
+
+			// درخواست قبلی را لغو کن تا نتیجه‌ی قدیمی روی جدید ننشیند.
+			if (this.sugXhr && this.sugXhr.readyState !== 4) {
+				this.sugXhr.abort();
+			}
+
+			this.showSuggestLoading();
+
+			this.sugXhr = $.post(ShoperData.ajaxUrl, {
+				action: 'shoper_suggest',
+				nonce: ShoperData.nonce,
+				term: term
+			}).done(function (resp) {
+				// اگر کاربر در این فاصله عبارت را عوض کرده، نتیجه را دور بریز.
+				if (self.$queryInput.val().trim() !== term) {
+					return;
+				}
+				var list = (resp && resp.success && resp.data && resp.data.suggestions) ? resp.data.suggestions : [];
+				self.sugLastTerm = term;
+				self.sugItems = list;
+				self.sugIndex = -1;
+				self.renderSuggest(list, term);
+			}).fail(function (xhr, status) {
+				if (status !== 'abort') {
+					self.closeSuggest();
+				}
+			});
+		},
+
+		showSuggestLoading: function () {
+			if (!this.$suggest) {
+				return;
+			}
+			this.$suggest
+				.html('<div class="shoper-suggest-loading"><span class="shoper-loading-inline"></span> در حال گرفتن پیشنهاد از ترب…</div>')
+				.show();
+			this.sugOpen = true;
+		},
+
+		/**
+		 * رندر لیست پیشنهاد.
+		 *
+		 * @param {Array}  items لیست.
+		 * @param {string} term  عبارت تایپ‌شده (برای هایلایت).
+		 */
+		renderSuggest: function (items, term) {
+			if (!this.$suggest) {
+				return;
+			}
+			if (!items.length) {
+				this.$suggest
+					.html('<div class="shoper-suggest-empty">پیشنهادی یافت نشد — می‌توانید دکمه‌ی جستجو را بزنید.</div>')
+					.show();
+				this.sugOpen = true;
+				return;
+			}
+
+			var html = '';
+			for (var i = 0; i < items.length; i++) {
+				var it = items[i];
+				html += '<div class="shoper-suggest-item" role="option" data-index="' + i + '">';
+				if (it.image_url) {
+					html += '<img class="shoper-suggest-thumb" src="' + this.esc(it.image_url) + '" alt="" loading="lazy">';
+				} else {
+					html += '<span class="shoper-suggest-thumb shoper-suggest-thumb-empty"></span>';
+				}
+				html += '<span class="shoper-suggest-text">';
+				html += '<span class="shoper-suggest-name">' + this.highlight(it.label, term) + '</span>';
+				var meta = [];
+				if (it.name2) { meta.push(this.esc(it.name2)); }
+				if (it.shop_text) { meta.push(this.esc(it.shop_text)); }
+				if (meta.length) {
+					html += '<span class="shoper-suggest-meta">' + meta.join(' • ') + '</span>';
+				}
+				html += '</span>';
+				if (it.price_text) {
+					html += '<span class="shoper-suggest-price">' + this.esc(it.price_text) + '</span>';
+				}
+				html += '</div>';
+			}
+
+			this.$suggest.html(html).show();
+			this.sugOpen = true;
+			this.$queryInput.attr('aria-expanded', 'true');
+		},
+
+		/**
+		 * هایلایت بخش تایپ‌شده در نام پیشنهادی.
+		 *
+		 * @param {string} text متن کامل.
+		 * @param {string} term عبارت.
+		 * @return {string} HTML امن.
+		 */
+		highlight: function (text, term) {
+			var safe = this.esc(text);
+			if (!term) {
+				return safe;
+			}
+			var safeTerm = this.esc(term).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+			try {
+				return safe.replace(new RegExp('(' + safeTerm + ')', 'gi'), '<mark>$1</mark>');
+			} catch (e) {
+				return safe;
+			}
+		},
+
+		/**
+		 * جابه‌جایی انتخاب با کلیدهای بالا/پایین.
+		 *
+		 * @param {number} delta جهت.
+		 */
+		moveSuggest: function (delta) {
+			if (!this.sugItems.length) {
+				return;
+			}
+			this.sugIndex += delta;
+			if (this.sugIndex < 0) {
+				this.sugIndex = this.sugItems.length - 1;
+			}
+			if (this.sugIndex >= this.sugItems.length) {
+				this.sugIndex = 0;
+			}
+			var $items = this.$suggest.find('.shoper-suggest-item');
+			$items.removeClass('active');
+			var $active = $items.eq(this.sugIndex).addClass('active');
+
+			// نام کامل را داخل فیلد بگذار تا کاربر ببیند چه انتخاب می‌کند.
+			if (this.sugItems[this.sugIndex]) {
+				this.$queryInput.val(this.sugItems[this.sugIndex].label);
+			}
+
+			// اسکرول به آیتم فعال.
+			if ($active.length) {
+				var box = this.$suggest[0];
+				var el = $active[0];
+				if (el.offsetTop < box.scrollTop) {
+					box.scrollTop = el.offsetTop;
+				} else if (el.offsetTop + el.offsetHeight > box.scrollTop + box.clientHeight) {
+					box.scrollTop = el.offsetTop + el.offsetHeight - box.clientHeight;
+				}
+			}
+		},
+
+		/**
+		 * انتخاب یک پیشنهاد: نام کامل در فیلد می‌نشیند و
+		 * مستقیماً پیش‌نمایش همان محصول بارگذاری می‌شود.
+		 *
+		 * @param {number} index اندیس.
+		 */
+		chooseSuggest: function (index) {
+			var it = this.sugItems[index];
+			if (!it) {
+				return;
+			}
+			this.$queryInput.val(it.label);
+			this.closeSuggest();
+
+			// چون prk را از قبل داریم، مستقیم به پیش‌نمایش می‌رویم.
+			if (it.random_key) {
+				this.preview(it.random_key, it.search_id || '');
+			} else {
+				this.search();
+			}
+		},
+
+		openSuggest: function () {
+			if (this.$suggest && this.$suggest.children().length) {
+				this.$suggest.show();
+				this.sugOpen = true;
+				this.$queryInput.attr('aria-expanded', 'true');
+			}
+		},
+
+		closeSuggest: function () {
+			if (this.$suggest) {
+				this.$suggest.hide();
+			}
+			this.sugOpen = false;
+			this.sugIndex = -1;
+			this.$queryInput.attr('aria-expanded', 'false');
 		},
 
 		status: function (msg, type) {
@@ -247,10 +552,40 @@
 				html += '</div></div>';
 			}
 
-			// قیمت.
+			// قیمت + خلاصه‌ی فروشندگان بررسی‌شده.
+			var agg = d.aggregate || {};
 			if (d.price) {
-				html += '<div class="shoper-field-group"><label>قیمت (ارزان‌ترین فروشنده)</label>';
+				html += '<div class="shoper-field-group"><label>قیمت انتخاب‌شده</label>';
 				html += '<input type="text" value="' + this.esc(this.numberFormat(d.price)) + ' تومان" readonly></div>';
+			}
+
+			if (agg.considered && agg.considered.length) {
+				html += '<div class="shoper-field-group">';
+				html += '<label>فروشندگان بررسی‌شده (' + agg.considered.length + ' از ' + (agg.total_sellers || 0) + ')</label>';
+				html += '<p class="description" style="margin:0 0 6px;">اطلاعات محصول از میان این چند فروشنده‌ی برتر جمع‌آوری شده است، نه از همه‌ی فروشگاه‌ها.</p>';
+				html += '<table class="shoper-sellers-preview"><thead><tr>';
+				html += '<th>فروشنده</th><th>شهر</th><th>امتیاز</th><th>قیمت</th>';
+				html += '</tr></thead><tbody>';
+				for (var s = 0; s < agg.considered.length; s++) {
+					var sel = agg.considered[s];
+					html += '<tr' + (s === 0 ? ' class="primary"' : '') + '>';
+					html += '<td>' + this.esc(sel.shop_name) + (s === 0 ? ' <span class="shoper-badge">منتخب</span>' : '') + '</td>';
+					html += '<td>' + this.esc(sel.city) + '</td>';
+					html += '<td>' + this.esc(sel.score_text || sel.score) + '</td>';
+					html += '<td>' + this.esc(this.numberFormat(sel.price)) + ' تومان</td>';
+					html += '</tr>';
+				}
+				html += '</tbody></table>';
+
+				if (agg.cheapest && agg.highest && agg.highest > agg.cheapest) {
+					html += '<p class="description">محدوده‌ی بازار: ' + this.esc(this.numberFormat(agg.cheapest));
+					html += ' تا ' + this.esc(this.numberFormat(agg.highest)) + ' تومان</p>';
+				}
+				if (agg.features && agg.features.length) {
+					html += '<p class="description"><strong>ویژگی‌های تجمیع‌شده:</strong> ';
+					html += this.esc(agg.features.slice(0, 6).join(' • ')) + '</p>';
+				}
+				html += '</div>';
 			}
 
 			// توضیحات.

@@ -18,6 +18,7 @@ class Shoper_Ajax {
 	 * سازنده.
 	 */
 	public function __construct() {
+		add_action( 'wp_ajax_shoper_suggest', array( $this, 'suggest' ) );
 		add_action( 'wp_ajax_shoper_search', array( $this, 'search' ) );
 		add_action( 'wp_ajax_shoper_preview', array( $this, 'preview' ) );
 		add_action( 'wp_ajax_shoper_create', array( $this, 'create' ) );
@@ -35,6 +36,33 @@ class Shoper_Ajax {
 			wp_send_json_error( array( 'message' => 'دسترسی غیرمجاز.' ), 403 );
 		}
 		check_ajax_referer( 'shoper_nonce', 'nonce' );
+	}
+
+	/**
+	 * پیشنهاد نام محصول برای نوار کشویی زیر فیلد جستجو.
+	 *
+	 * کاربر نام کامل محصول را نمی‌داند؛ با نوشتن بخشی از نام،
+	 * نام‌های کامل پیشنهاد می‌شوند.
+	 *
+	 * @return void
+	 */
+	public function suggest() {
+		$this->guard();
+
+		$term = isset( $_POST['term'] ) ? sanitize_text_field( wp_unslash( $_POST['term'] ) ) : '';
+		if ( mb_strlen( $term, 'UTF-8' ) < 2 ) {
+			wp_send_json_success( array( 'suggestions' => array() ) );
+		}
+
+		$builder = new Shoper_Product_Builder();
+		$result  = $builder->suggest( $term );
+
+		if ( is_wp_error( $result ) ) {
+			// پیشنهاد یک قابلیت کمکی است؛ خطایش نباید مزاحم تایپ کاربر شود.
+			wp_send_json_success( array( 'suggestions' => array() ) );
+		}
+
+		wp_send_json_success( $result );
 	}
 
 	/**
