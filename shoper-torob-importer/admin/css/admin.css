@@ -352,3 +352,136 @@
 	border-radius: 10px;
 	margin-right: 4px;
 }
+
+/* ------------------------------------------------------------------ */
+/* نوار مراحل (Stepper)                                                */
+/* ------------------------------------------------------------------ */
+.shoper-stepper {
+	display: flex;
+	gap: 6px;
+	margin-bottom: 16px;
+	background: #f6f7f7;
+	border: 1px solid #e5e5e5;
+	border-radius: 6px;
+	padding: 8px;
+}
+.shoper-step {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex: 1;
+	padding: 8px 10px;
+	border-radius: 4px;
+	cursor: pointer;
+	background: #fff;
+	border: 1px solid #e5e5e5;
+	color: #50575e;
+	font-weight: 600;
+	transition: all .15s;
+}
+.shoper-step.is-active {
+	background: #2271b1;
+	border-color: #2271b1;
+	color: #fff;
+}
+.shoper-step.is-done {
+	background: #edfaef;
+	border-color: #b8e6bf;
+	color: #1a7f37;
+}
+.shoper-step-num {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	border-radius: 50%;
+	background: #e5e5e5;
+	color: #50575e;
+	font-size: 12px;
+	flex: 0 0 auto;
+}
+.shoper-step.is-active .shoper-step-num,
+.shoper-step.is-done .shoper-step-num {
+	background: rgba(255, 255, 255, .85);
+}
+.shoper-step-count {
+	margin-left: auto;
+	background: #fff;
+	border: 1px solid #c5d9ed;
+	color: #2271b1;
+	font-size: 11px;
+	padding: 0 7px;
+	border-radius: 10px;
+}
+
+/* ------------------------------------------------------------------ */
+/* انتخاب تصاویر                                                       */
+/* ------------------------------------------------------------------ */
+.shoper-img-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+	gap: 10px;
+}
+.shoper-img-item {
+	border: 1px solid #e5e5e5;
+	border-radius: 6px;
+	overflow: hidden;
+	background: #fafafa;
+}
+.shoper-img-thumb {
+	height: 120px;
+	overflow: hidden;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: #fff;
+}
+.shoper-img-thumb img {
+	max-width: 100%;
+	max-height: 100%;
+	object-fit: contain;
+}
+.shoper-img-controls {
+	padding: 6px 8px;
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	font-size: 12px;
+}
+.shoper-img-controls label {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	margin: 0;
+	cursor: pointer;
+}
+
+/* ------------------------------------------------------------------ */
+/* نوار پیشرفت                                                         */
+/* ------------------------------------------------------------------ */
+.shoper-progress {
+	margin-top: 16px;
+	padding: 12px;
+	border: 1px solid #e5e5e5;
+	border-radius: 6px;
+	background: #fafafa;
+}
+.shoper-progress-track {
+	height: 14px;
+	background: #e5e5e5;
+	border-radius: 8px;
+	overflow: hidden;
+}
+.shoper-progress-bar {
+	height: 100%;
+	width: 0;
+	background: linear-gradient(90deg, #2271b1, #00a32a);
+	border-radius: 8px;
+	transition: width .4s ease;
+}
+.shoper-progress-label {
+	margin-top: 6px;
+	font-size: 12px;
+	color: #50575e;
+}

@@ -277,6 +277,20 @@
     </div>
 
     <aside class="shoper-side-col">
+      <div class="shoper-card shoper-download-card">
+        <h3>⬇️ دانلود آخرین نسخه‌ی افزونه</h3>
+        <p class="description" style="margin:0 0 10px;">
+          نسخه‌ی نهایی تست‌شده (v1.2.0) به‌صورت ZIP آماده‌ی نصب است.
+          بعد از دانلود، پوشه‌ی <code>shoper-torob-importer</code> را در
+          <code>wp-content/plugins/</code> بریزید و فعالش کنید.
+        </p>
+        <a id="shoper-download-btn" class="button button-primary button-hero" style="display:inline-block;text-align:center;width:100%;"
+           href="/download/latest">
+          ⬇️ دانلود shoper-torob-importer-1.2.0.zip
+        </a>
+        <p class="description" id="download-meta" style="margin-top:8px;font-size:11.5px;"></p>
+      </div>
+
       <div class="shoper-card">
         <h3>تست اتصال</h3>
         <button type="button" class="button" id="shoper-test-conn">بررسی اتصال به ترب</button>
@@ -413,8 +427,11 @@ window.ShoperData = {
     var specs = [];
     $('.shoper-spec-check:checked').each(function () { specs.push($(this).val()); });
 
+    var imgSel = (typeof Shoper.collectImgSelection === 'function') ? Shoper.collectImgSelection() : { selected: [], featured: 0 };
+
     this.status(ShoperData.i18n.creating, 'loading');
     this.$createBtn.prop('disabled', true);
+    if (typeof Shoper.showProgress === 'function') { Shoper.showProgress('دریافت اطلاعات'); }
 
     this.ajax('shoper_create', {
       prk: prk,
@@ -422,10 +439,20 @@ window.ShoperData = {
       name: $('#shoper-p-name').val(),
       description: $('#shoper-p-desc').val(),
       specs: JSON.stringify(specs),
-      status: $('#shoper-create-status').val()
+      status: $('#shoper-create-status').val(),
+      selected_images: JSON.stringify(imgSel.selected || []),
+      featured_image: imgSel.featured || 0,
+      seo_title: $('#shoper-p-seo-title').val(),
+      seo_desc: $('#shoper-p-seo-desc').val(),
+      tags: JSON.stringify($('#shoper-p-tags').val().split(/[،,]/).map(function (t) { return t.trim(); }).filter(Boolean))
     }, function (data) {
       self.$createBtn.prop('disabled', false);
       self.status('محصول ساخته شد (شبیه‌سازی‌شده).', 'success');
+      if (typeof Shoper.showProgress === 'function') {
+        Shoper.showProgress('دانلود تصاویر');
+        setTimeout(function () { Shoper.showProgress('سئو و برچسب'); }, 250);
+        setTimeout(function () { Shoper.showProgress('انجام شد!'); }, 500);
+      }
       renderWcOutput(data);
     }).fail(function () {
       self.$createBtn.prop('disabled', false);
@@ -451,6 +478,7 @@ window.ShoperData = {
     html += '<div class="wc-tab" data-tab="attrs">ویژگی‌ها (' + p.attributes.length + ')</div>';
     html += '<div class="wc-tab" data-tab="images">تصاویر (' + p.images.will_sideload + ')</div>';
     html += '<div class="wc-tab" data-tab="desc">توضیحات</div>';
+    html += '<div class="wc-tab" data-tab="seo">سئو / برچسب</div>';
     html += '<div class="wc-tab" data-tab="meta">متا / SKU</div>';
     html += '</div>';
 
@@ -480,7 +508,10 @@ window.ShoperData = {
 
     // تصاویر
     html += '<div class="wc-panel" data-panel="images">';
-    html += '<div class="img-note">این تصاویر با <code>media_sideload_image</code> در کتابخانه‌ی رسانه‌ی سایت شما ذخیره می‌شوند.</div>';
+    html += '<div class="img-note">این تصاویر با <code>media_handle_sideload</code> در کتابخانه‌ی رسانه‌ی سایت شما با نام <strong>«نام محصول-شماره»</strong> ذخیره می‌شوند.</div>';
+    if (p.images.filenames && p.images.filenames.length) {
+      html += '<div class="img-note">نام فایل‌ها: <code>' + esc(p.images.filenames.map(function (f) { return f + '.webp'; }).join('، ')) + '</code></div>';
+    }
     if (p.images.featured) {
       html += '<h3>تصویر شاخص</h3><img src="' + esc(p.images.featured) + '" style="max-width:150px;border:1px solid #ddd;border-radius:4px;">';
     }
@@ -495,6 +526,13 @@ window.ShoperData = {
 
     // توضیحات
     html += '<div class="wc-panel" data-panel="desc">' + p.description + '</div>';
+
+    // سئو / برچسب
+    html += '<div class="wc-panel" data-panel="seo"><table>';
+    html += '<tr><th>عنوان سئو</th><td>' + esc(p.seo.title) + '</td></tr>';
+    html += '<tr><th>توضیح متا</th><td>' + esc(p.seo.description) + '</td></tr>';
+    html += '<tr><th>برچسب‌ها</th><td>' + esc(p.seo.tags.join('، ')) + '</td></tr>';
+    html += '</table></div>';
 
     // متا
     html += '<div class="wc-panel" data-panel="meta"><div class="wc-code">' +

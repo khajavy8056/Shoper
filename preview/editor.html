@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>شبیه‌ساز ویرایشگر محصول ووکامرس + متاباکس Shoper</title>
+<style>
+	:root { --wp-blue:#2271b1; }
+	* { box-sizing: border-box; }
+	body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen,Ubuntu,sans-serif; background:#f0f0f1; color:#1d2327; }
+	.wp-toolbar { background:#1d2327; color:#c3c4c7; padding:0 12px; height:32px; display:flex; align-items:center; font-size:13px; }
+	.wp-toolbar .t { color:#fff; font-weight:600; margin-left:10px; }
+	.wrap { max-width:1200px; margin:20px auto; padding:0 12px; }
+	.page-title { font-size:23px; font-weight:400; padding:12px 0; border-bottom:1px solid #c3c4c7; margin-bottom:16px; }
+	.editor-layout { display:flex; gap:16px; align-items:flex-start; }
+	.editor-main { flex:1 1 auto; min-width:0; }
+	.editor-side { flex:0 0 280px; }
+	.panel { background:#fff; border:1px solid #c3c4c7; margin-bottom:16px; border-radius:2px; }
+	.panel h3.panel-title { margin:0; padding:10px 14px; border-bottom:1px solid #c3c4c7; font-size:14px; font-weight:600; }
+	.panel .panel-body { padding:14px; }
+	.form-field { margin-bottom:12px; }
+	.form-field label { display:block; font-weight:600; margin-bottom:4px; font-size:13px; }
+	.form-field input[type=text], .form-field textarea, .form-field input[type=number] {
+		width:100%; border:1px solid #8c8f94; border-radius:4px; padding:6px 8px; font-size:13px; background:#fff;
+	}
+	.wc-input { width:100%; border:1px solid #8c8f94; border-radius:4px; padding:6px 8px; font-size:13px; }
+	.wc-textarea { width:100%; min-height:80px; border:1px solid #8c8f94; border-radius:4px; padding:6px 8px; font-size:13px; }
+	.tagchecklist { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+	.tagchecklist span { background:#f6f7f7; border:1px solid #c3c4c7; border-radius:3px; padding:3px 8px; font-size:12px; }
+	.attr-row { display:flex; justify-content:space-between; border-bottom:1px dashed #e5e5e5; padding:6px 0; font-size:13px; }
+	.attr-row b { color:#2271b1; }
+	.attr-row code { color:#787c82; font-size:11px; }
+	.img-row { display:flex; flex-wrap:wrap; gap:8px; }
+	.img-row img { width:64px; height:64px; object-fit:cover; border:1px solid #ddd; border-radius:3px; }
+	.img-row .feat { border:2px solid #2271b1; }
+	.img-row .gal { border:1px solid #ddd; }
+	#fill-result { background:#edfaef; border:1px solid #b8e6bf; padding:12px; border-radius:4px; font-size:13px; margin-top:10px; }
+	#fill-result .ok { color:#1a7f37; font-weight:600; }
+	.note { font-size:12px; color:#50575e; background:#f0f6fc; border:1px solid #c5d9ed; padding:8px 10px; border-radius:4px; margin:10px 0; }
+	.mobile-toggle { margin-bottom:12px; }
+
+	/* ===== استایل واقعی افزونه (باید لود شود) ===== */
+	/* .shoper-metabox styles از admin/css/admin.css می‌آید */
+
+	@media (max-width: 782px) {
+		.editor-layout { flex-direction: column; }
+		.editor-side { flex:1 1 auto; width:100%; }
+	}
+</style>
+</head>
+<body>
+<div class="wp-toolbar"><span class="t">پیشخوان وردپرس</span> محصولات › افزودن محصول — ووکامرس</div>
+<div class="wrap">
+	<div class="mobile-toggle">
+		<strong>نمای صفحه:</strong>
+		<label><input type="radio" name="view" value="desktop" checked> دسکتاپ</label>
+		<label><input type="radio" name="view" value="mobile"> موبایل (۳۷۵px)</label>
+	</div>
+	<h1 class="page-title">محصول جدید</h1>
+
+	<div class="editor-layout" id="editor-layout">
+		<!-- ستون اصلی: فیلدهای محصول ووکامرس -->
+		<div class="editor-main">
+			<div class="panel">
+				<h3 class="panel-title">عنوان محصول</h3>
+				<div class="panel-body">
+					<div class="form-field">
+						<input type="text" id="title" class="wc-input" placeholder="عنوان محصول را اینجا بنویسید…">
+					</div>
+				</div>
+			</div>
+
+			<div class="panel">
+				<h3 class="panel-title">داده‌های محصول</h3>
+				<div class="panel-body">
+					<div class="wc-tabs">
+						<span class="wc-tab active" data-tab="general">عمومی</span>
+						<span class="wc-tab" data-tab="inventory">موجودی</span>
+						<span class="wc-tab" data-tab="attributes">ویژگی‌ها</span>
+					</div>
+					<div class="wc-tabpanel active" data-panel="general">
+						<div class="form-field"><label>قیمت عادی (تومان)</label><input type="text" id="_regular_price" class="wc-input"></div>
+						<div class="form-field"><label>قیمت فروش (تومان)</label><input type="text" id="_sale_price" class="wc-input"></div>
+					</div>
+					<div class="wc-tabpanel" data-panel="inventory">
+						<div class="form-field"><label>SKU</label><input type="text" id="_sku" class="wc-input"></div>
+					</div>
+					<div class="wc-tabpanel" data-panel="attributes">
+						<div id="product_attributes" class="attr-list"></div>
+					</div>
+				</div>
+			</div>
+
+			<div class="panel">
+				<h3 class="panel-title">توضیح کوتاه (خلاصه)</h3>
+				<div class="panel-body"><textarea id="excerpt" class="wc-textarea" placeholder="خلاصه‌ی محصول اینجا می‌آید…"></textarea></div>
+			</div>
+
+			<div class="panel">
+				<h3 class="panel-title">توضیحات محصول</h3>
+				<div class="panel-body"><textarea id="description" class="wc-textarea" rows="6" placeholder="توضیحات کامل محصول اینجا می‌آید…"></textarea></div>
+			</div>
+
+			<div class="panel">
+				<h3 class="panel-title">تصاویر محصول</h3>
+				<div class="panel-body">
+					<div class="form-field"><label>تصویر شاخص</label><div id="featured-img" class="img-row"></div></div>
+					<div class="form-field"><label>گالری تصاویر</label><div id="gallery-img" class="img-row"></div></div>
+				</div>
+			</div>
+
+			<div class="panel">
+				<h3 class="panel-title">برچسب‌های محصول</h3>
+				<div class="panel-body"><div id="tagsdiv" class="tagchecklist"></div></div>
+			</div>
+
+			<div class="note" id="wc-note">این صفحه نمای واقعیِ ویرایشگر ووکامرس است (عنوان، توضیحات، خلاصه، قیمت، SKU، ویژگی‌ها، تصاویر، برچسب‌ها). متاباکس Shoper در ستون کناری است و داده‌ها باید به همین فیلدها منتقل شوند.</div>
+			<div id="fill-result" style="display:none;"></div>
+		</div>
+
+		<!-- ستون کناری: متاباکس Shoper -->
+		<div class="editor-side" id="editor-side">
+			<div class="panel" id="shoper-meta-box">
+				<h3 class="panel-title">🛒 پر کردن از ترب (Shoper)</h3>
+				<div class="panel-body">
+					<!-- همان محتوای متاباکس واقعی -->
+					<div class="shoper-metabox">
+						<p class="shoper-hint">بخشی از نام محصول را بنویسید — نام‌های کامل به‌صورت کشویی پیشنهاد می‌شوند. سپس عنوان، توضیحات، تصاویر و همه‌ی مشخصات فنی به‌صورت ویژگی‌های مجزا برای این محصول پر می‌شود.</p>
+						<div class="shoper-field">
+							<label><input type="radio" name="shoper_input_mode" value="query" checked> جستجو با نام محصول</label>
+							<label style="margin-right:12px;"><input type="radio" name="shoper_input_mode" value="url"> لینک محصول</label>
+						</div>
+						<div class="shoper-field" id="shoper-query-wrap">
+							<input type="text" id="shoper-query" placeholder="مثال: گوشی سامسونگ S25 Ultra" class="widefat" autocomplete="off">
+						</div>
+						<div class="shoper-field" id="shoper-url-wrap" style="display:none;">
+							<input type="url" id="shoper-url" placeholder="https://torob.com/p/..." class="widefat" autocomplete="off">
+						</div>
+						<button type="button" class="button button-primary" id="shoper-search-btn">🔍 جستجو در ترب</button>
+						<div id="shoper-results" class="shoper-results" style="display:none;"></div>
+						<div id="shoper-preview" class="shoper-preview" style="display:none;"></div>
+						<p id="shoper-fill-row" style="display:none; margin-top:10px;">
+							<button type="button" class="button button-primary button-large" id="shoper-fill-btn" style="width:100%;">✅ پر کردن این محصول</button>
+						</p>
+						<div id="shoper-status" class="shoper-status"></div>
+						<input type="hidden" id="shoper-post-id" value="123">
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<script src="/vendor/jquery.min.js"></script>
+<script>window.ShoperData = { ajaxUrl:'/admin-ajax.php', nonce:'preview-nonce', i18n:{ searching:'در حال جستجو…', loading:'در حال دریافت اطلاعات…', creating:'در حال ساخت…', filling:'در حال پر کردن محصول…', empty_query:'نام محصول را وارد کنید.', select_one:'یک محصول را انتخاب کنید.', done:'انجام شد!', error:'خطا', view_product:'مشاهده محصول', edit_product:'ویرایش محصول' } };</script>
+<script src="/plugin/admin/js/admin.js"></script>
+<script src="/plugin/admin/css/admin.css" type="text/css"></script>
+<link rel="stylesheet" href="/plugin/admin/css/admin.css">
+<script>
+(function ($) {
+	'use strict';
+	window.__wcState = {};
+
+	// تزریق حالت داده‌ی ضبط‌شده + رندر فیلدهای ووکامرس بعد از پاسخ shoper_fill.
+	var baseAjax = Shoper.ajax;
+	Shoper.ajax = function (action, data, onSuccess) {
+		data = data || {};
+		data.data_mode = 'fixture';
+		data.seller_limit = '3';
+		data.seller_strategy = 'score';
+		return baseAjax.call(Shoper, action, data, function (resp) {
+			if (action === 'shoper_fill' && resp.wc_fields) {
+				renderWcFields(resp.wc_fields);
+			}
+			if (typeof onSuccess === 'function') onSuccess(resp);
+		});
+	};
+
+	function renderWcFields(f) {
+		if (!f) return;
+		window.__wcState.fields = f;
+		$('#title').val(f.title);
+		$('#_regular_price').val(f.regular_price);
+		$('#_sku').val(f.sku);
+		$('#excerpt').val(f.short_description);
+		$('#description').val(f.description);
+
+		// ویژگی‌ها
+		var ah = '';
+		(f.attributes || []).forEach(function (a) {
+			ah += '<div class="attr-row"><b>' + a.name + '</b><span>' + a.value + ' <code>' + a.taxonomy + '</code></span></div>';
+		});
+		$('#product_attributes').html(ah || '<em>هیچ ویژگی‌ای ثبت نشد.</em>');
+
+		// تصاویر
+		var feat = f.images && f.images.featured ? '<img class="feat" src="' + f.images.featured + '">' : '';
+		$('#featured-img').html(feat);
+		var gal = (f.images && f.images.gallery || []).map(function (u) { return '<img class="gal" src="' + u + '">'; }).join('');
+		$('#gallery-img').html(gal);
+
+		// برچسب‌ها
+		$('#tagsdiv').html((f.tags || []).map(function (t) { return '<span>' + t + '</span>'; }).join(''));
+
+		$('#fill-result').show().html('<div class="ok">✓ محصول از ترب پر شد — داده‌ها در فیلدهای درست ووکامرس ثبت شدند.</div><div class="note" style="margin-top:6px;">تصاویر در کتابخانه‌ی رسانه با نام «' + (f.images.filenames || []).join('، ') + '» ذخیره می‌شوند.</div>');
+	}
+
+	// تعویض دسکتاپ/موبایل
+	$('input[name=view]').on('change', function () {
+		var v = $(this).val();
+		if (v === 'mobile') {
+			$('#editor-layout').css({ 'flex-direction': 'column' });
+			$('.editor-side').css({ 'flex': '1 1 auto', 'width': '100%' });
+		} else {
+			$('#editor-layout').css({ 'flex-direction': '' });
+			$('.editor-side').css({ 'flex': '', 'width': '' });
+		}
+		$(window).trigger('resize');
+	});
+
+	window.__renderWcFields = renderWcFields;
+})(jQuery);
+</script>
+</body>
+</html>

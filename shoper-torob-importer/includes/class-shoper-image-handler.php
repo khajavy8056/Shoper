@@ -106,16 +106,23 @@ class Shoper_Image_Handler {
 	/**
 	 * دانلود تصویر شاخص و گالری برای یک محصول.
 	 *
-	 * @param array   $urls       آرایه‌ای از URLها (اولین مورد تصویر شاخص).
-	 * @param int     $post_id    شناسه‌ی محصول.
-	 * @param string  $title      عنوان محصول (برای alt).
-	 * @param bool    $gallery    آیا گالری هم دانلود شود.
-	 * @return array  { featured_id, gallery_ids, errors }
+	 * کاربر می‌تواند تعیین کند کدام تصاویر نگه داشته شوند و کدام‌یک «تصویر اصلی»
+	 * باشد. تصاویر با نام محصول + شماره‌ی ترتیبی ذخیره می‌شوند (مثل
+	 * `گوشی-سامسونگ-1.webp`).
+	 *
+	 * @param array      $urls        آرایه‌ای از URLها.
+	 * @param int        $post_id     شناسه‌ی محصول.
+	 * @param string     $title       عنوان محصول (برای alt و نام فایل).
+	 * @param bool       $gallery     آیا گالری هم دانلود شود.
+	 * @param array|null $selected    ایندکس‌های تصاویری که کاربر نگه می‌دارد (null = همه).
+	 * @param int        $featured    ایندکس تصویری که «تصویر اصلی» است (پیش‌فرض: اولی).
+	 * @return array  { featured_id, gallery_ids, filenames, errors }
 	 */
-	public function sideload_gallery( $urls, $post_id, $title = '', $gallery = true ) {
+	public function sideload_gallery( $urls, $post_id, $title = '', $gallery = true, $selected = null, $featured = 0 ) {
 		$result = array(
 			'featured_id' => 0,
 			'gallery_ids' => array(),
+			'filenames'   => array(),
 			'errors'      => array(),
 		);
 
@@ -123,17 +130,50 @@ class Shoper_Image_Handler {
 			return $result;
 		}
 
-		$first = true;
-		foreach ( $urls as $url ) {
-			$id = $this->sideload( $url, $post_id, $title );
+		// فهرست ایندکس‌هایی که باید دانلود شوند.
+		$total  = count( $urls );
+		$indices = array();
+		if ( is_array( $selected ) && ! empty( $selected ) ) {
+			foreach ( $selected as $i ) {
+				$i = (int) $i;
+				if ( $i >= 0 && $i < $total ) {
+					$indices[] = $i;
+				}
+			}
+		} else {
+			$indices = range( 0, $total - 1 );
+		}
+		$indices = array_values( array_unique( $indices ) );
+
+		if ( empty( $indices ) ) {
+			return $result;
+		}
+
+		// تعیین تصویر اصلی.
+		$featured = (int) $featured;
+		if ( ! in_array( $featured, $indices, true ) ) {
+			$featured = $indices[0];
+		}
+
+		$base   = $this->base_filename( $title );
+		$number = 0;
+
+		foreach ( $indices as $idx ) {
+			$url = $urls[ $idx ];
+			$number++;
+			$filename = $base . '-' . $number;
+
+			$id = $this->sideload_named( $url, $post_id, $filename, $title );
 			if ( is_wp_error( $id ) ) {
 				$result['errors'][] = $url . ' => ' . $id->get_error_message();
 				continue;
 			}
-			if ( $first ) {
+
+			$result['filenames'][] = $filename;
+
+			if ( $idx === $featured ) {
 				$result['featured_id'] = $id;
 				set_post_thumbnail( $post_id, $id );
-				$first = false;
 				if ( ! $gallery ) {
 					break;
 				}
@@ -143,6 +183,130 @@ class Shoper_Image_Handler {
 		}
 
 		return $result;
+	}
+
+	/**
+	 * دانلود و ثبت یک تصویر با نام فایل دلخواه (کنترل کامل بر نام فایل).
+	 *
+	 * برخلاف media_sideload_image که نام را از URL می‌گیرد، این متد فایل را با
+	 * نام `{نام محصول}-{شماره}` در کتابخانه‌ی رسانه ذخیره می‌کند.
+	 *
+	 * @param string $url      آدرس تصویر.
+	 * @param int    $post_id  شناسه‌ی پست برای الصاق.
+	 * @param string $filename نام فایل (بدون پسوند یا با پسوند).
+	 * @param string $title    عنوان/alt.
+	 * @return int|WP_Error
+	 */
+	public function sideload_named( $url, $post_id = 0, $filename = '', $title = '' ) {
+		if ( empty( $url ) ) {
+			return new WP_Error( 'empty_url', 'آدرس تصویر خالی است.' );
+		}
+
+		// جلوگیری از دانلود تکراری بر اساس URL مبدأ.
+		$existing = $this->find_by_source_url( $url );
+		if ( $existing ) {
+			return $existing;
+		}
+
+		if ( ! function_exists( 'media_handle_sideload' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/media.php';
+			require_once ABSPATH . 'wp-admin/includes/file.php';
+			require_once ABSPATH . 'wp-admin/includes/image.php';
+		}
+
+		// دانلود به فایل موقت با User-Agent و Referer مناسب.
+		add_filter( 'http_request_args', array( $this, 'filter_download_args' ), 10, 2 );
+		$tmp = download_url( $url );
+		remove_filter( 'http_request_args', array( $this, 'filter_download_args' ), 10 );
+
+		if ( is_wp_error( $tmp ) ) {
+			return $tmp;
+		}
+
+		// تعیین پسوند از URL و سپس از فایل.
+		$ext = $this->detect_extension( $url, $tmp );
+
+		$safe_name = sanitize_file_name( (string) $filename );
+		$safe_name = trim( $safe_name );
+		if ( '' === $safe_name ) {
+			$safe_name = 'shoper-product';
+		}
+		// اگر نام فایل پسوند نداشت، پسوند تصویر را اضافه کن.
+		$name_ext = strtolower( pathinfo( $safe_name, PATHINFO_EXTENSION ) );
+		if ( '' === $name_ext && $ext ) {
+			$safe_name .= '.' . $ext;
+		}
+
+		$file_array = array(
+			'name'     => $safe_name,
+			'type'     => function_exists( 'wp_get_image_mime' ) && $tmp ? wp_get_image_mime( $tmp ) : '',
+			'tmp_name' => $tmp,
+			'error'    => 0,
+			'size'     => file_exists( $tmp ) ? filesize( $tmp ) : 0,
+		);
+
+		$attachment_id = media_handle_sideload( $file_array, $post_id, $title ? $title : null, array() );
+
+		if ( file_exists( $tmp ) ) {
+			@unlink( $tmp ); // phpcs:ignore
+		}
+
+		if ( is_wp_error( $attachment_id ) ) {
+			return $attachment_id;
+		}
+
+		update_post_meta( $attachment_id, '_shoper_source_url', esc_url_raw( $url ) );
+		if ( $title ) {
+			update_post_meta( $attachment_id, '_wp_attachment_image_alt', sanitize_text_field( $title ) );
+		}
+
+		return (int) $attachment_id;
+	}
+
+	/**
+	 * تشخیص پسوند تصویر از URL، با fallback به نوع واقعی فایل.
+	 *
+	 * @param string $url آدرس.
+	 * @param string $tmp مسیر فایل موقت.
+	 * @return string
+	 */
+	private function detect_extension( $url, $tmp = '' ) {
+		$ext = '';
+		$path = wp_parse_url( $url, PHP_URL_PATH );
+		if ( $path ) {
+			$ext = strtolower( pathinfo( $path, PATHINFO_EXTENSION ) );
+		}
+		if ( ! in_array( $ext, array( 'jpg', 'jpeg', 'png', 'webp', 'gif', 'avif' ), true ) && $tmp && file_exists( $tmp ) ) {
+			$mime = function_exists( 'wp_get_image_mime' ) ? wp_get_image_mime( $tmp ) : '';
+			switch ( $mime ) {
+				case 'image/webp': $ext = 'webp'; break;
+				case 'image/png':  $ext = 'png'; break;
+				case 'image/gif':  $ext = 'gif'; break;
+				case 'image/avif': $ext = 'avif'; break;
+				default:           $ext = 'jpg';
+			}
+		}
+		return $ext;
+	}
+
+	/**
+	 * ساخت نام پایه برای فایل تصویر از عنوان محصول.
+	 *
+	 * نام محصول فارسی را نگه می‌دارد اما فاصله‌ها و کاراکترهای خطرناک را
+	 * به خط تیره تبدیل می‌کند. اگر خروجی خالی بود از «shoper-product» استفاده می‌شود.
+	 *
+	 * @param string $title عنوان محصول.
+	 * @return string
+	 */
+	private function base_filename( $title ) {
+		$base = sanitize_file_name( (string) $title );
+		$base = preg_replace( '/[\/\\\]/u', '-', $base );
+		$base = preg_replace( '/\s+/u', '-', $base );
+		$base = trim( $base, '-.' );
+		if ( '' === $base ) {
+			$base = 'shoper-product';
+		}
+		return substr( $base, 0, 80 );
 	}
 
 	/**

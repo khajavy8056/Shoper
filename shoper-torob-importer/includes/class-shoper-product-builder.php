@@ -229,10 +229,17 @@ class Shoper_Product_Builder {
 
 		$this->save_source_meta( $product_id, $data );
 
-		// تصاویر: دانلود در کتابخانه‌ی رسانه.
+		// تصاویر: دانلود در کتابخانه‌ی رسانه با نام محصول + شماره.
+		// کاربر می‌تواند فقط برخی تصاویر و یک «تصویر اصلی» را انتخاب کرده باشد.
+		$selected_images = ! empty( $args['selected_images'] ) && is_array( $args['selected_images'] )
+			? array_map( 'absint', $args['selected_images'] )
+			: null;
+		$featured_image  = isset( $args['featured_image'] ) ? (int) $args['featured_image'] : 0;
+
 		$image_info = array(
 			'featured_id' => 0,
 			'gallery_ids' => array(),
+			'filenames'   => array(),
 			'errors'      => array(),
 		);
 		if ( ! empty( $data['gallery'] ) && is_array( $data['gallery'] ) ) {
@@ -240,7 +247,9 @@ class Shoper_Product_Builder {
 				$data['gallery'],
 				$product_id,
 				$data['name1'],
-				$set_gallery
+				$set_gallery,
+				$selected_images,
+				$featured_image
 			);
 			if ( ! empty( $image_info['gallery_ids'] ) ) {
 				$product->set_gallery_image_ids( array_map( 'intval', $image_info['gallery_ids'] ) );
@@ -248,15 +257,45 @@ class Shoper_Product_Builder {
 			}
 		}
 
+		// سئو و برچسب‌ها.
+		$seo = $this->build_seo( $data );
+		$seo_title = ! empty( $args['seo_title'] )
+			? sanitize_text_field( $args['seo_title'] )
+			: $seo['title'];
+		$seo_desc  = ! empty( $args['seo_desc'] )
+			? sanitize_textarea_field( $args['seo_desc'] )
+			: $seo['description'];
+		$tags      = ( ! empty( $args['tags'] ) && is_array( $args['tags'] ) )
+			? array_map( 'sanitize_text_field', $args['tags'] )
+			: $seo['tags'];
+
+		if ( ! empty( $tags ) ) {
+			wp_set_object_terms( $product_id, $tags, 'product_tag' );
+		}
+		update_post_meta( $product_id, '_shoper_seo_title', $seo_title );
+		update_post_meta( $product_id, '_shoper_seo_desc', $seo_desc );
+
+		// اگر Yoast نصب باشد، متادیتای آن را هم پر می‌کنیم.
+		if ( defined( 'WPSEO_VERSION' ) || class_exists( '\Yoast\WP\SEO\Main' ) ) {
+			update_post_meta( $product_id, '_yoast_wpseo_title', $seo_title );
+			update_post_meta( $product_id, '_yoast_wpseo_metadesc', $seo_desc );
+		}
+
 		return array(
 			'product_id'    => $product_id,
 			'edit_link'     => get_edit_post_link( $product_id, 'url' ),
 			'view_link'     => get_permalink( $product_id ),
 			'image_info'    => $image_info,
+			'filenames'     => ! empty( $image_info['filenames'] ) ? $image_info['filenames'] : array(),
 			'specs_count'   => ! empty( $data['specs'] ) ? count( $data['specs'] ) : 0,
 			'price'         => ! empty( $data['price'] ) ? (int) $data['price'] : 0,
 			'sellers_used'  => ! empty( $data['aggregate']['considered'] ) ? count( $data['aggregate']['considered'] ) : 0,
 			'sellers_total' => ! empty( $data['sellers_count'] ) ? (int) $data['sellers_count'] : 0,
+			'seo'           => array(
+				'title'       => $seo_title,
+				'description' => $seo_desc,
+				'tags'        => $tags,
+			),
 			'attr_errors'   => $attr_errors,
 		);
 	}
@@ -266,9 +305,10 @@ class Shoper_Product_Builder {
 	 *
 	 * @param int   $post_id شناسه.
 	 * @param array $data    داده.
+	 * @param array $args    آرگومان‌های اختیاری (selected_images, featured_image, seo_title, seo_desc, tags).
 	 * @return array|WP_Error
 	 */
-	public function fill_product( $post_id, $data ) {
+	public function fill_product( $post_id, $data, $args = array() ) {
 		$product = wc_get_product( $post_id );
 		if ( ! $product ) {
 			return new WP_Error( 'not_found', 'محصول یافت نشد.' );
@@ -297,24 +337,56 @@ class Shoper_Product_Builder {
 		$this->save_source_meta( $post_id, $data );
 		update_post_meta( $post_id, '_shoper_filled_at', current_time( 'mysql' ) );
 
+		// انتخاب تصاویر + سئو و برچسب.
+		$selected_images = ! empty( $args['selected_images'] ) && is_array( $args['selected_images'] )
+			? array_map( 'absint', $args['selected_images'] )
+			: null;
+		$featured_image  = isset( $args['featured_image'] ) ? (int) $args['featured_image'] : 0;
+
 		$image_info = array(
 			'featured_id' => 0,
 			'gallery_ids' => array(),
+			'filenames'   => array(),
 			'errors'      => array(),
 		);
-		if ( ! has_post_thumbnail( $post_id ) && ! empty( $data['gallery'] ) ) {
+		if ( ! empty( $data['gallery'] ) ) {
 			$set_gallery = 'yes' === get_option( 'shoper_import_gallery', 'yes' );
-			$image_info  = $this->images->sideload_gallery( $data['gallery'], $post_id, $data['name1'], $set_gallery );
+			$image_info  = $this->images->sideload_gallery(
+				$data['gallery'],
+				$post_id,
+				$data['name1'],
+				$set_gallery,
+				$selected_images,
+				$featured_image
+			);
 			if ( ! empty( $image_info['gallery_ids'] ) ) {
 				$product->set_gallery_image_ids( array_map( 'intval', $image_info['gallery_ids'] ) );
 				$product->save();
 			}
 		}
 
+		// سئو و برچسب.
+		$seo       = $this->build_seo( $data );
+		$seo_title = ! empty( $args['seo_title'] ) ? sanitize_text_field( $args['seo_title'] ) : $seo['title'];
+		$seo_desc  = ! empty( $args['seo_desc'] ) ? sanitize_textarea_field( $args['seo_desc'] ) : $seo['description'];
+		$tags      = ( ! empty( $args['tags'] ) && is_array( $args['tags'] ) )
+			? array_map( 'sanitize_text_field', $args['tags'] )
+			: $seo['tags'];
+		if ( ! empty( $tags ) ) {
+			wp_set_object_terms( $post_id, $tags, 'product_tag' );
+		}
+		update_post_meta( $post_id, '_shoper_seo_title', $seo_title );
+		update_post_meta( $post_id, '_shoper_seo_desc', $seo_desc );
+		if ( defined( 'WPSEO_VERSION' ) || class_exists( '\Yoast\WP\SEO\Main' ) ) {
+			update_post_meta( $post_id, '_yoast_wpseo_title', $seo_title );
+			update_post_meta( $post_id, '_yoast_wpseo_metadesc', $seo_desc );
+		}
+
 		return array(
 			'post_id'     => $post_id,
 			'specs_count' => ! empty( $data['specs'] ) ? count( $data['specs'] ) : 0,
 			'images'      => $image_info,
+			'filenames'   => ! empty( $image_info['filenames'] ) ? $image_info['filenames'] : array(),
 			'attr_errors' => $attr_errors,
 		);
 	}
@@ -399,6 +471,77 @@ class Shoper_Product_Builder {
 		}
 
 		return implode( "\n", $parts );
+	}
+
+	/**
+	 * ساخت اطلاعات سئو: تیتر، توضیح متا و برچسب‌های محصول.
+	 *
+	 * برچسب‌ها از نام فارسی/انگلیسی محصول و مشخصات کلیدی (مثل برند و مدل)
+	 * استخراج می‌شوند و در بخش «برچسب‌ها» (product_tag) ثبت می‌گردند.
+	 *
+	 * @param array $data داده.
+	 * @return array { title, description, tags }
+	 */
+	public function build_seo( $data ) {
+		$title = isset( $data['name1'] ) ? (string) $data['name1'] : '';
+
+		// توضیح متا از نام انگلیسی + چند مشخصه‌ی کلیدی.
+		$desc_parts = array();
+		if ( ! empty( $data['name2'] ) ) {
+			$desc_parts[] = (string) $data['name2'];
+		}
+		if ( ! empty( $data['key_specs'] ) && is_array( $data['key_specs'] ) ) {
+			$i = 0;
+			foreach ( $data['key_specs'] as $k => $v ) {
+				if ( $i++ >= 5 ) {
+					break;
+				}
+				$desc_parts[] = (string) $k . ': ' . (string) $v;
+			}
+		}
+		$desc = implode( ' | ', $desc_parts );
+		if ( function_exists( 'mb_strlen' ) && mb_strlen( $desc, 'UTF-8' ) > 155 ) {
+			$desc = mb_substr( $desc, 0, 152, 'UTF-8' ) . '…';
+		} elseif ( strlen( $desc ) > 155 ) {
+			$desc = substr( $desc, 0, 152 ) . '…';
+		}
+
+		// برچسب‌ها.
+		$tags  = array();
+		$seen  = array();
+		$cands = array();
+		if ( ! empty( $data['name1'] ) ) {
+			$cands[] = $data['name1'];
+		}
+		if ( ! empty( $data['name2'] ) ) {
+			$cands[] = $data['name2'];
+		}
+		foreach ( array( 'برند', 'مدل', 'سازنده' ) as $key ) {
+			if ( ! empty( $data['specs'][ $key ] ) ) {
+				$cands[] = (string) $data['specs'][ $key ];
+			}
+		}
+
+		foreach ( $cands as $c ) {
+			$tokens = preg_split( '/[\|\/،,]+/u', (string) $c );
+			foreach ( $tokens as $t ) {
+				$t = trim( $t );
+				if ( '' === $t || isset( $seen[ $t ] ) ) {
+					continue;
+				}
+				$seen[ $t ] = true;
+				$tags[]     = $t;
+				if ( count( $tags ) >= 12 ) {
+					break 2;
+				}
+			}
+		}
+
+		return array(
+			'title'       => $title,
+			'description' => $desc,
+			'tags'        => $tags,
+		);
 	}
 
 	/**

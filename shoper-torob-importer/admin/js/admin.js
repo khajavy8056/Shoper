@@ -406,7 +406,9 @@
 			if (type === 'loading') {
 				html = '<span class="shoper-loading-inline"></span> ' + msg;
 			} else {
-				html = msg;
+				// هر پیامی که از سرور/API می‌آید ممکن است کنترل‌نشده باشد؛
+				// آن را escape می‌کنیم تا جلو XSS در پنل مدیریت گرفته شود.
+				html = this.esc(msg);
 			}
 			this.$status.removeClass('loading success error').addClass(type || '').html(html).show();
 		},
@@ -524,9 +526,23 @@
 		},
 
 		renderPreview: function (d) {
+			var self = this;
 			var html = '';
+			// نوار مراحل/گرید تصویر/سئو هم در صفحه‌ی اصلی افزونه (create) هم در
+			// متاباکس صفحه‌ی افزودن/ویرایش محصول (fill) نمایش داده می‌شود.
+			var isMain = !!(this.$createBtn.length || this.$fillRow.length);
 
-			// هدر با تصویر.
+			// --- نوار مراحل (فقط در صفحه‌ی اصلی) ---
+			if (isMain) {
+				html += '<div class="shoper-stepper">';
+				html += '<div class="shoper-step is-active" data-step="info"><span class="shoper-step-num">۱</span> دریافت اطلاعات</div>';
+				html += '<div class="shoper-step" data-step="images"><span class="shoper-step-num">۲</span> انتخاب تصاویر</div>';
+				html += '<div class="shoper-step" data-step="seo"><span class="shoper-step-num">۳</span> سئو و برچسب</div>';
+				html += '</div>';
+			}
+
+			// --- بخش ۱: اطلاعات ---
+			html += '<div class="shoper-step-body" data-step-body="info">';
 			html += '<div class="shoper-preview-header">';
 			if (d.image_url) {
 				html += '<img src="' + this.esc(d.image_url) + '" alt="">';
@@ -541,16 +557,6 @@
 				html += '<input type="text" value="' + this.esc(d.name2) + '" readonly></div>';
 			}
 			html += '</div></div>';
-
-			// گالری.
-			if (d.gallery && d.gallery.length) {
-				html += '<div class="shoper-field-group"><label>تصاویر (' + d.gallery.length + ')</label>';
-				html += '<div class="shoper-preview-gallery">';
-				for (var i = 0; i < d.gallery.length; i++) {
-					html += '<img src="' + this.esc(d.gallery[i]) + '" alt="">';
-				}
-				html += '</div></div>';
-			}
 
 			// قیمت + خلاصه‌ی فروشندگان بررسی‌شده.
 			var agg = d.aggregate || {};
@@ -611,12 +617,61 @@
 				}
 				html += '</div></div>';
 			}
+			html += '</div>'; // end info
+
+			// --- بخش ۲: تصاویر (انتخاب، تصویر اصلی، نام محصول+شماره) ---
+			if (isMain && d.gallery && d.gallery.length) {
+				html += '<div class="shoper-step-body" data-step-body="images">';
+				html += '<div class="shoper-field-group"><label>انتخاب تصاویر (' + d.gallery.length + ')</label>';
+				html += '<p class="description" style="margin:0 0 8px;">برای هر تصویر تیک <strong>«نگه‌داشته شود»</strong> را بزنید و یک تصویر را با دکمه‌ی <strong>«تصویر اصلی»</strong> مشخص کنید. تصاویر در کتابخانه‌ی رسانه با نام <strong>نام محصول + شماره</strong> ذخیره می‌شوند (مثل «' + this.esc(this.fileBase(d.name1)) + '-1.webp»).</p>';
+				html += '<div class="shoper-img-grid">';
+				for (var g = 0; g < d.gallery.length; g++) {
+					html += '<div class="shoper-img-item" data-idx="' + g + '">';
+					html += '<div class="shoper-img-thumb"><img src="' + this.esc(d.gallery[g]) + '" alt=""></div>';
+					html += '<div class="shoper-img-controls">';
+					html += '<label class="shoper-img-keep"><input type="checkbox" class="shoper-img-check" data-idx="' + g + '" checked> نگه‌داشته شود</label>';
+					html += '<label class="shoper-img-main"><input type="radio" name="shoper-featured" class="shoper-img-featured" data-idx="' + g + '"' + (g === 0 ? ' checked' : '') + '> تصویر اصلی</label>';
+					html += '</div></div>';
+				}
+				html += '</div></div>';
+				html += '</div>';
+			}
+
+			// --- بخش ۳: سئو و برچسب ---
+			if (isMain) {
+				var seo = this.buildSeo(d);
+				html += '<div class="shoper-step-body" data-step-body="seo">';
+				html += '<div class="shoper-field-group"><label>عنوان سئو (Meta Title)</label>';
+				html += '<input type="text" id="shoper-p-seo-title" value="' + this.esc(seo.title) + '"></div>';
+				html += '<div class="shoper-field-group"><label>توضیح متا (Meta Description)</label>';
+				html += '<textarea id="shoper-p-seo-desc">' + this.esc(seo.description) + '</textarea></div>';
+				html += '<div class="shoper-field-group"><label>برچسب‌ها (جدا با ویرگول)</label>';
+				html += '<input type="text" id="shoper-p-tags" value="' + this.esc(seo.tags.join('، ')) + '"></div>';
+				html += '<p class="description">این مقادیر به‌عنوان برچسب محصول (product_tag) و متادیتای سئو ثبت می‌شوند؛ اگر Yoast نصب باشد متادیتای آن هم پر می‌شود.</p>';
+				html += '</div>';
+
+				// نوار پیشرفت.
+				html += '<div id="shoper-progress" class="shoper-progress" style="display:none;">';
+				html += '<div class="shoper-progress-track"><div class="shoper-progress-bar" style="width:0%"></div></div>';
+				html += '<div class="shoper-progress-label">آماده‌ی ساخت…</div>';
+				html += '</div>';
+			}
 
 			// اطلاعات مخفی.
 			html += '<input type="hidden" id="shoper-p-prk" value="' + this.esc(d.random_key) + '">';
 			html += '<input type="hidden" id="shoper-p-searchid" value="' + this.esc(d.search_id || '') + '">';
 
 			this.$preview.html(html);
+
+			// اتصال نوار مراحل و شمارنده‌ها.
+			if (isMain) {
+				this.bindSteps();
+				this.updateImgCount();
+				this.$preview.on('change', '.shoper-img-check, .shoper-img-featured', function () {
+					self.updateImgCount();
+				});
+				this.goStep('info');
+			}
 
 			// در متاباکس ویرایش محصول، دکمه‌ی «پر کردن» را نشان بده.
 			if (this.$fillRow.length) {
@@ -628,6 +683,145 @@
 			}
 		},
 
+		/* ------------------------------------------------------------------
+		 * نوار مراحل (stepper) + نوار پیشرفت + انتخاب تصاویر + سئو
+		 * ------------------------------------------------------------------ */
+
+		/**
+		 * اتصال کلیک روی مراحل.
+		 */
+		bindSteps: function () {
+			var self = this;
+			this.$preview.off('click.steps').on('click.steps', '.shoper-step', function () {
+				self.goStep($(this).data('step'));
+			});
+		},
+
+		/**
+		 * رفتن به یک مرحله و به‌روزرسانی وضعیت نوار.
+		 *
+		 * @param {string} name info | images | seo
+		 */
+		goStep: function (name) {
+			var order = ['info', 'images', 'seo'];
+			var idx = order.indexOf(name);
+			if (idx < 0) idx = 0;
+			this.$preview.find('.shoper-step').removeClass('is-active is-done');
+			for (var i = 0; i < order.length; i++) {
+				if (i === idx) {
+					this.$preview.find('.shoper-step[data-step="' + order[i] + '"]').addClass('is-active');
+				} else if (i < idx) {
+					this.$preview.find('.shoper-step[data-step="' + order[i] + '"]').addClass('is-done');
+				}
+			}
+			this.$preview.find('.shoper-step-body').hide().filter('[data-step-body="' + name + '"]').show();
+		},
+
+		/**
+		 * به‌روزرسانی شمارنده‌ی تصاویر انتخاب‌شده.
+		 */
+		updateImgCount: function () {
+			var kept = this.$preview.find('.shoper-img-check:checked').length;
+			var total = this.$preview.find('.shoper-img-check').length;
+			var $step = this.$preview.find('.shoper-step[data-step="images"]');
+			$step.find('.shoper-step-count').remove();
+			$step.append('<span class="shoper-step-count">' + kept + '/' + total + '</span>');
+		},
+
+		/**
+		 * جمع‌آوری انتخاب تصاویر: ایندکس‌های نگه‌داشته‌شده + ایندکس تصویر اصلی.
+		 *
+		 * @return {Object}
+		 */
+		collectImgSelection: function () {
+			var kept = [];
+			var featured = 0;
+			this.$preview.find('.shoper-img-check:checked').each(function () {
+				kept.push(parseInt($(this).data('idx'), 10));
+			});
+			var $f = this.$preview.find('.shoper-img-featured:checked').first();
+			if ($f.length) {
+				featured = parseInt($f.data('idx'), 10);
+			}
+			return { selected: kept, featured: featured };
+		},
+
+		/**
+		 * ساخت اطلاعات سئو (آینه‌ی Shoper_Product_Builder::build_seo).
+		 *
+		 * @param {Object} d داده‌ی محصول.
+		 * @return {Object}
+		 */
+		buildSeo: function (d) {
+			var title = d.name1 || '';
+			var parts = [];
+			if (d.name2) { parts.push(d.name2); }
+			var ks = d.key_specs || {};
+			var i = 0;
+			for (var k in ks) {
+				if (!ks.hasOwnProperty(k)) continue;
+				if (i++ >= 5) break;
+				parts.push(k + ': ' + ks[k]);
+			}
+			var desc = parts.join(' | ');
+			if (desc.length > 155) { desc = desc.slice(0, 152) + '…'; }
+
+			var tags = [];
+			var seen = {};
+			var cands = [];
+			if (d.name1) { cands.push(d.name1); }
+			if (d.name2) { cands.push(d.name2); }
+			if (d.specs) {
+				['برند', 'مدل', 'سازنده'].forEach(function (key) {
+					if (d.specs[key]) { cands.push(d.specs[key]); }
+				});
+			}
+			cands.forEach(function (c) {
+				String(c).split(/[|\/،,]+/).forEach(function (t) {
+					t = t.trim();
+					if (t && !seen[t]) { seen[t] = true; tags.push(t); }
+				});
+			});
+			if (tags.length > 12) { tags = tags.slice(0, 12); }
+
+			return { title: title, description: desc, tags: tags };
+		},
+
+		/**
+		 * نام پایه برای فایل تصویر (آینه‌ی base_filename).
+		 *
+		 * @param {string} title نام محصول.
+		 * @return {string}
+		 */
+		fileBase: function (title) {
+			// آینه‌ی sanitize_file_name وردپرس + base_filename در PHP.
+			var base = String(title || '')
+				.replace(/[?\[\]\/\\=<>:;,"'&$#*()~`!{}%+|]/g, '') // کاراکترهای غیرمجاز
+				.replace(/\s+/g, '-')                               // فاصله → خط تیره
+				.replace(/-+/g, '-')                                // حذف تیره‌های تکراری
+				.replace(/^-+|-+$/g, '');
+			base = base.slice(0, 80);
+			return base || 'shoper-product';
+		},
+
+		/**
+		 * به‌روزرسانی نوار پیشرفت.
+		 *
+		 * @param {string} label برچسب مرحله.
+		 */
+		showProgress: function (label) {
+			var $p = this.$preview.find('#shoper-progress');
+			if (!$p.length) { return; }
+			$p.show();
+			var $bar = $p.find('.shoper-progress-bar');
+			var $lbl = $p.find('.shoper-progress-label');
+			if (label === 'دریافت اطلاعات') { $bar.css('width', '40%'); }
+			else if (label === 'دانلود تصاویر') { $bar.css('width', '75%'); }
+			else if (label === 'سئو و برچسب') { $bar.css('width', '92%'); }
+			else { $bar.css('width', '100%'); }
+			$lbl.text(label);
+		},
+
 		create: function () {
 			var self = this;
 			var prk = $('#shoper-p-prk').val();
@@ -636,11 +830,22 @@
 				return;
 			}
 
-			// جمع‌آوری مشخصات انتخاب‌شده.
+			// مشخصات فنی انتخاب‌شده.
 			var specs = [];
 			$('.shoper-spec-check:checked').each(function () {
 				specs.push($(this).val());
 			});
+
+			// انتخاب تصاویر.
+			var imgSel = { selected: [], featured: 0 };
+			if (typeof this.collectImgSelection === 'function') {
+				imgSel = this.collectImgSelection();
+			}
+
+			// سئو.
+			var seoTitle = $('#shoper-p-seo-title').val();
+			var seoDesc  = $('#shoper-p-seo-desc').val();
+			var tags     = $('#shoper-p-tags').val().split(/[،,]/).map(function (t) { return t.trim(); }).filter(Boolean);
 
 			var payload = {
 				prk: prk,
@@ -648,20 +853,38 @@
 				name: $('#shoper-p-name').val(),
 				description: $('#shoper-p-desc').val(),
 				specs: JSON.stringify(specs),
-				status: $('#shoper-create-status').val() || $('select#shoper-create-status').val() || 'draft'
+				status: $('#shoper-create-status').val() || $('select#shoper-create-status').val() || 'draft',
+				selected_images: JSON.stringify(imgSel.selected || []),
+				featured_image: imgSel.featured || 0,
+				seo_title: seoTitle,
+				seo_desc: seoDesc,
+				tags: JSON.stringify(tags)
 			};
 
 			this.status(ShoperData.i18n.creating, 'loading');
 			this.$createBtn.prop('disabled', true);
 
+			this.showProgress('دریافت اطلاعات');
+
 			this.ajax('shoper_create', payload, function (data) {
 				self.$createBtn.prop('disabled', false);
 				self.clearStatus();
 
+				self.showProgress('دانلود تصاویر');
+				setTimeout(function () { self.showProgress('سئو و برچسب'); }, 250);
+				setTimeout(function () { self.showProgress('انجام شد!'); }, 500);
+
 				var html = '<div class="shoper-success-box">';
 				html += '<p><strong>✓ محصول ساخته شد!</strong></p>';
 				html += '<p>تعداد ویژگی‌های ثبت‌شده: ' + (data.specs_count || 0) + '<br>';
-				html += 'تصاویر دانلودشده: ' + ((data.image_info && data.image_info.gallery_ids) ? data.image_info.gallery_ids.length + 1 : 0) + '</p>';
+				html += 'تصاویر دانلودشده: ' + ((data.image_info && data.image_info.gallery_ids) ? data.image_info.gallery_ids.length + 1 : 0) + '<br>';
+				if (data.filenames && data.filenames.length) {
+					html += 'نام فایل تصاویر: <code>' + self.esc(data.filenames.join('، ')) + '</code><br>';
+				}
+				if (data.seo && data.seo.tags && data.seo.tags.length) {
+					html += 'برچسب‌ها: <code>' + self.esc(data.seo.tags.join('، ')) + '</code>';
+				}
+				html += '</p>';
 				if (data.edit_link) {
 					html += '<a href="' + self.esc(data.edit_link) + '" class="button button-primary">ویرایش محصول</a>';
 				}
@@ -673,6 +896,7 @@
 				self.$createBtn.hide();
 			}).fail(function () {
 				self.$createBtn.prop('disabled', false);
+				self.$preview.find('#shoper-progress').hide();
 			});
 		},
 
@@ -691,15 +915,31 @@
 				return;
 			}
 
+			// انتخاب تصاویر و سئو (همان جریان صفحه‌ی اصلی).
+			var imgSel = { selected: [], featured: 0 };
+			if (typeof this.collectImgSelection === 'function') {
+				imgSel = this.collectImgSelection();
+			}
+			var seoTitle = $('#shoper-p-seo-title').val();
+			var seoDesc  = $('#shoper-p-seo-desc').val();
+			var tags     = $('#shoper-p-tags').val().split(/[،,]/).map(function (t) { return t.trim(); }).filter(Boolean);
+
 			this.status('در حال پر کردن محصول…', 'loading');
 			this.$fillBtn.prop('disabled', true);
+			this.showProgress('دریافت اطلاعات');
 
 			this.ajax('shoper_fill', {
 				post_id: postId,
 				prk: prk,
-				search_id: searchId
+				search_id: searchId,
+				selected_images: JSON.stringify(imgSel.selected || []),
+				featured_image: imgSel.featured || 0,
+				seo_title: seoTitle,
+				seo_desc: seoDesc,
+				tags: JSON.stringify(tags)
 			}, function (data) {
 				self.$fillBtn.prop('disabled', false);
+				self.showProgress('انجام شد!');
 				self.status(data.message || 'پر شد!', 'success');
 				// رفرش صفحه برای دیدن تغییرات در ویرایشگر.
 				if (data.reload) {
@@ -707,6 +947,7 @@
 				}
 			}).fail(function () {
 				self.$fillBtn.prop('disabled', false);
+				self.$preview.find('#shoper-progress').hide();
 			});
 		},
 

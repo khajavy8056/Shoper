@@ -217,6 +217,8 @@ const handlers = {
 		const seen = new Set();
 		const suggestions = [];
 		for (const item of out.data.results) {
+			// فروشندگان تبلیغاتی را در پیشنهادها نشان نده (آینه‌ی Shoper_Torob_Client::suggest).
+			if (item.is_adv) continue;
 			const name = (item.name1 || '').trim();
 			if (!name || seen.has(name)) continue;
 			seen.add(name);
@@ -310,6 +312,23 @@ const handlers = {
 			if (rawSpecs) allowedSpecs = JSON.parse(rawSpecs);
 		} catch (e) { /* ignore */ }
 
+		// انتخاب تصاویر — آینه‌ی Shoper_Ajax::create.
+		let selectedImages = null;
+		try {
+			const raw = params.get('selected_images');
+			if (raw) selectedImages = JSON.parse(raw);
+		} catch (e) { /* ignore */ }
+		let featuredImage = parseInt(params.get('featured_image') || '0', 10);
+		if (isNaN(featuredImage)) featuredImage = 0;
+
+		const seoTitle = params.get('seo_title') || '';
+		const seoDesc = params.get('seo_desc') || '';
+		let tags = null;
+		try {
+			const raw = params.get('tags');
+			if (raw) tags = JSON.parse(raw);
+		} catch (e) { /* ignore */ }
+
 		try {
 			const out = await getDetails(prk, params.get('search_id') || '', mode);
 			const data = out.data;
@@ -329,6 +348,24 @@ const handlers = {
 
 			const built = logic.buildAttributes(data.specs);
 			const description = descOverride || logic.buildDescriptionHtml(data);
+			const seo = logic.buildSeo(data);
+			const finalTitle = seoTitle || seo.title;
+			const finalDesc = seoDesc || seo.description;
+			const finalTags = (Array.isArray(tags) && tags.length) ? tags : seo.tags;
+
+			// انتخاب و نام‌گذاری تصاویر — آینه‌ی Shoper_Image_Handler::sideload_gallery.
+			const total = (data.gallery || []).length;
+			let indices = [];
+			if (Array.isArray(selectedImages) && selectedImages.length) {
+				indices = selectedImages.filter((i) => Number.isInteger(i) && i >= 0 && i < total);
+			} else {
+				indices = [];
+				for (let i = 0; i < total; i++) indices.push(i);
+			}
+			if (!indices.includes(featuredImage)) featuredImage = indices[0];
+			const fileBase = logic.fileBase(data.name1);
+			const filenames = indices.map((_, idx) => fileBase + '-' + (idx + 1));
+			const keptUrls = indices.map((i) => data.gallery[i]);
 
 			ok(res, {
 				simulated: true,
@@ -341,23 +378,125 @@ const handlers = {
 					description,
 					attributes: built.attrs,
 					images: {
-						featured: data.gallery[0] || '',
-						gallery: data.gallery.slice(1),
-						// در وردپرس این تصاویر با media_sideload_image در
-						// کتابخانه‌ی رسانه ذخیره می‌شوند.
-						will_sideload: data.gallery.length,
+						featured: keptUrls[0] || '',
+						gallery: keptUrls.slice(1),
+						// در وردپرس این تصاویر با media_handle_sideload با نام
+						// «{نام محصول}-{شماره}» در کتابخانه‌ی رسانه ذخیره می‌شوند.
+						will_sideload: keptUrls.length,
+						selected: indices,
+						featured_index: featuredImage,
+						filenames,
+					},
+					seo: {
+						title: finalTitle,
+						description: finalDesc,
+						tags: finalTags,
 					},
 					meta: {
 						_shoper_random_key: data.random_key,
 						_shoper_source_url: data.page_url,
 						_shoper_sellers_used: data.aggregate.considered.map((s) => s.shop_name).join('، '),
 						_shoper_sellers_total: data.sellers_count,
+						_shoper_seo_title: finalTitle,
+						_shoper_seo_desc: finalDesc,
 					},
 				},
 				specs_count: Object.keys(data.specs).length,
 				sellers_used: data.aggregate.considered.length,
 				sellers_total: data.sellers_count,
-				image_info: { gallery_ids: data.gallery.slice(1).map((_, i) => i + 2), featured_id: 1 },
+				image_info: { gallery_ids: keptUrls.slice(1).map((_, i) => i + 2), featured_id: 1 },
+				filenames,
+				seo: { title: finalTitle, description: finalDesc, tags: finalTags },
+				_source: out.source,
+			});
+		} catch (err) {
+			fail(res, err.message);
+		}
+	},
+
+	/**
+	 * شبیه‌سازی «پر کردن محصول موجود» از متاباکس صفحه‌ی ویرایش محصول.
+	 *
+	 * آینه‌ی Shoper_Product_Builder::fill_product. در وردپرس واقعی این داده‌ها
+	 * مستقیماً روی WC_Product موجود نوشته می‌شود؛ اینجا فقط نشان می‌دهیم هر
+	 * داده به کدام فیلد ووکامرس می‌رود.
+	 */
+	async shoper_fill(params, res) {
+		const postId = parseInt(params.get('post_id') || '0', 10);
+		const prk = (params.get('prk') || '').trim();
+		if (!postId || !prk) return fail(res, 'شناسه محصول یا post_id نامعتبر است.');
+
+		const mode = params.get('data_mode') || 'auto';
+		const limit = parseInt(params.get('seller_limit') || '3', 10);
+		const strategy = params.get('seller_strategy') || 'score';
+
+		let selectedImages = null;
+		try {
+			const raw = params.get('selected_images');
+			if (raw) selectedImages = JSON.parse(raw);
+		} catch (e) { /* ignore */ }
+		let featuredImage = parseInt(params.get('featured_image') || '0', 10);
+		if (isNaN(featuredImage)) featuredImage = 0;
+
+		const seoTitle = params.get('seo_title') || '';
+		const seoDesc = params.get('seo_desc') || '';
+		let tags = null;
+		try {
+			const raw = params.get('tags');
+			if (raw) tags = JSON.parse(raw);
+		} catch (e) { /* ignore */ }
+
+		try {
+			const out = await getDetails(prk, params.get('search_id') || '', mode);
+			const data = out.data;
+			data.aggregate = logic.aggregate(data.sellers, limit, strategy);
+			if (data.aggregate.price) data.price = data.aggregate.price;
+
+			const built = logic.buildAttributes(data.specs);
+			const description = logic.buildDescriptionHtml(data);
+			const shortDescription = logic.buildShortDescription(data);
+			const seo = logic.buildSeo(data);
+			const finalTitle = seoTitle || seo.title;
+			const finalDesc = seoDesc || seo.description;
+			const finalTags = (Array.isArray(tags) && tags.length) ? tags : seo.tags;
+
+			const total = (data.gallery || []).length;
+			let indices = [];
+			if (Array.isArray(selectedImages) && selectedImages.length) {
+				indices = selectedImages.filter((i) => Number.isInteger(i) && i >= 0 && i < total);
+			} else {
+				indices = [];
+				for (let i = 0; i < total; i++) indices.push(i);
+			}
+			if (!indices.includes(featuredImage)) featuredImage = indices[0];
+			const fileBase = logic.fileBase(data.name1);
+			const filenames = indices.map((_, idx) => fileBase + '-' + (idx + 1));
+			const keptUrls = indices.map((i) => data.gallery[i]);
+
+			ok(res, {
+				simulated: true,
+				message: 'محصول با موفقیت از ترب پر شد. برای ذخیره‌ی نهایی دکمه‌ی «به‌روزرسانی» را بزنید.',
+				post_id: postId,
+				specs_count: Object.keys(data.specs).length,
+				attr_errors: built.errors,
+				reload: true,
+				filenames,
+				// فیلدهای ووکامرس که پر می‌شوند:
+				wc_fields: {
+					title: data.name1,                                  // ← فیلد عنوان محصول
+					short_description: shortDescription,                // ← تب «توضیح کوتاه»
+					description,                                        // ← تب «توضیحات»
+					regular_price: data.price,                          // ← فیلد قیمت عادی (General)
+					sku: 'TRB-' + data.random_key,                      // ← فیلد SKU (Inventory)
+					attributes: built.attrs,                            // ← تب «ویژگی‌ها»
+					images: {
+						featured: keptUrls[0] || '',                     // ← تصویر شاخص
+						gallery: keptUrls.slice(1),                      // ← گالری
+						filenames,
+					},
+					tags: finalTags,                                    // ← برچسب‌های محصول (product_tag)
+					seo: { title: finalTitle, description: finalDesc }, // ← متادیتای سئو / Yoast
+				},
 				_source: out.source,
 			});
 		} catch (err) {
@@ -475,6 +614,24 @@ const server = http.createServer(async (req, res) => {
 	// --- فایل‌های پیش‌نمایش ---
 	if (pathname === '/' || pathname === '/index.html') {
 		return serveFile(res, path.join(PREVIEW_DIR, 'index.html'));
+	}
+
+	// --- دانلود آخرین نسخه‌ی افزونه (ZIP) ---
+	if (pathname === '/download/latest' || pathname === '/download/shoper-torob-importer-1.2.0.zip') {
+		const zip = path.join(ROOT, 'build', 'shoper-torob-importer-1.2.0.zip');
+		try {
+			const data = await fsp.readFile(zip);
+			res.writeHead(200, {
+				'Content-Type': 'application/zip',
+				'Content-Disposition': 'attachment; filename="shoper-torob-importer-1.2.0.zip"',
+				'Content-Length': data.length,
+				'Cache-Control': 'no-store',
+			});
+			return res.end(data);
+		} catch (err) {
+			res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+			return res.end('آرشیو ZIP هنوز ساخته نشده است. اسکریپت build را اجرا کنید.');
+		}
 	}
 
 	const safe = path.normalize(pathname.slice(1)).replace(/^(\.\.[/\\])+/, '');
