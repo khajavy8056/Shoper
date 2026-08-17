@@ -794,7 +794,13 @@
 		 * @return {string}
 		 */
 		fileBase: function (title) {
-			var base = String(title || '').replace(/[\/\\]+/g, '-').replace(/\s+/g, '-').replace(/^-+|-+$/g, '');
+			// آینه‌ی sanitize_file_name وردپرس + base_filename در PHP.
+			var base = String(title || '')
+				.replace(/[?\[\]\/\\=<>:;,"'&$#*()~`!{}%+|]/g, '') // کاراکترهای غیرمجاز
+				.replace(/\s+/g, '-')                               // فاصله → خط تیره
+				.replace(/-+/g, '-')                                // حذف تیره‌های تکراری
+				.replace(/^-+|-+$/g, '');
+			base = base.slice(0, 80);
 			return base || 'shoper-product';
 		},
 

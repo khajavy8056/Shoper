@@ -564,9 +564,11 @@ function buildSeo(data) {
  */
 function fileBase(title) {
 	const base = String(title || '')
-		.replace(/[\/\\]+/g, '-')
+		.replace(/[?\[\]\/\\=<>:;,"'&$#*()~`!{}%+|]/g, '')
 		.replace(/\s+/g, '-')
-		.replace(/^-+|-+$/g, '');
+		.replace(/-+/g, '-')
+		.replace(/^-+|-+$/g, '')
+		.slice(0, 80);
 	return base || 'shoper-product';
 }
 
