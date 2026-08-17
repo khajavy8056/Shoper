@@ -16,6 +16,7 @@ if ( isset( $_POST['shoper_save_settings'] ) && check_admin_referer( 'shoper_set
 		'shoper_product_status' => isset( $_POST['product_status'] ) ? sanitize_text_field( wp_unslash( $_POST['product_status'] ) ) : 'draft',
 		'shoper_import_gallery' => isset( $_POST['import_gallery'] ) ? 'yes' : 'no',
 		'shoper_price_behavior' => isset( $_POST['price_behavior'] ) ? sanitize_text_field( wp_unslash( $_POST['price_behavior'] ) ) : 'cheapest',
+		'shoper_proxy_url'      => isset( $_POST['proxy_url'] ) ? esc_url_raw( wp_unslash( $_POST['proxy_url'] ) ) : '',
 	);
 	foreach ( $options as $k => $v ) {
 		update_option( $k, $v );
@@ -27,6 +28,7 @@ $data_source    = get_option( 'shoper_data_source', 'direct' );
 $product_status = get_option( 'shoper_product_status', 'draft' );
 $import_gallery = get_option( 'shoper_import_gallery', 'yes' );
 $price_behavior = get_option( 'shoper_price_behavior', 'cheapest' );
+$proxy_url = get_option( 'shoper_proxy_url', '' );
 ?>
 <div class="wrap shoper-wrap" dir="rtl">
 	<h1 class="wp-heading-inline">🛒 Shoper — درون‌ریز محصول از ترب</h1>
@@ -96,6 +98,7 @@ $price_behavior = get_option( 'shoper_price_behavior', 'cheapest' );
 								</select>
 							</td>
 						</tr>
+						<tr><th>پروکسی ترب</th><td><input type="url" class="regular-text" name="proxy_url" value="<?php echo esc_attr( $proxy_url ); ?>" placeholder="http://user:pass@proxy.example:8080"><p class="description">اختیاری؛ برای خطای 490 از پروکسی خروجی مناسب استفاده کنید.</p></td></tr>
 						<tr>
 							<th>وضعیت پیش‌فرض</th>
 							<td>

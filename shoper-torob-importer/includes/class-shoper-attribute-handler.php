@@ -89,6 +89,19 @@ class Shoper_Attribute_Handler {
 		'حسگرها'                => 'sensors',
 		'صدا'                   => 'audio',
 		'بلندگو'                => 'speaker',
+		'کیفیت دوربین جلو'      => 'front-camera-quality',
+		'کیفیت دوربین اصلی'     => 'main-camera-quality',
+		'سیم کارت'              => 'sim',
+		'سیم‌کارت'              => 'sim',
+		'کشور ROM'              => 'rom-country',
+		'وضعیت رجیستر'          => 'registration-status',
+		'وضعیت فعال بودن'       => 'activation-status',
+		'سال تولید'             => 'production-year',
+		'پشتیبانی از کارت حافظه' => 'memory-card',
+		'اقلام همراه'           => 'box-contents',
+		'اصالت کالا'            => 'authenticity',
+		'پردازنده مرکزی'        => 'cpu',
+		'نسخه سیستم عامل'       => 'os-version',
 	);
 
 	/**

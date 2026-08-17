@@ -2,51 +2,229 @@
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<title>پیش‌نمایش افزونه Shoper</title>
-<link rel="stylesheet" href="../shoper-torob-importer/admin/css/admin.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>پیش‌نمایش زنده افزونه Shoper</title>
+
+<!-- CSS واقعی افزونه — همان فایلی که در وردپرس بارگذاری می‌شود. -->
+<link rel="stylesheet" href="/plugin/admin/css/admin.css">
+
 <style>
-  body { background: #f0f0f1; font-family: Tahoma, sans-serif; margin: 0; padding: 20px; }
-  .wp-browser-bar {
-    background: #1d2327; color: #fff; padding: 8px 16px; border-radius: 6px 6px 0 0;
-    font-size: 13px;
+  body {
+    background: #f0f0f1; margin: 0; padding: 20px;
+    font-family: Tahoma, "Segoe UI", sans-serif; color: #1d2327;
   }
-  .wp-browser-bar span { color: #72aee6; }
+  .wp-browser-bar {
+    background: #1d2327; color: #fff; padding: 10px 16px;
+    border-radius: 6px 6px 0 0; font-size: 13px;
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  }
+  .wp-browser-bar span.site { color: #72aee6; }
   .fake-wp-content {
     background: #f0f0f1; padding: 20px; border: 1px solid #c3c4c7;
     border-top: none; border-radius: 0 0 6px 6px;
   }
-  .demo-banner {
-    background: #fffbe6; border: 1px solid #f0c36d; padding: 10px 14px;
-    border-radius: 6px; margin-bottom: 16px; font-size: 13px;
+  .shoper-wrap { max-width: 1180px; margin: 0 auto; }
+  .shoper-wrap h1 { font-size: 23px; margin: 0 0 4px; }
+
+  .env-banner {
+    padding: 10px 14px; border-radius: 6px; margin-bottom: 16px;
+    font-size: 13px; line-height: 1.7; border: 1px solid;
   }
-  .shoper-wrap { max-width: 1100px; margin: 0 auto; }
-  .shoper-wrap h1 { font-size: 23px; }
+  .env-banner.live    { background: #edfaef; border-color: #68de7c; }
+  .env-banner.fixture { background: #fffbe6; border-color: #f0c36d; }
+  .env-banner.loading { background: #f6f7f7; border-color: #c3c4c7; }
+
+  .mode-bar {
+    display: flex; flex-wrap: wrap; gap: 16px; align-items: center;
+    background: #fff; border: 1px solid #c3c4c7; border-radius: 6px;
+    padding: 10px 14px; margin-bottom: 16px; font-size: 13px;
+  }
+  .mode-bar label { display: inline-flex; align-items: center; gap: 5px; }
+  .mode-bar .sep { width: 1px; height: 22px; background: #dcdcde; }
+  .mode-bar strong { font-weight: 600; }
+
+  /* استایل حداقلی پیشخوان وردپرس تا بدون WP هم درست دیده شود. */
+  .shoper-layout { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+  .shoper-main-col { flex: 1 1 640px; min-width: 320px; }
+  .shoper-side-col { flex: 0 0 300px; }
+  .shoper-card {
+    background: #fff; border: 1px solid #c3c4c7; border-radius: 6px;
+    padding: 16px 18px; margin-bottom: 18px;
+  }
+  .shoper-card h2 { font-size: 16px; margin: 0 0 6px; }
+  .shoper-card h3 { font-size: 14px; margin: 0 0 8px; }
+  .description { color: #646970; font-size: 12.5px; margin: 4px 0; }
+  .button {
+    display: inline-block; background: #f6f7f7; border: 1px solid #2271b1;
+    color: #2271b1; border-radius: 3px; padding: 6px 14px; cursor: pointer;
+    font-size: 13px; line-height: 1.6; text-decoration: none;
+  }
+  .button:hover { background: #f0f0f1; }
+  .button-primary { background: #2271b1; border-color: #2271b1; color: #fff; }
+  .button-primary:hover { background: #135e96; }
+  .button-hero { padding: 8px 18px; font-size: 14px; }
+  input[type="text"], input[type="url"], select, textarea {
+    border: 1px solid #8c8f94; border-radius: 4px; padding: 6px 8px;
+    font-size: 13px; font-family: inherit; box-sizing: border-box;
+  }
+  input[type="text"]:focus, input[type="url"]:focus {
+    border-color: #2271b1; box-shadow: 0 0 0 1px #2271b1; outline: none;
+  }
+  .regular-text { width: 100%; }
+  .shoper-input-row { display: flex; gap: 8px; align-items: flex-start; }
+  .shoper-input-row .shoper-suggest-wrap { flex: 1 1 auto; }
+  .shoper-mode-toggle { margin: 8px 0; display: flex; gap: 16px; font-size: 13px; }
+  .shoper-create-row {
+    display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+    margin-top: 14px; padding-top: 14px; border-top: 1px solid #f0f0f1;
+  }
+
+  .shoper-results { margin-top: 12px; }
+  .shoper-result-item {
+    display: flex; gap: 10px; align-items: center; padding: 8px;
+    border: 1px solid #e5e5e5; border-radius: 5px; margin-bottom: 6px; cursor: pointer;
+  }
+  .shoper-result-item:hover { background: #f6f7f7; }
+  .shoper-result-item.selected { border-color: #2271b1; background: #f0f6fc; }
+  .shoper-result-item img { width: 48px; height: 48px; object-fit: contain; }
+  .shoper-ri-info { flex: 1 1 auto; min-width: 0; }
+  .shoper-ri-name { font-size: 13px; }
+  .shoper-ri-meta { font-size: 11px; color: #787c82; }
+  .shoper-ri-price { font-size: 12px; color: #2271b1; white-space: nowrap; }
+
+  .shoper-field-group { margin: 12px 0; }
+  .shoper-field-group > label {
+    display: block; font-weight: 600; font-size: 13px; margin-bottom: 4px;
+  }
+  .shoper-field-group input[type="text"], .shoper-field-group textarea { width: 100%; }
+  .shoper-field-group textarea { min-height: 130px; font-family: monospace; font-size: 11px; }
+  .shoper-preview-header { display: flex; gap: 14px; align-items: flex-start; }
+  .shoper-preview-header > img {
+    width: 110px; height: 110px; object-fit: contain;
+    border: 1px solid #e5e5e5; border-radius: 5px; background: #fafafa;
+  }
+  .shoper-preview-header > div { flex: 1 1 auto; min-width: 0; }
+  .shoper-preview-gallery { display: flex; gap: 6px; flex-wrap: wrap; }
+  .shoper-preview-gallery img {
+    width: 62px; height: 62px; object-fit: contain;
+    border: 1px solid #e5e5e5; border-radius: 4px; background: #fafafa;
+  }
+  .shoper-specs-list {
+    max-height: 260px; overflow-y: auto;
+    border: 1px solid #e5e5e5; border-radius: 5px; padding: 4px;
+  }
+  .shoper-spec-item { padding: 3px 4px; border-bottom: 1px solid #f6f7f7; font-size: 12px; }
+  .shoper-spec-item:last-child { border-bottom: none; }
+  .shoper-spec-key { flex: 0 0 40%; font-weight: 600; }
+  .shoper-spec-val { flex: 1 1 auto; color: #50575e; }
+
+  .shoper-status { margin-top: 12px; font-size: 13px; padding: 8px 0; }
+  .shoper-status.error { color: #d63638; }
+  .shoper-status.success { color: #00a32a; }
+  .shoper-loading-inline {
+    display: inline-block; width: 12px; height: 12px;
+    border: 2px solid #c3c4c7; border-top-color: #2271b1;
+    border-radius: 50%; animation: shoper-spin .8s linear infinite;
+    vertical-align: -2px;
+  }
+  @keyframes shoper-spin { to { transform: rotate(360deg); } }
+
+  .shoper-success-box {
+    background: #edfaef; border: 1px solid #68de7c;
+    border-radius: 5px; padding: 12px; margin-top: 14px;
+  }
+  .shoper-help ul { padding-right: 18px; margin: 0; font-size: 12.5px; line-height: 1.9; }
+
+  /* خروجی شبیه‌سازی‌شده‌ی محصول ووکامرس */
+  .wc-result { margin-top: 16px; }
+  .wc-result h3 { margin: 14px 0 6px; font-size: 14px; }
+  .wc-tabs { display: flex; gap: 4px; border-bottom: 1px solid #c3c4c7; margin-top: 10px; }
+  .wc-tab {
+    padding: 7px 14px; cursor: pointer; font-size: 13px;
+    border: 1px solid transparent; border-bottom: none; border-radius: 4px 4px 0 0;
+  }
+  .wc-tab.active { background: #fff; border-color: #c3c4c7; margin-bottom: -1px; }
+  .wc-panel { display: none; background: #fff; border: 1px solid #c3c4c7; border-top: none; padding: 14px; }
+  .wc-panel.active { display: block; }
+  .wc-panel table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .wc-panel th, .wc-panel td { border: 1px solid #eee; padding: 7px 10px; text-align: right; vertical-align: top; }
+  .wc-panel th { background: #f6f7f7; width: 34%; }
+  .wc-code {
+    background: #1d2327; color: #c3f0c8; padding: 12px; border-radius: 5px;
+    font-family: monospace; font-size: 11.5px; direction: ltr; text-align: left;
+    max-height: 320px; overflow: auto; white-space: pre-wrap; word-break: break-all;
+  }
+  .wc-attr-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px; }
+  .wc-attr {
+    border: 1px solid #e5e5e5; border-radius: 4px; padding: 6px 9px;
+    font-size: 12px; background: #fafafa;
+  }
+  .wc-attr b { display: block; font-size: 11px; color: #2271b1; }
+  .wc-attr code { font-size: 10px; color: #787c82; }
+  .img-note {
+    font-size: 12px; background: #f0f6fc; border: 1px solid #c5d9ed;
+    padding: 8px 10px; border-radius: 4px; margin-bottom: 8px;
+  }
+  .src-pill {
+    display: inline-block; font-size: 11px; padding: 2px 8px;
+    border-radius: 10px; margin-right: 6px;
+  }
+  .src-pill.live { background: #d5f5dc; color: #0b5124; }
+  .src-pill.fixture { background: #fcf0cd; color: #7a5c00; }
 </style>
 </head>
 <body>
 
 <div class="wp-browser-bar">
-  پیشخوان وردپرس ‹ <span>فروشگاه من</span> — پیش‌نمایش افزونه Shoper (حالت آزمایشی با داده‌ی نمونه)
+  <div>پیشخوان وردپرس ‹ <span class="site">فروشگاه من</span> — ووکامرس › Shoper</div>
+  <div id="env-pill"></div>
 </div>
 
 <div class="fake-wp-content">
 <div class="wrap shoper-wrap" dir="rtl">
 
-  <div class="demo-banner">
-    🔬 این یک <strong>پیش‌نمایش تعاملی</strong> از رابط افزونه است (بدون نیاز به وردپرس).
-    می‌توانید جستجو کنید، یک نتیجه را انتخاب کنید، مشخصات فنی را تیک بزنید و دکمه‌ی ساخت را ببینید.
-    داده‌ها از فایل نمونه بارگذاری می‌شوند.
+  <div id="env-banner" class="env-banner loading">در حال بررسی دسترسی به ترب…</div>
+
+  <div class="mode-bar">
+    <strong>منبع داده:</strong>
+    <label><input type="radio" name="data_mode" value="auto" checked> خودکار</label>
+    <label><input type="radio" name="data_mode" value="live"> فقط زنده (ترب)</label>
+    <label><input type="radio" name="data_mode" value="fixture"> داده‌ی ضبط‌شده</label>
+    <span class="sep"></span>
+    <strong>تعداد فروشنده:</strong>
+    <select id="seller-limit">
+      <option value="1">۱</option>
+      <option value="3" selected>۳</option>
+      <option value="5">۵</option>
+      <option value="10">۱۰</option>
+    </select>
+    <span class="sep"></span>
+    <strong>معیار:</strong>
+    <select id="seller-strategy">
+      <option value="score" selected>معتبرترین</option>
+      <option value="cheapest">ارزان‌ترین</option>
+      <option value="merge">ترکیبی</option>
+    </select>
   </div>
 
-  <h1 class="wp-heading-inline">🛒 Shoper — درون‌ریز محصول از ترب</h1>
-  <hr class="wp-header-end">
+  <h1>🛒 Shoper — درون‌ریز محصول از ترب</h1>
+  <p class="description">
+    این پیش‌نمایش، فایل‌های <strong>واقعی</strong> افزونه را اجرا می‌کند
+    (<code>admin/js/admin.js</code> و <code>admin/css/admin.css</code>) و اندپوینت
+    <code>admin-ajax.php</code> وردپرس را شبیه‌سازی می‌کند.
+  </p>
+  <hr>
 
   <div class="shoper-layout">
     <div class="shoper-main-col">
 
       <div class="shoper-card">
         <h2>۱. جستجوی محصول در ترب</h2>
-        <p class="description">نام محصول را بنویسید (مثلاً «s25» یا هر چیزی — در این دمو همه یک نتیجه می‌دهند).</p>
+        <p class="description">
+          بخشی از نام محصول را بنویسید — لازم نیست نام کامل را بدانید.
+          نوار کشویی، <strong>نام کامل</strong> محصولات را پیشنهاد می‌دهد.
+          مثال: «سام»، «s26»، «گوشی».
+        </p>
 
         <div class="shoper-field shoper-mode-toggle">
           <label><input type="radio" name="shoper_mode" value="query" checked> جستجو با نام</label>
@@ -55,7 +233,7 @@
 
         <div class="shoper-input-row">
           <input type="text" id="shoper-query" class="regular-text"
-            placeholder="مثال: گوشی سامسونگ S25 Ultra" autocomplete="off">
+            placeholder="مثال: سام  یا  s26 ultra" autocomplete="off">
           <input type="url" id="shoper-url" class="regular-text"
             placeholder="https://torob.com/p/..." style="display:none;">
           <button type="button" class="button button-primary button-hero" id="shoper-search-btn">
@@ -69,7 +247,8 @@
       <div class="shoper-card" id="shoper-preview-card" style="display:none;">
         <h2>۲. پیش‌نمایش و ویرایش</h2>
         <p class="description">
-          اطلاعات را بررسی کنید. تیک مشخصات فنی‌ که می‌خواهید به‌صورت ویژگی اضافه شوند را بزنید.
+          اطلاعات از چند فروشنده‌ی برتر جمع‌آوری شده است. تیک مشخصات فنی‌ای که
+          می‌خواهید به‌صورت ویژگی اضافه شوند را بزنید.
         </p>
         <div id="shoper-preview"></div>
 
@@ -86,18 +265,58 @@
         </div>
       </div>
 
+      <div id="wc-output" class="shoper-card" style="display:none;">
+        <h2>۳. خروجی نهایی در ووکامرس</h2>
+        <p class="description">
+          دقیقاً همان چیزی که افزونه در سایت شما می‌سازد. اینجا فقط نمایش داده می‌شود.
+        </p>
+        <div id="wc-output-body"></div>
+      </div>
+
       <div id="shoper-status" class="shoper-status"></div>
     </div>
 
     <aside class="shoper-side-col">
+      <div class="shoper-card shoper-download-card">
+        <h3>⬇️ دانلود آخرین نسخه‌ی افزونه</h3>
+        <p class="description" style="margin:0 0 10px;">
+          نسخه‌ی نهایی تست‌شده (v1.2.0) به‌صورت ZIP آماده‌ی نصب است.
+          بعد از دانلود، پوشه‌ی <code>shoper-torob-importer</code> را در
+          <code>wp-content/plugins/</code> بریزید و فعالش کنید.
+        </p>
+        <a id="shoper-download-btn" class="button button-primary button-hero" style="display:inline-block;text-align:center;width:100%;"
+           href="/download/latest">
+          ⬇️ دانلود shoper-torob-importer-1.2.0.zip
+        </a>
+        <p class="description" id="download-meta" style="margin-top:8px;font-size:11.5px;"></p>
+      </div>
+
+      <div class="shoper-card">
+        <h3>تست اتصال</h3>
+        <button type="button" class="button" id="shoper-test-conn">بررسی اتصال به ترب</button>
+        <div id="shoper-conn-result" style="margin-top:10px;font-size:12.5px;"></div>
+      </div>
+
       <div class="shoper-card shoper-help">
-        <h3>راهنما</h3>
+        <h3>این پیش‌نمایش چه چیزی را تست می‌کند؟</h3>
         <ul>
-          <li>تصاویر ابتدا در کتابخانه‌ی رسانه ذخیره می‌شوند.</li>
-          <li>هر مشخصه‌ی فنی یک <strong>ویژگی مجزا</strong> در تب ویژگی‌هاست.</li>
-          <li>SKU برابر <code>TRB-{random_key}</code> برای جلوگیری از تکرار.</li>
-          <li>پیش‌فرض: پیش‌نویس.</li>
+          <li>✅ پیشنهاد <strong>نام کامل</strong> محصول در نوار کشویی هنگام تایپ</li>
+          <li>✅ دریافت زنده‌ی اطلاعات از ترب</li>
+          <li>✅ بررسی <strong>چند فروشنده</strong> (نه همه) و تجمیع اطلاعاتشان</li>
+          <li>✅ استخراج مشخصات فنی به‌صورت ویژگی‌های مجزا</li>
+          <li>✅ ساخت گالری تصاویر</li>
+          <li>✅ تولید توضیحات کامل محصول</li>
         </ul>
+      </div>
+
+      <div class="shoper-card shoper-help">
+        <h3>تصاویر</h3>
+        <p class="description" style="margin:0;">
+          تصاویر در سایت شما با <code>media_sideload_image</code> در
+          <strong>کتابخانه‌ی رسانه</strong> ذخیره می‌شوند و سپس به محصول وصل می‌گردند.
+          در این پیش‌نمایش (که وردپرسی ندارد) فقط لیست تصاویری که دانلود خواهند شد
+          نمایش داده می‌شود.
+        </p>
       </div>
     </aside>
   </div>
@@ -105,92 +324,257 @@
 </div>
 </div>
 
+<!-- jQuery (وردپرس هم همین را لود می‌کند) — لوکال، تا پیش‌نمایش آفلاین هم کار کند. -->
+<script src="/vendor/jquery.min.js"></script>
+
 <script>
-// ===== شبیه‌سازی پاسخ AJAX با فایل mock =====
-window.SHOPER_MOCK_MODE = true;
+// معادل wp_localize_script در افزونه‌ی واقعی.
+window.ShoperData = {
+  ajaxUrl: '/admin-ajax.php',
+  nonce: 'preview-nonce',
+  i18n: {
+    searching: 'در حال جستجو در ترب…',
+    loading: 'در حال دریافت اطلاعات محصول…',
+    creating: 'در حال ساخت محصول در ووکامرس…',
+    filling: 'در حال پر کردن محصول…',
+    empty_query: 'نام محصول را وارد کنید.',
+    select_one: 'یک محصول را انتخاب کنید.',
+    done: 'انجام شد!',
+    error: 'خطا',
+    view_product: 'مشاهده‌ی محصول',
+    edit_product: 'ویرایش محصول'
+  }
+};
 </script>
-<script src="../shoper-torob-importer/admin/js/admin.js"></script>
+
+<!-- JS واقعی افزونه — همان فایلی که در وردپرس اجرا می‌شود. -->
+<script src="/plugin/admin/js/admin.js"></script>
+
 <script>
-(function($){
-  // جایگزینی توابع گلوبال وردپرس با نسخه‌ی mock.
-  window.Shoperedata = window.Shoperedata || {};
-  // override Shoper.ajax برای خواندن از فایل JSON.
+(function ($) {
+  'use strict';
+
+  /* --- تنظیمات پیش‌نمایش را به هر درخواست AJAX تزریق می‌کنیم. --- */
   var origAjax = Shoper.ajax;
-  Shoper.ajax = function(action, data, onSuccess){
-    if (action === 'shoper_search') {
-      this.status(ShoperData.i18n.searching, 'loading');
-      return $.getJSON('../shoper-torob-importer/assets/mock/torob-search-sample.json')
-        .done(function(d){
-          var normalized = {
-            count: d.count,
-            results: d.results.map(function(it){
-              // استخراج prk/search_id.
-              var prk = it.random_key, sid = '';
-              if (it.more_info_url) {
-                try {
-                  var u = new URL(it.more_info_url, 'https://api.torob.com');
-                  prk = u.searchParams.get('prk') || prk;
-                  sid = u.searchParams.get('search_id') || '';
-               	} catch(e){}
-              }
-              var gallery = (it.media_urls||[]).map(function(m){return m.url;});
-              if (!gallery.length && it.image_url) gallery=[it.image_url];
-              return {
-                random_key: prk, search_id: sid,
-                name1: it.name1, name2: it.name2,
-                price: it.price, price_text: it.price_text,
-                shop_text: it.shop_text,
-                image_url: it.image_url, gallery: gallery
-              };
-            })
-          };
-          setTimeout(function(){ onSuccess(normalized); }, 400);
-        });
-    }
-    if (action === 'shoper_preview') {
-      this.status(ShoperData.i18n.loading, 'loading');
-      return $.getJSON('../shoper-torob-importer/assets/mock/torob-details-sample.json')
-        .done(function(d){
-          var gallery = (d.media_urls||[]).map(function(m){return m.url;});
-          if (!gallery.length && d.image_url) gallery=[d.image_url];
-          var specs = (d.structural_specs && d.structural_specs.headers[0] &&
-                       d.structural_specs.headers[0].specs) || {};
-          var key_specs = d.key_specs || [];
-          var sellers = (d.products_info && d.products_info.result) || [];
-          sellers = sellers.map(function(s){
-            return { shop_name:s.shop_name, city:s.shop_name2, price:s.price,
-                     price_text:s.price_text, score:s.shop_score };
-          });
-          setTimeout(function(){
-            onSuccess({
-              random_key: d.random_key, search_id: '',
-              name1: d.name1, name2: d.name2,
-              price: d.min_price, image_url: d.image_url, gallery: gallery,
-              specs: specs, key_specs: key_specs, sellers: sellers,
-              page_url: '#', description_html: '<p>'+d.description+'</p>'
-            });
-          }, 400);
-        });
-    }
-    if (action === 'shoper_create') {
-      this.status(ShoperData.i18n.creating, 'loading');
-      var self = this;
-      setTimeout(function(){
-        self.clearStatus();
-        $('#shoper-preview').append(
-          '<div class="shoper-success-box">' +
-          '<p><strong>✓ در حالت واقعی، محصول اکنون در ووکامرس ساخته می‌شد!</strong></p>' +
-          '<p>تعداد ویژگی‌ها: ' + ($('.shoper-spec-check:checked').length) + '</p>' +
-          '<p>تصاویر: گالری کامل به Media Library دانلود و به محصول وصل می‌شد.</p>' +
-          '<a class="button button-primary" href="#">ویرایش محصول (شبیه‌سازی)</a>' +
-          '</div>'
-        );
-        $('#shoper-create-btn').hide();
-      }, 600);
-      return;
-    }
-    return origAjax.call(this, action, data, onSuccess);
+  Shoper.ajax = function (action, data, onSuccess) {
+    data = data || {};
+    data.data_mode = $('input[name="data_mode"]:checked').val();
+    data.seller_limit = $('#seller-limit').val();
+    data.seller_strategy = $('#seller-strategy').val();
+    return origAjax.call(Shoper, action, data, onSuccess);
   };
+
+  /* --- برچسب منبع داده (زنده / ضبط‌شده) روی نتایج --- */
+  function srcPill(src) {
+    if (src === 'live') return '<span class="src-pill live">داده‌ی زنده از ترب</span>';
+    if (src === 'fixture') return '<span class="src-pill fixture">داده‌ی واقعی ضبط‌شده</span>';
+    return '';
+  }
+
+  var origRenderResults = Shoper.renderResults;
+  Shoper.renderResults = function (items) {
+    origRenderResults.call(this, items);
+    if (this._lastSource) {
+      this.$results.prepend('<p class="description">' + srcPill(this._lastSource) + '</p>');
+    }
+  };
+
+  // منبع را از پاسخ بگیریم.
+  var origSearch = Shoper.search;
+  Shoper.search = function () {
+    var self = this;
+    var mode = this.getMode();
+    if (mode === 'url') { return origSearch.call(this); }
+
+    var query = this.$queryInput.val().trim();
+    if (!query) { this.status(ShoperData.i18n.empty_query, 'error'); return; }
+
+    this.$results.empty().hide();
+    this.$previewCard.hide();
+    $('#wc-output').hide();
+    this.status(ShoperData.i18n.searching, 'loading');
+
+    this.ajax('shoper_search', { query: query }, function (data) {
+      self.clearStatus();
+      self._lastSource = data._source;
+      if (data.random_key) {      // پاسخ از مسیر لینک آمده.
+        self.currentData = data;
+        self.renderPreview(data);
+        self.$previewCard.show();
+        return;
+      }
+      self.renderResults(data.results || []);
+      if (data._note) { self.status(data._note, 'error'); }
+    });
+  };
+
+  /* --- بعد از پیش‌نمایش، منبع را نشان بده --- */
+  var origRenderPreview = Shoper.renderPreview;
+  Shoper.renderPreview = function (d) {
+    origRenderPreview.call(this, d);
+    this.$preview.prepend('<p class="description">' + srcPill(d._source) + '</p>');
+    if (d._note) {
+      this.$preview.prepend('<div class="img-note">' + this.esc(d._note) + '</div>');
+    }
+  };
+
+  /* --- «ساخت محصول»: خروجی شبیه‌سازی‌شده‌ی ووکامرس را نشان بده --- */
+  Shoper.create = function () {
+    var self = this;
+    var prk = $('#shoper-p-prk').val();
+    if (!prk) { this.status('ابتدا یک محصول را انتخاب کنید.', 'error'); return; }
+
+    var specs = [];
+    $('.shoper-spec-check:checked').each(function () { specs.push($(this).val()); });
+
+    var imgSel = (typeof Shoper.collectImgSelection === 'function') ? Shoper.collectImgSelection() : { selected: [], featured: 0 };
+
+    this.status(ShoperData.i18n.creating, 'loading');
+    this.$createBtn.prop('disabled', true);
+    if (typeof Shoper.showProgress === 'function') { Shoper.showProgress('دریافت اطلاعات'); }
+
+    this.ajax('shoper_create', {
+      prk: prk,
+      search_id: $('#shoper-p-searchid').val(),
+      name: $('#shoper-p-name').val(),
+      description: $('#shoper-p-desc').val(),
+      specs: JSON.stringify(specs),
+      status: $('#shoper-create-status').val(),
+      selected_images: JSON.stringify(imgSel.selected || []),
+      featured_image: imgSel.featured || 0,
+      seo_title: $('#shoper-p-seo-title').val(),
+      seo_desc: $('#shoper-p-seo-desc').val(),
+      tags: JSON.stringify($('#shoper-p-tags').val().split(/[،,]/).map(function (t) { return t.trim(); }).filter(Boolean))
+    }, function (data) {
+      self.$createBtn.prop('disabled', false);
+      self.status('محصول ساخته شد (شبیه‌سازی‌شده).', 'success');
+      if (typeof Shoper.showProgress === 'function') {
+        Shoper.showProgress('دانلود تصاویر');
+        setTimeout(function () { Shoper.showProgress('سئو و برچسب'); }, 250);
+        setTimeout(function () { Shoper.showProgress('انجام شد!'); }, 500);
+      }
+      renderWcOutput(data);
+    }).fail(function () {
+      self.$createBtn.prop('disabled', false);
+    });
+  };
+
+  function esc(s) { return $('<div>').text(s === null || s === undefined ? '' : String(s)).html(); }
+  function fa(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '٫'); }
+
+  function renderWcOutput(data) {
+    var p = data.product;
+    var html = '';
+
+    html += '<p>' + srcPill(data._source) + '</p>';
+    html += '<div class="img-note">';
+    html += '<strong>خلاصه:</strong> ' + data.specs_count + ' ویژگی • ';
+    html += p.images.will_sideload + ' تصویر برای دانلود در کتابخانه رسانه • ';
+    html += 'اطلاعات از ' + data.sellers_used + ' فروشنده از مجموع ' + data.sellers_total + ' فروشنده';
+    html += '</div>';
+
+    html += '<div class="wc-tabs">';
+    html += '<div class="wc-tab active" data-tab="general">عمومی</div>';
+    html += '<div class="wc-tab" data-tab="attrs">ویژگی‌ها (' + p.attributes.length + ')</div>';
+    html += '<div class="wc-tab" data-tab="images">تصاویر (' + p.images.will_sideload + ')</div>';
+    html += '<div class="wc-tab" data-tab="desc">توضیحات</div>';
+    html += '<div class="wc-tab" data-tab="seo">سئو / برچسب</div>';
+    html += '<div class="wc-tab" data-tab="meta">متا / SKU</div>';
+    html += '</div>';
+
+    // عمومی
+    html += '<div class="wc-panel active" data-panel="general"><table>';
+    html += '<tr><th>نام محصول</th><td>' + esc(p.name) + '</td></tr>';
+    html += '<tr><th>وضعیت</th><td>' + (p.status === 'draft' ? 'پیش‌نویس' : 'منتشر شده') + '</td></tr>';
+    html += '<tr><th>SKU</th><td><code>' + esc(p.sku) + '</code></td></tr>';
+    html += '<tr><th>قیمت عادی</th><td>' + fa(p.regular_price) + ' تومان</td></tr>';
+    html += '<tr><th>توضیح کوتاه</th><td>' + p.short_description + '</td></tr>';
+    html += '</table></div>';
+
+    // ویژگی‌ها
+    html += '<div class="wc-panel" data-panel="attrs">';
+    if (p.attributes.length) {
+      html += '<p class="description">هر مشخصه یک ویژگی مجزا در تب «ویژگی‌ها»ی محصول است.</p>';
+      html += '<div class="wc-attr-list">';
+      p.attributes.forEach(function (a) {
+        html += '<div class="wc-attr"><b>' + esc(a.name) + '</b>' + esc(a.value);
+        html += '<br><code>' + esc(a.taxonomy) + '</code></div>';
+      });
+      html += '</div>';
+    } else {
+      html += '<p>هیچ ویژگی‌ای انتخاب نشده است.</p>';
+    }
+    html += '</div>';
+
+    // تصاویر
+    html += '<div class="wc-panel" data-panel="images">';
+    html += '<div class="img-note">این تصاویر با <code>media_handle_sideload</code> در کتابخانه‌ی رسانه‌ی سایت شما با نام <strong>«نام محصول-شماره»</strong> ذخیره می‌شوند.</div>';
+    if (p.images.filenames && p.images.filenames.length) {
+      html += '<div class="img-note">نام فایل‌ها: <code>' + esc(p.images.filenames.map(function (f) { return f + '.webp'; }).join('، ')) + '</code></div>';
+    }
+    if (p.images.featured) {
+      html += '<h3>تصویر شاخص</h3><img src="' + esc(p.images.featured) + '" style="max-width:150px;border:1px solid #ddd;border-radius:4px;">';
+    }
+    if (p.images.gallery.length) {
+      html += '<h3>گالری (' + p.images.gallery.length + ')</h3><div class="shoper-preview-gallery">';
+      p.images.gallery.forEach(function (u) {
+        html += '<img src="' + esc(u) + '" loading="lazy">';
+      });
+      html += '</div>';
+    }
+    html += '</div>';
+
+    // توضیحات
+    html += '<div class="wc-panel" data-panel="desc">' + p.description + '</div>';
+
+    // سئو / برچسب
+    html += '<div class="wc-panel" data-panel="seo"><table>';
+    html += '<tr><th>عنوان سئو</th><td>' + esc(p.seo.title) + '</td></tr>';
+    html += '<tr><th>توضیح متا</th><td>' + esc(p.seo.description) + '</td></tr>';
+    html += '<tr><th>برچسب‌ها</th><td>' + esc(p.seo.tags.join('، ')) + '</td></tr>';
+    html += '</table></div>';
+
+    // متا
+    html += '<div class="wc-panel" data-panel="meta"><div class="wc-code">' +
+            esc(JSON.stringify(p.meta, null, 2)) + '</div></div>';
+
+    $('#wc-output-body').html(html);
+    $('#wc-output').show();
+    $('html, body').animate({ scrollTop: $('#wc-output').offset().top - 30 }, 400);
+  }
+
+  $(document).on('click', '.wc-tab', function () {
+    var t = $(this).data('tab');
+    $('.wc-tab').removeClass('active');
+    $(this).addClass('active');
+    $('.wc-panel').removeClass('active');
+    $('.wc-panel[data-panel="' + t + '"]').addClass('active');
+  });
+
+  /* --- تست اتصال --- */
+  Shoper.testConnection = function () {
+    var self = this;
+    this.$connResult.html('<span class="shoper-loading-inline"></span> در حال تست…');
+    this.ajax('shoper_test_connection', {}, function (data) {
+      var extra = data.sample ? '<br><span style="color:#646970;">نمونه: ' + self.esc(data.sample) + '</span>' : '';
+      self.$connResult.html('<span style="color:#00a32a;">✓ ' + self.esc(data.message) + '</span>' + extra);
+    });
+  };
+
+  /* --- بنر وضعیت محیط --- */
+  $.getJSON('/api/env', function (env) {
+    var $b = $('#env-banner');
+    $b.removeClass('loading');
+    if (env.live_available) {
+      $b.addClass('live').html('🟢 <strong>حالت زنده فعال است.</strong> ' + env.message);
+      $('#env-pill').html('<span class="src-pill live">متصل به ترب</span>');
+    } else {
+      $b.addClass('fixture').html('🟡 <strong>حالت داده‌ی ضبط‌شده.</strong> ' + env.message);
+      $('#env-pill').html('<span class="src-pill fixture">آفلاین</span>');
+      $('input[name="data_mode"][value="fixture"]').prop('checked', true);
+    }
+  });
+
 })(jQuery);
 </script>
 

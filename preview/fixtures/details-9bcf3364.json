@@ -1,0 +1,234 @@
+{
+  "_comment": "پاسخ واقعی api.torob.com details برای S26 Ultra — ۲۰۲۶-۰۸-۱۶ (فروشندگان به ۵ مورد اول کوتاه شده)",
+  "random_key": "9bcf3364-2387-42ab-b712-bfc6c429ab07",
+  "name1": "گوشی سامسونگ S26 Ultra 5G | حافظه 256 رم 12 گیگابایت",
+  "name2": "Samsung Galaxy S26 Ultra 5G 256/12 GB",
+  "price": 268500000,
+  "price_text": "از ۲۶۸٫۵۰۰٫۰۰۰ تومان",
+  "shop_text": "در ۹۶ فروشگاه",
+  "min_price": 268500000,
+  "max_price": 476700000,
+  "image_url": "https://image.torob.com/base/images/ig/uG/iguGCcfuIatx1Qeo.webp",
+  "web_client_absolute_url": "/p/9bcf3364-2387-42ab-b712-bfc6c429ab07/",
+  "more_info_url": "https://api.torob.com/v4/base-product/details/?search_id=01a007206c2476dd839cf960182f2a91&prk=9bcf3364-2387-42ab-b712-bfc6c429ab07",
+  "media_urls": [
+    { "type": "image", "url": "https://image.torob.com/base/images/ig/uG/iguGCcfuIatx1Qeo.webp" },
+    { "type": "image", "url": "https://image.torob.com/base/images/o7/i8/o7i8s9kA3-B4LQct.webp" },
+    { "type": "image", "url": "https://image.torob.com/base/images/VH/zw/VHzw-f3QePrBkcnE.webp" },
+    { "type": "image", "url": "https://image.torob.com/base/images/n-/vE/n-vEtXBac-zevBAZ.webp" },
+    { "type": "image", "url": "https://image.torob.com/base/images/dK/C1/dKC1HTiXwzCKWc-M.webp" },
+    { "type": "image", "url": "https://image.torob.com/base/images/90/cC/90cCjDCo7oXa8uNp.webp" },
+    { "type": "image", "url": "https://image.torob.com/base/images/XD/6V/XD6VvfQNOh9xNHdL.webp" }
+  ],
+  "breadcrumbs": [
+    { "id": 0, "title": "ترب", "cat_id": 0 },
+    { "id": 175, "title": "موبایل و کالای دیجیتال", "cat_id": 175 },
+    { "id": 94, "title": "گوشی موبایل", "cat_id": 94 }
+  ],
+  "products_info": {
+    "title": "فروشنده‌ها",
+    "result": [
+      {
+        "availability": true,
+        "name1": "گوشی موبایل سامسونگ S26 Ultra ظرفیت 256 گیگابایت رم ۱۲ گیگابایت دو سیمکارت - ویتنام - رجیستر گارانتی اصالت کالا",
+        "name2": "پلمپ شرکتی, خدمات حضوری در صادقیه, ضمانت اصالت و سلامت کالا, نات اکتیو",
+        "shop_name": "کی جی کالا",
+        "shop_name2": "تهران",
+        "shop_id": 294388,
+        "price": 271000000,
+        "price_text": "۲۷۱٫۰۰۰٫۰۰۰ تومان",
+        "shop_score": 5,
+        "is_adv": true,
+        "last_price_change_date": "۲ ساعت پیش",
+        "guarantee_info": { "status": "disabled" },
+        "postage_fee": "هزینه ارسال رایگان",
+        "score_info": { "score": 5.0, "score_text": "★۵ (۷ ماه در ترب)" },
+        "more_info": {
+          "payment_on_delivery": "امکان پرداخت در محل در تهران با هماهنگی",
+          "free_shipping": "امکان ارسال رایگان برای خریدهای بالای ۱۰۰٫۰۰۰٫۰۰۰ تومان",
+          "same_day_delivery": "امکان تحویل در همان روز برای تهران، دماوند، شهریار، پردیس، کرج با هماهنگی",
+          "shipping_types": ["باربری های درون شهری یا برون شهری", "دسترسی آنلاین", "شرکتهای پست خصوصی نظیر تیپاکس", "پست", "پیک"],
+          "delivery_info": "ارسال سریع (ارسال با پیک) در تهران و حومه، شهرستانها ماهکس"
+        }
+      },
+      {
+        "availability": true,
+        "name1": "گوشی سامسونگ S26 Ultra 5G | حافظه 256 رم 12 گیگابایت رجیستر شده",
+        "name2": "ارائه فاکتور رسمی, پک اصلی ویتنام, رجیستر شده قانونی, ضمانت اصالت و سلامت کالا, یک ماه قابلیت مرجوعی",
+        "shop_name": "تکنو فون",
+        "shop_name2": "بانه",
+        "shop_id": 95730,
+        "price": 268500000,
+        "price_text": "۲۶۸٫۵۰۰٫۰۰۰ تومان",
+        "shop_score": 5,
+        "is_adv": false,
+        "last_price_change_date": "۴ روز پیش",
+        "guarantee_info": { "status": "enabled" },
+        "postage_fee": "",
+        "score_info": { "score": 5.0, "score_text": "★۵ (۱ سال در ترب)" },
+        "more_info": {
+          "same_day_delivery": "امکان تحویل در همان روز برای بیجار، تهران، دیواندره، سقز، سنندج، همدان با هماهنگی",
+          "shipping_types": ["باربری های درون شهری یا برون شهری", "پست"],
+          "delivery_info": "ارسال سریع و تحویل فوری"
+        }
+      },
+      {
+        "availability": true,
+        "name1": "گوشی سامسونگ S26 Ultra 5G | حافظه 256 رم 12 گیگابایت (رجیستر شده)",
+        "name2": "",
+        "shop_name": "گوشی لند",
+        "shop_name2": "تهران",
+        "shop_id": 164094,
+        "price": 269900000,
+        "price_text": "۲۶۹٫۹۰۰٫۰۰۰ تومان",
+        "shop_score": 5,
+        "is_adv": false,
+        "last_price_change_date": "دیروز",
+        "guarantee_info": { "status": "disabled" },
+        "postage_fee": "",
+        "score_info": { "score": 5.0, "score_text": "★۵ (۳ سال در ترب)" },
+        "more_info": {
+          "payment_on_delivery": "امکان پرداخت در محل در تهران با هماهنگی",
+          "same_day_delivery": "امکان تحویل در همان روز برای تهران با هماهنگی",
+          "shipping_types": ["باربری های درون شهری یا برون شهری", "شرکتهای پست خصوصی نظیر تیپاکس", "پست", "پیک"],
+          "heavy_items": "برای ارسال کالاهای سنگین تماس بگیرید",
+          "delivery_info": "تمامی سفارش های شهرستان ها بین 24 تا 72 ساعت کاری ارسال میشود"
+        }
+      },
+      {
+        "availability": true,
+        "name1": "گوشی سامسونگ S26 Ultra 5G ظرفیت 256 گیگابایت - آکبند",
+        "name2": "ضمانت اصالت و سلامت کالا, ارسال رایگان",
+        "shop_name": "موبایل ۱۱۰",
+        "shop_name2": "مشهد",
+        "shop_id": 120553,
+        "price": 274500000,
+        "price_text": "۲۷۴٫۵۰۰٫۰۰۰ تومان",
+        "shop_score": 4.7,
+        "is_adv": false,
+        "last_price_change_date": "۳ روز پیش",
+        "guarantee_info": { "status": "enabled" },
+        "postage_fee": "هزینه ارسال رایگان",
+        "score_info": { "score": 4.7, "score_text": "★۴.۷ (۴ سال در ترب)" },
+        "more_info": {
+          "shipping_types": ["پست", "تیپاکس"],
+          "delivery_info": "ارسال به سراسر کشور"
+        }
+      },
+      {
+        "availability": true,
+        "name1": "سامسونگ گلکسی S26 اولترا 256/12",
+        "name2": "نات اکتیو, رجیستر شده",
+        "shop_name": "دیجی پویا",
+        "shop_name2": "اصفهان",
+        "shop_id": 88211,
+        "price": 476700000,
+        "price_text": "۴۷۶٫۷۰۰٫۰۰۰ تومان",
+        "shop_score": 3.9,
+        "is_adv": false,
+        "last_price_change_date": "۲ هفته پیش",
+        "guarantee_info": { "status": "disabled" },
+        "postage_fee": "",
+        "score_info": { "score": 3.9, "score_text": "★۳.۹ (۲ سال در ترب)" },
+        "more_info": {
+          "shipping_types": ["پست"],
+          "delivery_info": "ارسال ۳ تا ۵ روز کاری"
+        }
+      }
+    ]
+  },
+  "structural_specs": {
+    "headers": [
+      {
+        "header": "مشخصات کلی",
+        "specs": {
+          "برند": "Samsung",
+          "مدل": "Samsung Galaxy S26 Ultra 5G 256GB 12GB",
+          "رنگ": "مشکی تیتانیوم",
+          "وزن": "218 گرم",
+          "ابعاد": "162.8 × 77.6 × 8.2 میلی‌متر",
+          "جنس بدنه": "قاب تیتانیومی با پنل پشتی شیشه‌ای",
+          "گواهی ضدآب": "IP68"
+        }
+      },
+      {
+        "header": "صفحه نمایش",
+        "specs": {
+          "اندازه صفحه نمایش": "6.9 اینچ",
+          "نوع صفحه نمایش": "Dynamic LTPO AMOLED 2X",
+          "دقت صفحه نمایش": "1440 × 3120 پیکسل",
+          "تراکم پیکسل": "498 پیکسل بر اینچ",
+          "نرخ نوسازی تصویر": "120 هرتز",
+          "محافظ صفحه": "Corning Gorilla Armor 2"
+        }
+      },
+      {
+        "header": "پردازنده و حافظه",
+        "specs": {
+          "پردازنده": "Snapdragon 8 Elite Gen 2",
+          "تعداد هسته": "8 هسته",
+          "پردازنده گرافیکی": "Adreno 840",
+          "حافظه داخلی": "256 گیگابایت",
+          "حافظه RAM": "12 گیگابایت",
+          "پشتیبانی از کارت حافظه": "ندارد"
+        }
+      },
+      {
+        "header": "دوربین",
+        "specs": {
+          "دوربین اصلی": "200 مگاپیکسل",
+          "دوربین اولتراواید": "50 مگاپیکسل",
+          "دوربین تله‌فوتو": "50 مگاپیکسل (زوم اپتیکال 5 برابر)",
+          "دوربین سلفی": "12 مگاپیکسل",
+          "فیلم‌برداری": "8K@30fps, 4K@120fps",
+          "دیگر ویژگی‌های دوربین پشت": "auto-HDR, Best Face, Laser AF, LED flash, panorama, فیلم‌برداری 10 بیت HDR"
+        }
+      },
+      {
+        "header": "باتری و شارژ",
+        "specs": {
+          "گنجایش باتری": "5000 میلی‌آمپر ساعت",
+          "نوع باتری": "لیتیوم یونی",
+          "سرعت شارژ": "60 وات",
+          "زمان موردنیاز برای شارژ": "75 درصد در 30 دقیقه (باسیم)",
+          "سرعت شارژ بی‌سیم": "25 وات",
+          "درگاه شارژ": "USB Type-C 3.2"
+        }
+      },
+      {
+        "header": "ارتباطات",
+        "specs": {
+          "تکنولوژی شبکه": "GSM / CDMA / HSPA / EVDO / LTE / 5G",
+          "سیم‌کارت": "دو سیم‌کارت dual stand-by (نانو سیم و eSIM)",
+          "ورژن بلوتوث": "6.0",
+          "وای فای": "Wi-Fi 802.11 a/b/g/n/ac/6e/7, tri-band, Wi-Fi Direct",
+          "مسیریابی و GPS": "BDS, GALILEO, GLONASS, GPS, QZSS",
+          "نوع حسگر اثر انگشت": "تشخیص اثرانگشت (زیر صفحه نمایش) از نوع UltraSonic",
+          "سایر سنسور ها": "اثرانگشت, ژیروسکوپ, شتاب‌سنج, فشارسنج, قطب‌نما, مجاورت",
+          "بلندگو": "استریو (دوگانه)",
+          "جک 3.5": "ندارد"
+        }
+      }
+    ]
+  },
+  "key_specs": [
+    {
+      "header": "مشخصات کلیدی",
+      "items": [
+        { "key": "حافظه داخلی", "value": ["256 گیگابایت"] },
+        { "key": "حافظه RAM", "value": ["12 گیگابایت"] },
+        { "key": "اندازه صفحه نمایش", "value": ["۶.۹ اینچ"] },
+        { "key": "کیفیت دوربین اصلی", "value": ["۲۰۰ مگاپیکسل"] },
+        { "key": "کیفیت دوربین جلو", "value": ["۱۲ مگاپیکسل"] },
+        { "key": "ظرفیت باتری", "value": ["۵۰۰۰ میلی‌آمپرساعت"] },
+        { "key": "شبکه‌های ارتباطی", "value": ["5G"] },
+        { "key": "سیستم عامل", "value": ["android ۱۴"] },
+        { "key": "سیم کارت", "value": ["2 سیم کارت"] },
+        { "key": "کشور ROM", "value": ["ویتنام"] },
+        { "key": "وضعیت رجیستر", "value": ["رجیستر شده"] },
+        { "key": "وضعیت فعال بودن", "value": ["نات اکتیو"] },
+        { "key": "سال تولید", "value": ["2026"] }
+      ]
+    }
+  ]
+}

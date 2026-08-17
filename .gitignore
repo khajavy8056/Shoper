@@ -1,6 +1,10 @@
 # Build artifacts
 *.zip
 
+# Allow the published install packages under dist/
+!dist/
+dist/*.zip
+
 # OS files
 .DS_Store
 Thumbs.db
@@ -10,3 +14,5 @@ Thumbs.db
 *.swo
 .idea/
 .vscode/
+node_modules/
+package-lock.json

@@ -10,10 +10,19 @@
 		currentData: null,
 		selectedPid: null,
 
+		// وضعیت نوار پیشنهاد (autocomplete).
+		sugTimer: null,
+		sugXhr: null,
+		sugItems: [],
+		sugIndex: -1,
+		sugOpen: false,
+		sugLastTerm: '',
+
 		init: function () {
 			this.cache();
 			if (this.$body.length) {
 				this.bind();
+				this.buildSuggestBox();
 			}
 		},
 
@@ -53,11 +62,59 @@
 				}
 			});
 
+			// --- نوار پیشنهاد نام محصول (autocomplete) ---
+			// کاربر لازم نیست نام کامل را بداند؛ با تایپ بخشی از نام،
+			// نام‌های کامل زیر فیلد پیشنهاد می‌شوند.
+			this.$queryInput.on('input', function () {
+				self.onQueryInput($(this).val());
+			});
+
+			// ناوبری با کیبورد در لیست پیشنهاد.
+			this.$queryInput.on('keydown', function (e) {
+				if (!self.sugOpen) {
+					return;
+				}
+				if (e.which === 40) {          // ↓
+					e.preventDefault();
+					self.moveSuggest(1);
+				} else if (e.which === 38) {   // ↑
+					e.preventDefault();
+					self.moveSuggest(-1);
+				} else if (e.which === 27) {   // Esc
+					self.closeSuggest();
+				} else if (e.which === 13 && self.sugIndex >= 0) { // Enter روی یک پیشنهاد
+					e.preventDefault();
+					self.chooseSuggest(self.sugIndex);
+				}
+			});
+
+			this.$queryInput.on('focus', function () {
+				if (self.sugItems.length && $(this).val().trim().length >= 2) {
+					self.openSuggest();
+				}
+			});
+
+			// کلیک روی یک پیشنهاد.
+			$(document).on('mousedown', '.shoper-suggest-item', function (e) {
+				e.preventDefault();
+				self.chooseSuggest($(this).index());
+			});
+
+			// بستن با کلیک بیرون.
+			$(document).on('click', function (e) {
+				if (!$(e.target).closest('.shoper-suggest-wrap, #shoper-query').length) {
+					self.closeSuggest();
+				}
+			});
+
 			// جستجو با Enter.
 			this.$queryInput.on('keypress', function (e) {
 				if (e.which === 13) {
 					e.preventDefault();
-					self.search();
+					if (self.sugIndex < 0) {
+						self.closeSuggest();
+						self.search();
+					}
 				}
 			});
 
@@ -69,7 +126,7 @@
 			$(document).on('click', '.shoper-result-item', function () {
 				var $item = $(this);
 				$item.addClass('selected').siblings().removeClass('selected');
-				self.preview($item.data('prk'), $item.data('searchid'));
+				self.preview($item.data('prk'), $item.data('searchid'), $item.data('moreinfo'));
 			});
 
 			this.$createBtn.on('click', function (e) {
@@ -93,6 +150,254 @@
 			return $('input[name="shoper_input_mode"]:checked, input[name="shoper_mode"]:checked').val() || 'query';
 		},
 
+		/* ------------------------------------------------------------------
+		 * نوار پیشنهاد نام محصول (autocomplete)
+		 * ------------------------------------------------------------------ */
+
+		/**
+		 * ساخت ظرف نوار پیشنهاد، دقیقاً زیر فیلد جستجو.
+		 */
+		buildSuggestBox: function () {
+			if (!this.$queryInput.length) {
+				return;
+			}
+			// ظرف با position:relative تا لیست زیر فیلد بچسبد.
+			if (!this.$queryInput.parent().hasClass('shoper-suggest-wrap')) {
+				this.$queryInput.wrap('<span class="shoper-suggest-wrap"></span>');
+			}
+			this.$suggest = $('<div class="shoper-suggest" role="listbox"></div>')
+				.appendTo(this.$queryInput.parent())
+				.hide();
+
+			this.$queryInput.attr({
+				'autocomplete': 'off',
+				'role': 'combobox',
+				'aria-autocomplete': 'list',
+				'aria-expanded': 'false'
+			});
+		},
+
+		/**
+		 * هر بار که کاربر تایپ می‌کند (با debounce).
+		 *
+		 * @param {string} term عبارت فعلی.
+		 */
+		onQueryInput: function (term) {
+			var self = this;
+			term = (term || '').trim();
+
+			if (this.sugTimer) {
+				clearTimeout(this.sugTimer);
+			}
+
+			// کمتر از ۲ نویسه ارزش درخواست ندارد.
+			if (term.length < 2) {
+				this.closeSuggest();
+				this.sugItems = [];
+				return;
+			}
+
+			// اگر عبارت تغییری نکرده، دوباره درخواست نده.
+			if (term === this.sugLastTerm && this.sugItems.length) {
+				this.openSuggest();
+				return;
+			}
+
+			// ۲۵۰ms صبر تا کاربر دست از تایپ بردارد.
+			this.sugTimer = setTimeout(function () {
+				self.fetchSuggest(term);
+			}, 250);
+		},
+
+		/**
+		 * گرفتن پیشنهادها از سرور.
+		 *
+		 * @param {string} term عبارت.
+		 */
+		fetchSuggest: function (term) {
+			var self = this;
+
+			// درخواست قبلی را لغو کن تا نتیجه‌ی قدیمی روی جدید ننشیند.
+			if (this.sugXhr && this.sugXhr.readyState !== 4) {
+				this.sugXhr.abort();
+			}
+
+			this.showSuggestLoading();
+
+			this.sugXhr = $.post(ShoperData.ajaxUrl, {
+				action: 'shoper_suggest',
+				nonce: ShoperData.nonce,
+				term: term
+			}).done(function (resp) {
+				// اگر کاربر در این فاصله عبارت را عوض کرده، نتیجه را دور بریز.
+				if (self.$queryInput.val().trim() !== term) {
+					return;
+				}
+				var list = (resp && resp.success && resp.data && resp.data.suggestions) ? resp.data.suggestions : [];
+				self.sugLastTerm = term;
+				self.sugItems = list;
+				self.sugIndex = -1;
+				self.renderSuggest(list, term);
+			}).fail(function (xhr, status) {
+				if (status !== 'abort') {
+					self.closeSuggest();
+				}
+			});
+		},
+
+		showSuggestLoading: function () {
+			if (!this.$suggest) {
+				return;
+			}
+			this.$suggest
+				.html('<div class="shoper-suggest-loading"><span class="shoper-loading-inline"></span> در حال گرفتن پیشنهاد از ترب…</div>')
+				.show();
+			this.sugOpen = true;
+		},
+
+		/**
+		 * رندر لیست پیشنهاد.
+		 *
+		 * @param {Array}  items لیست.
+		 * @param {string} term  عبارت تایپ‌شده (برای هایلایت).
+		 */
+		renderSuggest: function (items, term) {
+			if (!this.$suggest) {
+				return;
+			}
+			if (!items.length) {
+				this.$suggest
+					.html('<div class="shoper-suggest-empty">پیشنهادی یافت نشد — می‌توانید دکمه‌ی جستجو را بزنید.</div>')
+					.show();
+				this.sugOpen = true;
+				return;
+			}
+
+			var html = '';
+			for (var i = 0; i < items.length; i++) {
+				var it = items[i];
+				html += '<div class="shoper-suggest-item" role="option" data-index="' + i + '">';
+				if (it.image_url) {
+					html += '<img class="shoper-suggest-thumb" src="' + this.esc(it.image_url) + '" alt="" loading="lazy">';
+				} else {
+					html += '<span class="shoper-suggest-thumb shoper-suggest-thumb-empty"></span>';
+				}
+				html += '<span class="shoper-suggest-text">';
+				html += '<span class="shoper-suggest-name">' + this.highlight(it.label, term) + '</span>';
+				var meta = [];
+				if (it.name2) { meta.push(this.esc(it.name2)); }
+				if (it.shop_text) { meta.push(this.esc(it.shop_text)); }
+				if (meta.length) {
+					html += '<span class="shoper-suggest-meta">' + meta.join(' • ') + '</span>';
+				}
+				html += '</span>';
+				if (it.price_text) {
+					html += '<span class="shoper-suggest-price">' + this.esc(it.price_text) + '</span>';
+				}
+				html += '</div>';
+			}
+
+			this.$suggest.html(html).show();
+			this.sugOpen = true;
+			this.$queryInput.attr('aria-expanded', 'true');
+		},
+
+		/**
+		 * هایلایت بخش تایپ‌شده در نام پیشنهادی.
+		 *
+		 * @param {string} text متن کامل.
+		 * @param {string} term عبارت.
+		 * @return {string} HTML امن.
+		 */
+		highlight: function (text, term) {
+			var safe = this.esc(text);
+			if (!term) {
+				return safe;
+			}
+			var safeTerm = this.esc(term).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+			try {
+				return safe.replace(new RegExp('(' + safeTerm + ')', 'gi'), '<mark>$1</mark>');
+			} catch (e) {
+				return safe;
+			}
+		},
+
+		/**
+		 * جابه‌جایی انتخاب با کلیدهای بالا/پایین.
+		 *
+		 * @param {number} delta جهت.
+		 */
+		moveSuggest: function (delta) {
+			if (!this.sugItems.length) {
+				return;
+			}
+			this.sugIndex += delta;
+			if (this.sugIndex < 0) {
+				this.sugIndex = this.sugItems.length - 1;
+			}
+			if (this.sugIndex >= this.sugItems.length) {
+				this.sugIndex = 0;
+			}
+			var $items = this.$suggest.find('.shoper-suggest-item');
+			$items.removeClass('active');
+			var $active = $items.eq(this.sugIndex).addClass('active');
+
+			// نام کامل را داخل فیلد بگذار تا کاربر ببیند چه انتخاب می‌کند.
+			if (this.sugItems[this.sugIndex]) {
+				this.$queryInput.val(this.sugItems[this.sugIndex].label);
+			}
+
+			// اسکرول به آیتم فعال.
+			if ($active.length) {
+				var box = this.$suggest[0];
+				var el = $active[0];
+				if (el.offsetTop < box.scrollTop) {
+					box.scrollTop = el.offsetTop;
+				} else if (el.offsetTop + el.offsetHeight > box.scrollTop + box.clientHeight) {
+					box.scrollTop = el.offsetTop + el.offsetHeight - box.clientHeight;
+				}
+			}
+		},
+
+		/**
+		 * انتخاب یک پیشنهاد: نام کامل در فیلد می‌نشیند و
+		 * مستقیماً پیش‌نمایش همان محصول بارگذاری می‌شود.
+		 *
+		 * @param {number} index اندیس.
+		 */
+		chooseSuggest: function (index) {
+			var it = this.sugItems[index];
+			if (!it) {
+				return;
+			}
+			this.$queryInput.val(it.label);
+			this.closeSuggest();
+
+			// چون prk را از قبل داریم، مستقیم به پیش‌نمایش می‌رویم.
+			if (it.random_key) {
+				this.preview(it.random_key, it.search_id || '');
+			} else {
+				this.search();
+			}
+		},
+
+		openSuggest: function () {
+			if (this.$suggest && this.$suggest.children().length) {
+				this.$suggest.show();
+				this.sugOpen = true;
+				this.$queryInput.attr('aria-expanded', 'true');
+			}
+		},
+
+		closeSuggest: function () {
+			if (this.$suggest) {
+				this.$suggest.hide();
+			}
+			this.sugOpen = false;
+			this.sugIndex = -1;
+			this.$queryInput.attr('aria-expanded', 'false');
+		},
+
 		status: function (msg, type) {
 			if (!this.$status.length) {
 				this.$status = $('<div id="shoper-status" class="shoper-status"></div>').appendTo('.shoper-metabox, .shoper-card').first();
@@ -101,7 +406,9 @@
 			if (type === 'loading') {
 				html = '<span class="shoper-loading-inline"></span> ' + msg;
 			} else {
-				html = msg;
+				// هر پیامی که از سرور/API می‌آید ممکن است کنترل‌نشده باشد؛
+				// آن را escape می‌کنیم تا جلو XSS در پنل مدیریت گرفته شود.
+				html = this.esc(msg);
 			}
 			this.$status.removeClass('loading success error').addClass(type || '').html(html).show();
 		},
@@ -176,7 +483,8 @@
 			for (var i = 0; i < items.length; i++) {
 				var it = items[i];
 				html += '<div class="shoper-result-item" data-prk="' + this.esc(it.random_key) + '" '
-					+ 'data-searchid="' + this.esc(it.search_id) + '">';
+					+ 'data-searchid="' + this.esc(it.search_id) + '" '
+					+ 'data-moreinfo="' + this.esc(it.more_info_url) + '">';
 				if (it.image_url) {
 					html += '<img src="' + this.esc(it.image_url) + '" alt="">';
 				}
@@ -201,14 +509,18 @@
 			this.$results.html(html).show();
 		},
 
-		preview: function (prk, searchId) {
+		preview: function (prk, searchId, moreInfo) {
 			var self = this;
 			if (!prk) return;
 			this.status(ShoperData.i18n.loading, 'loading');
 			this.$results.find('.shoper-result-item').removeClass('selected');
 			this.$results.find('[data-prk="' + prk + '"]').addClass('selected');
 
-			this.ajax('shoper_preview', { prk: prk, search_id: searchId || '' }, function (data) {
+			this.ajax('shoper_preview', {
+				prk: prk,
+				search_id: searchId || '',
+				more_info_url: moreInfo || ''
+			}, function (data) {
 				self.clearStatus();
 				self.currentData = data;
 				self.selectedPid = prk;
@@ -219,9 +531,23 @@
 		},
 
 		renderPreview: function (d) {
+			var self = this;
 			var html = '';
+			// نوار مراحل/گرید تصویر/سئو هم در صفحه‌ی اصلی افزونه (create) هم در
+			// متاباکس صفحه‌ی افزودن/ویرایش محصول (fill) نمایش داده می‌شود.
+			var isMain = !!(this.$createBtn.length || this.$fillRow.length);
 
-			// هدر با تصویر.
+			// --- نوار مراحل (فقط در صفحه‌ی اصلی) ---
+			if (isMain) {
+				html += '<div class="shoper-stepper">';
+				html += '<div class="shoper-step is-active" data-step="info"><span class="shoper-step-num">۱</span> دریافت اطلاعات</div>';
+				html += '<div class="shoper-step" data-step="images"><span class="shoper-step-num">۲</span> انتخاب تصاویر</div>';
+				html += '<div class="shoper-step" data-step="seo"><span class="shoper-step-num">۳</span> سئو و برچسب</div>';
+				html += '</div>';
+			}
+
+			// --- بخش ۱: اطلاعات ---
+			html += '<div class="shoper-step-body" data-step-body="info">';
 			html += '<div class="shoper-preview-header">';
 			if (d.image_url) {
 				html += '<img src="' + this.esc(d.image_url) + '" alt="">';
@@ -237,20 +563,40 @@
 			}
 			html += '</div></div>';
 
-			// گالری.
-			if (d.gallery && d.gallery.length) {
-				html += '<div class="shoper-field-group"><label>تصاویر (' + d.gallery.length + ')</label>';
-				html += '<div class="shoper-preview-gallery">';
-				for (var i = 0; i < d.gallery.length; i++) {
-					html += '<img src="' + this.esc(d.gallery[i]) + '" alt="">';
-				}
-				html += '</div></div>';
+			// قیمت + خلاصه‌ی فروشندگان بررسی‌شده.
+			var agg = d.aggregate || {};
+			if (d.price) {
+				html += '<div class="shoper-field-group"><label>قیمت انتخاب‌شده</label>';
+				html += '<input type="text" value="' + this.esc(this.numberFormat(d.price)) + ' تومان" readonly></div>';
 			}
 
-			// قیمت.
-			if (d.price) {
-				html += '<div class="shoper-field-group"><label>قیمت (ارزان‌ترین فروشنده)</label>';
-				html += '<input type="text" value="' + this.esc(this.numberFormat(d.price)) + ' تومان" readonly></div>';
+			if (agg.considered && agg.considered.length) {
+				html += '<div class="shoper-field-group">';
+				html += '<label>فروشندگان بررسی‌شده (' + agg.considered.length + ' از ' + (agg.total_sellers || 0) + ')</label>';
+				html += '<p class="description" style="margin:0 0 6px;">اطلاعات محصول از میان این چند فروشنده‌ی برتر جمع‌آوری شده است، نه از همه‌ی فروشگاه‌ها.</p>';
+				html += '<table class="shoper-sellers-preview"><thead><tr>';
+				html += '<th>فروشنده</th><th>شهر</th><th>امتیاز</th><th>قیمت</th>';
+				html += '</tr></thead><tbody>';
+				for (var s = 0; s < agg.considered.length; s++) {
+					var sel = agg.considered[s];
+					html += '<tr' + (s === 0 ? ' class="primary"' : '') + '>';
+					html += '<td>' + this.esc(sel.shop_name) + (s === 0 ? ' <span class="shoper-badge">منتخب</span>' : '') + '</td>';
+					html += '<td>' + this.esc(sel.city) + '</td>';
+					html += '<td>' + this.esc(sel.score_text || sel.score) + '</td>';
+					html += '<td>' + this.esc(this.numberFormat(sel.price)) + ' تومان</td>';
+					html += '</tr>';
+				}
+				html += '</tbody></table>';
+
+				if (agg.cheapest && agg.highest && agg.highest > agg.cheapest) {
+					html += '<p class="description">محدوده‌ی بازار: ' + this.esc(this.numberFormat(agg.cheapest));
+					html += ' تا ' + this.esc(this.numberFormat(agg.highest)) + ' تومان</p>';
+				}
+				if (agg.features && agg.features.length) {
+					html += '<p class="description"><strong>ویژگی‌های تجمیع‌شده:</strong> ';
+					html += this.esc(agg.features.slice(0, 6).join(' • ')) + '</p>';
+				}
+				html += '</div>';
 			}
 
 			// توضیحات.
@@ -276,12 +622,62 @@
 				}
 				html += '</div></div>';
 			}
+			html += '</div>'; // end info
+
+			// --- بخش ۲: تصاویر (انتخاب، تصویر اصلی، نام محصول+شماره) ---
+			if (isMain && d.gallery && d.gallery.length) {
+				html += '<div class="shoper-step-body" data-step-body="images">';
+				html += '<div class="shoper-field-group"><label>انتخاب تصاویر (' + d.gallery.length + ')</label>';
+				html += '<p class="description" style="margin:0 0 8px;">برای هر تصویر تیک <strong>«نگه‌داشته شود»</strong> را بزنید و یک تصویر را با دکمه‌ی <strong>«تصویر اصلی»</strong> مشخص کنید. تصاویر در کتابخانه‌ی رسانه با نام <strong>نام محصول + شماره</strong> ذخیره می‌شوند (مثل «' + this.esc(this.fileBase(d.name1)) + '-1.webp»).</p>';
+				html += '<div class="shoper-img-grid">';
+				for (var g = 0; g < d.gallery.length; g++) {
+					html += '<div class="shoper-img-item" data-idx="' + g + '">';
+					html += '<div class="shoper-img-thumb"><img src="' + this.esc(d.gallery[g]) + '" alt=""></div>';
+					html += '<div class="shoper-img-controls">';
+					html += '<label class="shoper-img-keep"><input type="checkbox" class="shoper-img-check" data-idx="' + g + '" checked> نگه‌داشته شود</label>';
+					html += '<label class="shoper-img-main"><input type="radio" name="shoper-featured" class="shoper-img-featured" data-idx="' + g + '"' + (g === 0 ? ' checked' : '') + '> تصویر اصلی</label>';
+					html += '</div></div>';
+				}
+				html += '</div></div>';
+				html += '</div>';
+			}
+
+			// --- بخش ۳: سئو و برچسب ---
+			if (isMain) {
+				var seo = this.buildSeo(d);
+				html += '<div class="shoper-step-body" data-step-body="seo">';
+				html += '<div class="shoper-field-group"><label>عنوان سئو (Meta Title)</label>';
+				html += '<input type="text" id="shoper-p-seo-title" value="' + this.esc(seo.title) + '"></div>';
+				html += '<div class="shoper-field-group"><label>توضیح متا (Meta Description)</label>';
+				html += '<textarea id="shoper-p-seo-desc">' + this.esc(seo.description) + '</textarea></div>';
+				html += '<div class="shoper-field-group"><label>برچسب‌ها (جدا با ویرگول)</label>';
+				html += '<input type="text" id="shoper-p-tags" value="' + this.esc(seo.tags.join('، ')) + '"></div>';
+				html += '<p class="description">این مقادیر به‌عنوان برچسب محصول (product_tag) و متادیتای سئو ثبت می‌شوند؛ اگر Yoast نصب باشد متادیتای آن هم پر می‌شود.</p>';
+				html += '</div>';
+
+				// نوار پیشرفت.
+				html += '<div id="shoper-progress" class="shoper-progress" style="display:none;">';
+				html += '<div class="shoper-progress-track"><div class="shoper-progress-bar" style="width:0%"></div></div>';
+				html += '<div class="shoper-progress-label">آماده‌ی ساخت…</div>';
+				html += '</div>';
+			}
 
 			// اطلاعات مخفی.
 			html += '<input type="hidden" id="shoper-p-prk" value="' + this.esc(d.random_key) + '">';
 			html += '<input type="hidden" id="shoper-p-searchid" value="' + this.esc(d.search_id || '') + '">';
+			html += '<input type="hidden" id="shoper-p-moreinfo" value="' + this.esc(d.more_info_url || '') + '">';
 
 			this.$preview.html(html);
+
+			// اتصال نوار مراحل و شمارنده‌ها.
+			if (isMain) {
+				this.bindSteps();
+				this.updateImgCount();
+				this.$preview.on('change', '.shoper-img-check, .shoper-img-featured', function () {
+					self.updateImgCount();
+				});
+				this.goStep('info');
+			}
 
 			// در متاباکس ویرایش محصول، دکمه‌ی «پر کردن» را نشان بده.
 			if (this.$fillRow.length) {
@@ -293,6 +689,145 @@
 			}
 		},
 
+		/* ------------------------------------------------------------------
+		 * نوار مراحل (stepper) + نوار پیشرفت + انتخاب تصاویر + سئو
+		 * ------------------------------------------------------------------ */
+
+		/**
+		 * اتصال کلیک روی مراحل.
+		 */
+		bindSteps: function () {
+			var self = this;
+			this.$preview.off('click.steps').on('click.steps', '.shoper-step', function () {
+				self.goStep($(this).data('step'));
+			});
+		},
+
+		/**
+		 * رفتن به یک مرحله و به‌روزرسانی وضعیت نوار.
+		 *
+		 * @param {string} name info | images | seo
+		 */
+		goStep: function (name) {
+			var order = ['info', 'images', 'seo'];
+			var idx = order.indexOf(name);
+			if (idx < 0) idx = 0;
+			this.$preview.find('.shoper-step').removeClass('is-active is-done');
+			for (var i = 0; i < order.length; i++) {
+				if (i === idx) {
+					this.$preview.find('.shoper-step[data-step="' + order[i] + '"]').addClass('is-active');
+				} else if (i < idx) {
+					this.$preview.find('.shoper-step[data-step="' + order[i] + '"]').addClass('is-done');
+				}
+			}
+			this.$preview.find('.shoper-step-body').hide().filter('[data-step-body="' + name + '"]').show();
+		},
+
+		/**
+		 * به‌روزرسانی شمارنده‌ی تصاویر انتخاب‌شده.
+		 */
+		updateImgCount: function () {
+			var kept = this.$preview.find('.shoper-img-check:checked').length;
+			var total = this.$preview.find('.shoper-img-check').length;
+			var $step = this.$preview.find('.shoper-step[data-step="images"]');
+			$step.find('.shoper-step-count').remove();
+			$step.append('<span class="shoper-step-count">' + kept + '/' + total + '</span>');
+		},
+
+		/**
+		 * جمع‌آوری انتخاب تصاویر: ایندکس‌های نگه‌داشته‌شده + ایندکس تصویر اصلی.
+		 *
+		 * @return {Object}
+		 */
+		collectImgSelection: function () {
+			var kept = [];
+			var featured = 0;
+			this.$preview.find('.shoper-img-check:checked').each(function () {
+				kept.push(parseInt($(this).data('idx'), 10));
+			});
+			var $f = this.$preview.find('.shoper-img-featured:checked').first();
+			if ($f.length) {
+				featured = parseInt($f.data('idx'), 10);
+			}
+			return { selected: kept, featured: featured };
+		},
+
+		/**
+		 * ساخت اطلاعات سئو (آینه‌ی Shoper_Product_Builder::build_seo).
+		 *
+		 * @param {Object} d داده‌ی محصول.
+		 * @return {Object}
+		 */
+		buildSeo: function (d) {
+			var title = d.name1 || '';
+			var parts = [];
+			if (d.name2) { parts.push(d.name2); }
+			var ks = d.key_specs || {};
+			var i = 0;
+			for (var k in ks) {
+				if (!ks.hasOwnProperty(k)) continue;
+				if (i++ >= 5) break;
+				parts.push(k + ': ' + ks[k]);
+			}
+			var desc = parts.join(' | ');
+			if (desc.length > 155) { desc = desc.slice(0, 152) + '…'; }
+
+			var tags = [];
+			var seen = {};
+			var cands = [];
+			if (d.name1) { cands.push(d.name1); }
+			if (d.name2) { cands.push(d.name2); }
+			if (d.specs) {
+				['برند', 'مدل', 'سازنده'].forEach(function (key) {
+					if (d.specs[key]) { cands.push(d.specs[key]); }
+				});
+			}
+			cands.forEach(function (c) {
+				String(c).split(/[|\/،,]+/).forEach(function (t) {
+					t = t.trim();
+					if (t && !seen[t]) { seen[t] = true; tags.push(t); }
+				});
+			});
+			if (tags.length > 12) { tags = tags.slice(0, 12); }
+
+			return { title: title, description: desc, tags: tags };
+		},
+
+		/**
+		 * نام پایه برای فایل تصویر (آینه‌ی base_filename).
+		 *
+		 * @param {string} title نام محصول.
+		 * @return {string}
+		 */
+		fileBase: function (title) {
+			// آینه‌ی sanitize_file_name وردپرس + base_filename در PHP.
+			var base = String(title || '')
+				.replace(/[?\[\]\/\\=<>:;,"'&$#*()~`!{}%+|]/g, '') // کاراکترهای غیرمجاز
+				.replace(/\s+/g, '-')                               // فاصله → خط تیره
+				.replace(/-+/g, '-')                                // حذف تیره‌های تکراری
+				.replace(/^-+|-+$/g, '');
+			base = base.slice(0, 80);
+			return base || 'shoper-product';
+		},
+
+		/**
+		 * به‌روزرسانی نوار پیشرفت.
+		 *
+		 * @param {string} label برچسب مرحله.
+		 */
+		showProgress: function (label) {
+			var $p = this.$preview.find('#shoper-progress');
+			if (!$p.length) { return; }
+			$p.show();
+			var $bar = $p.find('.shoper-progress-bar');
+			var $lbl = $p.find('.shoper-progress-label');
+			if (label === 'دریافت اطلاعات') { $bar.css('width', '40%'); }
+			else if (label === 'دانلود تصاویر') { $bar.css('width', '75%'); }
+			else if (label === 'سئو و برچسب') { $bar.css('width', '92%'); }
+			else { $bar.css('width', '100%'); }
+			$lbl.text(label);
+		},
+
 		create: function () {
 			var self = this;
 			var prk = $('#shoper-p-prk').val();
@@ -301,32 +836,62 @@
 				return;
 			}
 
-			// جمع‌آوری مشخصات انتخاب‌شده.
+			// مشخصات فنی انتخاب‌شده.
 			var specs = [];
 			$('.shoper-spec-check:checked').each(function () {
 				specs.push($(this).val());
 			});
 
+			// انتخاب تصاویر.
+			var imgSel = { selected: [], featured: 0 };
+			if (typeof this.collectImgSelection === 'function') {
+				imgSel = this.collectImgSelection();
+			}
+
+			// سئو.
+			var seoTitle = $('#shoper-p-seo-title').val();
+			var seoDesc  = $('#shoper-p-seo-desc').val();
+			var tags     = $('#shoper-p-tags').val().split(/[،,]/).map(function (t) { return t.trim(); }).filter(Boolean);
+
 			var payload = {
 				prk: prk,
 				search_id: $('#shoper-p-searchid').val(),
+				more_info_url: $('#shoper-p-moreinfo').val(),
 				name: $('#shoper-p-name').val(),
 				description: $('#shoper-p-desc').val(),
 				specs: JSON.stringify(specs),
-				status: $('#shoper-create-status').val() || $('select#shoper-create-status').val() || 'draft'
+				status: $('#shoper-create-status').val() || $('select#shoper-create-status').val() || 'draft',
+				selected_images: JSON.stringify(imgSel.selected || []),
+				featured_image: imgSel.featured || 0,
+				seo_title: seoTitle,
+				seo_desc: seoDesc,
+				tags: JSON.stringify(tags)
 			};
 
 			this.status(ShoperData.i18n.creating, 'loading');
 			this.$createBtn.prop('disabled', true);
 
+			this.showProgress('دریافت اطلاعات');
+
 			this.ajax('shoper_create', payload, function (data) {
 				self.$createBtn.prop('disabled', false);
 				self.clearStatus();
 
+				self.showProgress('دانلود تصاویر');
+				setTimeout(function () { self.showProgress('سئو و برچسب'); }, 250);
+				setTimeout(function () { self.showProgress('انجام شد!'); }, 500);
+
 				var html = '<div class="shoper-success-box">';
 				html += '<p><strong>✓ محصول ساخته شد!</strong></p>';
 				html += '<p>تعداد ویژگی‌های ثبت‌شده: ' + (data.specs_count || 0) + '<br>';
-				html += 'تصاویر دانلودشده: ' + ((data.image_info && data.image_info.gallery_ids) ? data.image_info.gallery_ids.length + 1 : 0) + '</p>';
+				html += 'تصاویر دانلودشده: ' + ((data.image_info && data.image_info.gallery_ids) ? data.image_info.gallery_ids.length + 1 : 0) + '<br>';
+				if (data.filenames && data.filenames.length) {
+					html += 'نام فایل تصاویر: <code>' + self.esc(data.filenames.join('، ')) + '</code><br>';
+				}
+				if (data.seo && data.seo.tags && data.seo.tags.length) {
+					html += 'برچسب‌ها: <code>' + self.esc(data.seo.tags.join('، ')) + '</code>';
+				}
+				html += '</p>';
 				if (data.edit_link) {
 					html += '<a href="' + self.esc(data.edit_link) + '" class="button button-primary">ویرایش محصول</a>';
 				}
@@ -338,6 +903,7 @@
 				self.$createBtn.hide();
 			}).fail(function () {
 				self.$createBtn.prop('disabled', false);
+				self.$preview.find('#shoper-progress').hide();
 			});
 		},
 
@@ -346,6 +912,7 @@
 			var postId = this.$postId.val();
 			var prk = $('#shoper-p-prk').val() || this.selectedPid;
 			var searchId = $('#shoper-p-searchid').val() || '';
+			var moreInfo = $('#shoper-p-moreinfo').val() || '';
 
 			if (!postId) {
 				this.status('برای پر کردن، ابتدا محصول را به‌صورت پیش‌نویس ذخیره کنید.', 'error');
@@ -356,15 +923,32 @@
 				return;
 			}
 
+			// انتخاب تصاویر و سئو (همان جریان صفحه‌ی اصلی).
+			var imgSel = { selected: [], featured: 0 };
+			if (typeof this.collectImgSelection === 'function') {
+				imgSel = this.collectImgSelection();
+			}
+			var seoTitle = $('#shoper-p-seo-title').val();
+			var seoDesc  = $('#shoper-p-seo-desc').val();
+			var tags     = $('#shoper-p-tags').val().split(/[،,]/).map(function (t) { return t.trim(); }).filter(Boolean);
+
 			this.status('در حال پر کردن محصول…', 'loading');
 			this.$fillBtn.prop('disabled', true);
+			this.showProgress('دریافت اطلاعات');
 
 			this.ajax('shoper_fill', {
 				post_id: postId,
 				prk: prk,
-				search_id: searchId
+				search_id: searchId,
+				more_info_url: moreInfo,
+				selected_images: JSON.stringify(imgSel.selected || []),
+				featured_image: imgSel.featured || 0,
+				seo_title: seoTitle,
+				seo_desc: seoDesc,
+				tags: JSON.stringify(tags)
 			}, function (data) {
 				self.$fillBtn.prop('disabled', false);
+				self.showProgress('انجام شد!');
 				self.status(data.message || 'پر شد!', 'success');
 				// رفرش صفحه برای دیدن تغییرات در ویرایشگر.
 				if (data.reload) {
@@ -372,6 +956,7 @@
 				}
 			}).fail(function () {
 				self.$fillBtn.prop('disabled', false);
+				self.$preview.find('#shoper-progress').hide();
 			});
 		},
 
