@@ -417,7 +417,16 @@
 			this.$status.removeClass('loading success error').hide().empty();
 		},
 
-		ajax: function (action, data, onSuccess) {
+		/**
+		 * درخواست AJAX یکپارچه با پیام خطای دقیق.
+		 *
+		 * @param {string}   action    نام اکشن.
+		 * @param {Object}   data      داده‌ها.
+		 * @param {Function} onSuccess موفق.
+		 * @param {Function} onError   خطا (اختیاری) — { code, message, status }.
+		 * @return {jqXHR}
+		 */
+		ajax: function (action, data, onSuccess, onError) {
 			var self = this;
 			data = data || {};
 			data.action = action;
@@ -428,13 +437,104 @@
 					if (resp && resp.success) {
 						onSuccess(resp.data || {});
 					} else {
-						var msg = (resp && resp.data && resp.data.message) ? resp.data.message : ShoperData.i18n.error;
-						self.status(msg, 'error');
+						var info = self.describeError(resp);
+						if (onError) {
+							onError(info);
+						} else {
+							self.status(info.message, 'error');
+						}
 					}
 				})
-				.fail(function () {
-					self.status('خطا در برقراری ارتباط با سرور.', 'error');
+				.fail(function (xhr, status) {
+					var info = self.describeFail(xhr, status);
+					if (onError) {
+						onError(info);
+					} else {
+						self.status(info.message, 'error');
+					}
 				});
+		},
+
+		/**
+		 * تحلیل پاسخ خطای JSON برگشتی از PHP.
+		 *
+		 * @param {Object} resp پاسخ.
+		 * @return {Object} { code, message, status }
+		 */
+		describeError: function (resp) {
+			var data = (resp && resp.data) ? resp.data : {};
+			var code = data.code || 'error';
+			return {
+				code: code,
+				message: data.message || this.errorText(code),
+				status: data.status || 0
+			};
+		},
+
+		/**
+		 * تحلیل خطای سطح شبکه/HTTP (fail).
+		 *
+		 * @param {jqXHR}  xhr    درخواست.
+		 * @param {string} status وضعیت jQuery.
+		 * @return {Object} { code, message }
+		 */
+		describeFail: function (xhr, status) {
+			if (status === 'timeout') {
+				return { code: 'timeout', message: 'زمان پاسخ سرور به پایان رسید؛ دوباره تلاش کنید.' };
+			}
+
+			var http = xhr.status || 0;
+			var parsed = null;
+			try {
+				parsed = JSON.parse(xhr.responseText);
+			} catch (e) {
+				parsed = null;
+			}
+
+			if (parsed && parsed.data) {
+				return {
+					code: parsed.data.code || ('http_' + http),
+					message: parsed.data.message || this.errorText(parsed.data.code),
+					status: http
+				};
+			}
+
+			if (http === 0) {
+				return { code: 'network', message: 'ارتباط با سرور برقرار نشد. اتصال اینترنت یا سرور را بررسی کنید.' };
+			}
+			if (http === 403) {
+				return { code: 'forbidden', message: 'دسترسی غیرمجاز یا نشانه‌ی امنیتی نامعتبر؛ صفحه را تازه‌سازی کنید.' };
+			}
+			return { code: 'http_' + http, message: 'پاسخ نامعتبر از سرور دریافت شد (کد ' + http + ').' };
+		},
+
+		/**
+		 * پیام فارسی پیش‌فرض هر کد خطا (اگر سرور پیام نداد).
+		 *
+		 * @param {string} code کد خطا.
+		 * @return {string}
+		 */
+		errorText: function (code) {
+			var map = {
+				'forbidden': 'دسترسی غیرمجاز برای انجام این عملیات.',
+				'nonce_failed': 'نشانه‌ی امنیتی منقضی شده است؛ صفحه را تازه‌سازی کنید.',
+				'empty_query': 'نام محصول را وارد کنید.',
+				'invalid_prk': 'شناسه محصول نامعتبر است.',
+				'invalid_url': 'لینک محصول ترب معتبر نیست.',
+				'rate_limited': 'ترب تعداد درخواست‌ها را محدود کرده است؛ کمی بعد دوباره تلاش کنید.',
+				'blocked': 'ترب این درخواست را مسدود کرده است (کد 403/490).',
+				'torob_blocked': 'ترب این درخواست را مسدود کرده است.',
+				'connection_failed': 'اتصال به ترب برقرار نشد.',
+				'curl_failed': 'خطا در برقراری اتصال (cURL).',
+				'curl_unavailable': 'کتابخانه‌ی cURL روی سرور فعال نیست.',
+				'http_error': 'پاسخ غیرمنتظره از ترب دریافت شد.',
+				'invalid_json': 'پاسخ دریافتی از ترب قابل پردازش نیست.',
+				'invalid_response': 'ساختار پاسخ ترب تغییر کرده است.',
+				'torob_error': 'خطای ترب.',
+				'network': 'ارتباط با سرور برقرار نشد.',
+				'timeout': 'زمان پاسخ سرور به پایان رسید.'
+			};
+			return map[code] || 'خطا در انجام عملیات.';
 		},
 
 		search: function () {
@@ -965,8 +1065,8 @@
 			this.$connResult.html('<span class="shoper-loading-inline"></span> در حال تست...');
 			this.ajax('shoper_test_connection', {}, function (data) {
 				self.$connResult.html('<span style="color:#00a32a;">✓ ' + self.esc(data.message) + '</span>');
-			}).fail(function () {
-				self.$connResult.html('<span style="color:#d63638;">✗ خطا</span>');
+			}, function (info) {
+				self.$connResult.html('<span style="color:#d63638;">✗ ' + self.esc(info.message) + '</span>');
 			});
 		},
 
