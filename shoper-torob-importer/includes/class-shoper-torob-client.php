@@ -75,6 +75,10 @@ class Shoper_Torob_Client {
 			self::API_BASE . self::SEARCH_URL
 		);
 
+		$cache_key = 'shoper_search_' . md5( $query . '|' . (int) $page . '|' . (int) $size );
+		$cached = get_transient( $cache_key );
+		if ( is_array( $cached ) ) { return $cached; }
+
 		$data = $this->request( $url );
 		if ( is_wp_error( $data ) ) {
 			return $data;
@@ -82,7 +86,9 @@ class Shoper_Torob_Client {
 		if ( empty( $data['results'] ) || ! is_array( $data['results'] ) ) {
 			return new WP_Error( 'no_results', 'نتیجه‌ای برای این عبارت یافت نشد.' );
 		}
-		return $this->normalize_search_results( $data );
+		$normalized = $this->normalize_search_results( $data );
+		set_transient( $cache_key, $normalized, 5 * MINUTE_IN_SECONDS );
+		return $normalized;
 	}
 
 	/**
@@ -97,18 +103,9 @@ class Shoper_Torob_Client {
 			return $this->load_mock( 'torob-details-sample.json' );
 		}
 
-		if ( empty( $search_id ) ) {
-			// تلاش برای گرفتن search_id از طریق جستجو.
-			$search_id = $this->resolve_search_id( $prk );
-			if ( is_wp_error( $search_id ) ) {
-				return $search_id;
-			}
-		}
-
 		$url = add_query_arg(
 			array(
 				'prk'       => $prk,
-				'search_id' => $search_id,
 				'source'    => 'next_desktop',
 			),
 			self::API_BASE . self::DETAIL_URL
@@ -153,46 +150,37 @@ class Shoper_Torob_Client {
 	 * @return array|WP_Error
 	 */
 	private function request( $url ) {
-		$response = wp_remote_get(
-			$url,
-			array(
-				'timeout'     => $this->timeout,
-				'redirection' => 3,
-				'user-agent'  => $this->user_agent,
-				'headers'     => array(
-					'Accept'          => 'application/json, text/plain, */*',
-					'Accept-Language' => 'fa-IR,fa;q=0.9,en;q=0.8',
-					'Referer'         => 'https://torob.com/',
-					'Origin'          => 'https://torob.com',
-				),
-				'sslverify'   => true,
-			)
+		$agents = array(
+			'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36',
+			'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/123.0.0.0 Safari/537.36',
+			'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/17.3 Safari/605.1.15',
 		);
-
-		if ( is_wp_error( $response ) ) {
-			return new WP_Error(
-				'connection_failed',
-				'اتصال به ترب برقرار نشد: ' . $response->get_error_message()
-			);
+		$headers = array(
+			'Accept: application/json, text/plain, */*', 'Accept-Language: fa-IR,fa;q=0.9,en-US;q=0.8,en;q=0.7',
+			'Cache-Control: no-cache', 'Pragma: no-cache', 'Referer: https://torob.com/', 'Origin: https://torob.com',
+			'Sec-Fetch-Dest: empty', 'Sec-Fetch-Mode: cors', 'Sec-Fetch-Site: same-site',
+			'Sec-Ch-Ua: "Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+			'Sec-Ch-Ua-Mobile: ?0', 'Sec-Ch-Ua-Platform: "Windows"',
+			'Accept-Encoding: gzip, deflate, br',
+		);
+		$attempts = 3;
+		for ( $attempt = 0; $attempt < $attempts; $attempt++ ) {
+			$ch = curl_init( $url );
+			curl_setopt_array( $ch, array( CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true, CURLOPT_MAXREDIRS => 3,
+				CURLOPT_TIMEOUT => $this->timeout, CURLOPT_CONNECTTIMEOUT => min( 10, $this->timeout ), CURLOPT_HTTPHEADER => $headers,
+				CURLOPT_USERAGENT => $agents[ $attempt % count( $agents ) ], CURLOPT_ENCODING => '', CURLOPT_SSL_VERIFYPEER => true,
+			) );
+			$proxy = trim( (string) get_option( 'shoper_proxy_url', '' ) );
+			if ( $proxy ) { curl_setopt( $ch, CURLOPT_PROXY, $proxy ); }
+			$body = curl_exec( $ch ); $error = curl_error( $ch ); $code = (int) curl_getinfo( $ch, CURLINFO_HTTP_CODE ); curl_close( $ch );
+			if ( false === $body ) { if ( $attempt < 2 ) { sleep( 1 + $attempt ); continue; } return new WP_Error( 'connection_failed', 'اتصال به ترب برقرار نشد: ' . $error ); }
+			if ( in_array( $code, array( 429, 502, 503 ), true ) && $attempt < 2 ) { sleep( 1 + $attempt ); continue; }
+			if ( 403 === $code || 490 === $code ) return new WP_Error( 'torob_blocked', "ترب درخواست را مسدود کرد (کد $code). پروکسی خروجی معتبر تنظیم کنید یا هاست را تغییر دهید." );
+			if ( 200 !== $code ) return new WP_Error( 'http_error', "پاسخ غیرمنتظره از ترب (کد $code)." );
+			$data = json_decode( $body, true ); return is_array( $data ) ? $data : new WP_Error( 'invalid_json', 'پاسخ ترب قابل پردازش نیست.' );
 		}
-
-		$code = (int) wp_remote_retrieve_response_code( $response );
-		$body = wp_remote_retrieve_body( $response );
-
-		if ( 429 === $code ) {
-			return new WP_Error( 'rate_limited', 'ترب تعداد درخواست‌ها را محدود کرده است. کمی بعد دوباره تلاش کنید.' );
-		}
-		if ( 200 !== $code ) {
-			return new WP_Error( 'http_error', "پاسخ غیرمنتظره از ترب (کد $code)." );
-		}
-
-		$data = json_decode( $body, true );
-		if ( ! is_array( $data ) ) {
-			return new WP_Error( 'invalid_json', 'پاسخ ترب قابل پردازش نیست.' );
-		}
-		return $data;
+		return new WP_Error( 'http_error', 'تلاش برای اتصال به ترب ناموفق بود.' );
 	}
-
 	/**
 	 * نرمال‌سازی نتایج جستجو.
 	 *
