@@ -138,6 +138,27 @@
 				self.create();
 			});
 
+			$(document).on('click', '#shoper-next-step', function (e) {
+				e.preventDefault();
+				self.stepDelta(1);
+			});
+			$(document).on('click', '#shoper-prev-step', function (e) {
+				e.preventDefault();
+				self.stepDelta(-1);
+			});
+			$(document).on('click', '#shoper-ai-rerun', function (e) {
+				e.preventDefault();
+				if (self.currentData) { self.queueEnhance(self.currentData, true); }
+			});
+			$(document).on('click', '.shoper-ai-tab', function (e) {
+				e.preventDefault();
+				var tab = $(this).data('tab');
+				self.$preview.find('.shoper-ai-tab').removeClass('is-active');
+				$(this).addClass('is-active');
+				self.$preview.find('.shoper-ai-pane').hide();
+				self.$preview.find('.shoper-ai-pane[data-pane="' + tab + '"]').show();
+			});
+
 			this.$testConn.on('click', function (e) {
 				e.preventDefault();
 				self.testConnection();
@@ -946,22 +967,32 @@
 				self.status((err && err.message) ? err.message : 'جزئیات محصول دریافت نشد.', 'error');
 			};
 
-			this.browserFetch(this.torobDetailsUrl(prk, moreInfo)).done(function (raw) {
-				if (raw && (raw.random_key || raw.name1)) {
-					self.ingest('details', raw, showPreview, function () {
-						self.ajax('shoper_preview', {
-							prk: prk,
-							search_id: searchId || '',
-							more_info_url: moreInfo || ''
-						}, showPreview, fromFallback);
-					});
-					return;
-				}
+			var runServerPreview = function () {
 				self.ajax('shoper_preview', {
 					prk: prk,
 					search_id: searchId || '',
 					more_info_url: moreInfo || ''
 				}, showPreview, fromFallback);
+			};
+
+			if (self.isDkp(prk)) {
+				var dkp = self.extractDkp(prk);
+				self.browserFetch(self.dkDetailsUrl(dkp)).done(function (raw) {
+					if (raw && raw.data && raw.data.product) {
+						self.ingest('dk_details', raw, showPreview, runServerPreview);
+						return;
+					}
+					runServerPreview();
+				});
+				return;
+			}
+
+			this.browserFetch(this.torobDetailsUrl(prk, moreInfo)).done(function (raw) {
+				if (raw && (raw.random_key || raw.name1)) {
+					self.ingest('details', raw, showPreview, runServerPreview);
+					return;
+				}
+				runServerPreview();
 			});
 		},
 
@@ -977,7 +1008,8 @@
 				html += '<div class="shoper-stepper">';
 				html += '<div class="shoper-step is-active" data-step="info"><span class="shoper-step-num">۱</span> دریافت اطلاعات</div>';
 				html += '<div class="shoper-step" data-step="images"><span class="shoper-step-num">۲</span> انتخاب تصاویر</div>';
-				html += '<div class="shoper-step" data-step="seo"><span class="shoper-step-num">۳</span> سئو و برچسب</div>';
+				html += '<div class="shoper-step" data-step="ai"><span class="shoper-step-num">۳</span> بازنویسی هوشمند</div>';
+				html += '<div class="shoper-step" data-step="review"><span class="shoper-step-num">۴</span> نظارت و سئو</div>';
 				html += '</div>';
 			}
 
@@ -1082,17 +1114,38 @@
 				html += '</div>';
 			}
 
-			// --- بخش ۳: سئو و برچسب ---
+			// --- بخش ۳: بازنویسی هوشمند ---
 			if (isMain) {
+				html += '<div class="shoper-step-body" data-step-body="ai">';
+				html += '<div id="shoper-ai-status" class="shoper-ai-status">پس از دریافت تصاویر، متن کارشناسی آماده می‌شود.</div>';
+				html += '<div class="shoper-ai-tabs">';
+				html += '<button type="button" class="shoper-ai-tab is-active" data-tab="analysis">تحلیل کارشناسی</button>';
+				html += '<button type="button" class="shoper-ai-tab" data-tab="review">بررسی</button>';
+				html += '<button type="button" class="shoper-ai-tab" data-tab="audience">مخاطب</button>';
+				html += '</div>';
+				html += '<div class="shoper-ai-pane" data-pane="analysis"><textarea id="shoper-p-analysis" rows="8"></textarea></div>';
+				html += '<div class="shoper-ai-pane" data-pane="review" style="display:none;"><textarea id="shoper-p-review" rows="8"></textarea></div>';
+				html += '<div class="shoper-ai-pane" data-pane="audience" style="display:none;"><textarea id="shoper-p-audience" rows="5"></textarea></div>';
+				html += '<p class="description">این متن از مشخصات واقعی ساخته می‌شود؛ نظر جعلی مشتری نوشته نمی‌شود. شما ناظرید و می‌توانید هر بخش را ویرایش کنید.</p>';
+				html += '<p><button type="button" class="button" id="shoper-ai-rerun">بازنویسی دوباره (سرویس بعدی)</button></p>';
+				html += '</div>';
+
 				var seo = this.buildSeo(d);
-				html += '<div class="shoper-step-body" data-step-body="seo">';
+				html += '<div class="shoper-step-body" data-step-body="review">';
+				html += '<div class="shoper-supervisor">';
+				html += '<strong>میز نظارت خواجوی</strong> — قبل از ساخت، عنوان، توضیحات کامل و سئو را تأیید کنید.';
+				html += '</div>';
+				html += '<div class="shoper-field-group"><label>توضیح کوتاه</label>';
+				html += '<textarea id="shoper-p-short">' + this.esc(d.short_description || '') + '</textarea></div>';
 				html += '<div class="shoper-field-group"><label>عنوان سئو (Meta Title)</label>';
 				html += '<input type="text" id="shoper-p-seo-title" value="' + this.esc(seo.title) + '"></div>';
 				html += '<div class="shoper-field-group"><label>توضیح متا (Meta Description)</label>';
 				html += '<textarea id="shoper-p-seo-desc">' + this.esc(seo.description) + '</textarea></div>';
+				html += '<div class="shoper-field-group"><label>کلمه کلیدی اصلی</label>';
+				html += '<input type="text" id="shoper-p-focus" value="' + this.esc(seo.title) + '"></div>';
 				html += '<div class="shoper-field-group"><label>برچسب‌ها (جدا با ویرگول)</label>';
 				html += '<input type="text" id="shoper-p-tags" value="' + this.esc(seo.tags.join('، ')) + '"></div>';
-				html += '<p class="description">این مقادیر به‌عنوان برچسب محصول (product_tag) و متادیتای سئو ثبت می‌شوند؛ اگر Yoast نصب باشد متادیتای آن هم پر می‌شود.</p>';
+				html += '<p class="description">اگر Yoast یا Rank Math نصب باشد، عنوان، توضیح متا و کلمه کلیدی همان‌جا هم نوشته می‌شود.</p>';
 				html += '</div>';
 
 				// نوار پیشرفت.
@@ -1117,6 +1170,9 @@
 					self.updateImgCount();
 				});
 				this.goStep('info');
+				if (this.cfg('aiAuto', 'yes') !== 'no' && this.cfg('aiEnabled', 'yes') !== 'no') {
+					this.queueEnhance(d, false);
+				}
 			}
 
 			// در متاباکس ویرایش محصول، دکمه‌ی «پر کردن» را نشان بده.
@@ -1149,7 +1205,7 @@
 		 * @param {string} name info | images | seo
 		 */
 		goStep: function (name) {
-			var order = ['info', 'images', 'seo'];
+			var order = ['info', 'images', 'ai', 'review'];
 			var idx = order.indexOf(name);
 			if (idx < 0) idx = 0;
 			this.$preview.find('.shoper-step').removeClass('is-active is-done');
@@ -1299,6 +1355,8 @@
 				more_info_url: $('#shoper-p-moreinfo').val(),
 				name: $('#shoper-p-name').val(),
 				description: $('#shoper-p-desc').val(),
+				short_description: $('#shoper-p-short').val() || '',
+				focus_keyword: $('#shoper-p-focus').val() || '',
 				specs: JSON.stringify(specs),
 				status: $('#shoper-create-status').val() || $('select#shoper-create-status').val() || 'draft',
 				selected_images: JSON.stringify(imgSel.selected || []),
@@ -1386,6 +1444,9 @@
 				featured_image: imgSel.featured || 0,
 				seo_title: seoTitle,
 				seo_desc: seoDesc,
+				focus_keyword: $('#shoper-p-focus').val() || '',
+				description: $('#shoper-p-desc').val() || '',
+				short_description: $('#shoper-p-short').val() || '',
 				tags: JSON.stringify(tags),
 				product_json: this.currentData ? JSON.stringify(this.currentData) : ''
 			}, function (data) {
@@ -1621,6 +1682,73 @@
 				$field.val(hint);
 			}
 			alert('فایل رله دانلود شد. آن را روی هاست ایران آپلود کنید و در فیلد رله این آدرس را با دامنهٔ واقعی ذخیره کنید:\n' + hint);
+		},
+
+
+		stepOrder: function () {
+			return ['info', 'images', 'ai', 'review'];
+		},
+
+		currentStep: function () {
+			var $a = this.$preview.find('.shoper-step.is-active').first();
+			return $a.length ? String($a.data('step') || 'info') : 'info';
+		},
+
+		stepDelta: function (delta) {
+			var order = this.stepOrder();
+			var idx = order.indexOf(this.currentStep());
+			if (idx < 0) { idx = 0; }
+			idx = Math.max(0, Math.min(order.length - 1, idx + delta));
+			this.goStep(order[idx]);
+			if (order[idx] === 'ai' && this.currentData && !this._enhancedOnce) {
+				this.queueEnhance(this.currentData, false);
+			}
+		},
+
+		setAiStatus: function (msg, type) {
+			var $el = this.$preview.find('#shoper-ai-status');
+			if (!$el.length) { return; }
+			$el.removeClass('is-loading is-ok is-warn').addClass(type || '');
+			$el.html(type === 'is-loading' ? '<span class="shoper-loading-inline"></span> ' + this.esc(msg) : this.esc(msg));
+		},
+
+		applyEnhance: function (enh) {
+			if (!enh) { return; }
+			this._enhancedOnce = true;
+			this.lastEnhance = enh;
+			if (enh.description_html) {
+				$('#shoper-p-desc').val(enh.description_html);
+			}
+			if (enh.short_description) {
+				$('#shoper-p-short').val(enh.short_description);
+			}
+			if (enh.analysis) { $('#shoper-p-analysis').val(enh.analysis); }
+			if (enh.review) { $('#shoper-p-review').val(enh.review); }
+			if (enh.audience) { $('#shoper-p-audience').val(enh.audience); }
+			if (enh.seo_title) { $('#shoper-p-seo-title').val(enh.seo_title); }
+			if (enh.seo_desc) { $('#shoper-p-seo-desc').val(enh.seo_desc); }
+			if (enh.focus_keyword) { $('#shoper-p-focus').val(enh.focus_keyword); }
+			if (enh.tags && enh.tags.length) { $('#shoper-p-tags').val(enh.tags.join('، ')); }
+			var label = enh.provider_label || 'استودیوی نویسندگی خواجوی';
+			var extra = enh.fallback_reason ? ' — ' + enh.fallback_reason : '';
+			this.setAiStatus('آمادهٔ نظارت: ' + label + extra, 'is-ok');
+		},
+
+		queueEnhance: function (data, force) {
+			var self = this;
+			if (this.cfg('aiEnabled', 'yes') === 'no') { return; }
+			if (this._enhancing && !force) { return; }
+			this._enhancing = true;
+			this.setAiStatus((typeof ShoperData !== 'undefined' && ShoperData.i18n && ShoperData.i18n.enhancing) ? ShoperData.i18n.enhancing : 'در حال بازنویسی…', 'is-loading');
+			this.ajax('shoper_enhance', {
+				product_json: JSON.stringify(data || this.currentData || {})
+			}, function (resp) {
+				self._enhancing = false;
+				self.applyEnhance(resp);
+			}, function (info) {
+				self._enhancing = false;
+				self.setAiStatus((info && info.message) ? info.message : 'بازنویسی ناموفق بود؛ متن منبع باقی ماند.', 'is-warn');
+			});
 		},
 
 		esc: function (str) {

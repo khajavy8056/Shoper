@@ -23,7 +23,7 @@ const fixtureDir = path.join(__dirname, '../preview/fixtures');
 const searchRaw = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'search-samsung.json'), 'utf8'));
 const detailsRaw = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'details-9bcf3364.json'), 'utf8'));
 
-console.log('\nShoper 1.4 node tests\n');
+console.log('\nShoper 1.5 node tests\n');
 
 const search = logic.normalizeSearch(searchRaw);
 check('جستجوی fixture نرمال می‌شود', search.results && search.results.length > 0, search.results.length + ' نتیجه');
@@ -78,10 +78,10 @@ check('درگاه پیشوندی CORS.SH درست ساخته می‌شود', gw 
 const pluginJs = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/admin/js/admin.js'), 'utf8');
 check('admin.js مسیر مرورگر و درگاه دارد', pluginJs.includes('browserFetch') && pluginJs.includes('wrapGateway') && pluginJs.includes('product_json'));
 check('chooseSuggest لینک more_info را می‌فرستد', /preview\(it\.random_key[\s\S]{0,80}more_info_url/.test(pluginJs));
-check('fill هم product_json می‌فرستد', /shoper_fill[\s\S]{0,400}product_json/.test(pluginJs));
+check('fill هم product_json می‌فرستد', /shoper_fill[\s\S]{0,900}product_json/.test(pluginJs));
 
 const mainPhp = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/shoper-torob-importer.php'), 'utf8');
-check('plugin version 1.4', mainPhp.includes("define( 'SHOPER_VERSION', '1.4.0' )"));
+check('plugin version 1.5', mainPhp.includes("define( 'SHOPER_VERSION', '1.5.0' )"));
 check('کلاس تجمیع فروشنده بارگذاری می‌شود', mainPhp.includes('class-shoper-seller-aggregator.php'));
 
 check('digikala client required', mainPhp.includes('class-shoper-digikala-client.php') && mainPhp.includes('class-shoper-catalog.php'));
@@ -96,6 +96,17 @@ check('digikala expert review', (dkDetails.description || '').length > 20);
 check('admin.js knows dkp', pluginJs.includes('extractDkp') && pluginJs.includes('dk_search'));
 
 const ajax = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/includes/class-shoper-ajax.php'), 'utf8');
+
+check('copywriter/ai classes required', mainPhp.includes('class-shoper-copywriter.php') && mainPhp.includes('class-shoper-ai-client.php'));
+check('author Khajavy', mainPhp.includes('خواجوی'));
+const enh = logic.enhanceProduct(dkDetails);
+check('enhance analysis', !!(enh.analysis && enh.analysis.length > 40));
+check('enhance review', !!(enh.review && enh.review.indexOf('نقاط قوت') >= 0));
+check('enhance seo', !!(enh.seo_title && enh.seo_desc));
+check('enhance keeps specs table', (enh.description_html || '').indexOf('مشخصات') >= 0);
+check('admin.js enhance + 4 steps', pluginJs.includes('queueEnhance') && pluginJs.includes('data-step=\"ai\"') && pluginJs.includes('data-step=\"review\"'));
+check('ajax enhance action', ajax.includes('shoper_enhance'));
+
 check('اکشن ingest ثبت شده', ajax.includes("wp_ajax_shoper_ingest") && ajax.includes('preview_from_payload'));
 
 const client = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/includes/class-shoper-torob-client.php'), 'utf8');

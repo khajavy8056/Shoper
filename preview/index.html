@@ -207,7 +207,8 @@
     </select>
   </div>
 
-  <h1>🛒 Shoper — درون‌ریز محصول از ترب</h1>
+  <h1>Shoper Studio — سازنده هوشمند محصول</h1>
+  <p class="description" style="margin-top:0;">طراحی و توسعه: <strong>خواجوی</strong></p>
   <p class="description">
     این پیش‌نمایش، فایل‌های <strong>واقعی</strong> افزونه را اجرا می‌کند
     (<code>admin/js/admin.js</code> و <code>admin/css/admin.css</code>) و اندپوینت
@@ -280,13 +281,13 @@
       <div class="shoper-card shoper-download-card">
         <h3>⬇️ دانلود آخرین نسخه‌ی افزونه</h3>
         <p class="description" style="margin:0 0 10px;">
-          نسخه‌ی نهایی تست‌شده (v1.2.0) به‌صورت ZIP آماده‌ی نصب است.
+          نسخه‌ی نهایی تست‌شده (v1.5.0) به‌صورت ZIP آماده‌ی نصب است.
           بعد از دانلود، پوشه‌ی <code>shoper-torob-importer</code> را در
           <code>wp-content/plugins/</code> بریزید و فعالش کنید.
         </p>
         <a id="shoper-download-btn" class="button button-primary button-hero" style="display:inline-block;text-align:center;width:100%;"
            href="/download/latest">
-          ⬇️ دانلود shoper-torob-importer-1.2.0.zip
+          دانلود shoper-torob-importer-1.5.0.zip
         </a>
         <p class="description" id="download-meta" style="margin-top:8px;font-size:11.5px;"></p>
       </div>
@@ -334,6 +335,9 @@ window.ShoperData = {
   nonce: 'preview-nonce',
   fetchMode: 'server',
   gateways: [],
+  aiEnabled: 'yes',
+  aiAuto: 'yes',
+  author: 'خواجوی',
   i18n: {
     searching: 'در حال جستجو در ترب…',
     loading: 'در حال دریافت اطلاعات محصول…',

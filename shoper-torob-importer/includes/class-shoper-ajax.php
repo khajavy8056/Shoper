@@ -24,6 +24,7 @@ class Shoper_Ajax {
 		add_action( 'wp_ajax_shoper_ingest', array( $this, 'ingest' ) );
 		add_action( 'wp_ajax_shoper_create', array( $this, 'create' ) );
 		add_action( 'wp_ajax_shoper_fill', array( $this, 'fill' ) );
+		add_action( 'wp_ajax_shoper_enhance', array( $this, 'enhance' ) );
 		add_action( 'wp_ajax_shoper_test_connection', array( $this, 'test_connection' ) );
 		add_action( 'wp_ajax_shoper_diagnostics', array( $this, 'diagnostics' ) );
 	}
@@ -259,6 +260,29 @@ class Shoper_Ajax {
 	}
 
 	/**
+	 * بازنویسی هوشمند توضیحات / تحلیل / سئو.
+	 *
+	 * @return void
+	 */
+	public function enhance() {
+		$this->guard();
+
+		$payload = $this->posted_product_payload();
+		if ( ! $payload ) {
+			wp_send_json_error( array( 'code' => 'invalid_payload', 'message' => 'دادهٔ محصول برای بازنویسی ناقص است.' ) );
+		}
+
+		if ( ! class_exists( 'Shoper_AI_Client' ) ) {
+			wp_send_json_error( array( 'code' => 'ai_missing', 'message' => 'موتور نویسندگی در دسترس نیست.' ), 500 );
+		}
+
+		$client = new Shoper_AI_Client();
+		$result = $client->enhance( $payload );
+		$result['rotation'] = $client->status_snapshot();
+		wp_send_json_success( $result );
+	}
+
+	/**
 	 * ساخت محصول جدید.
 	 *
 	 * @return void
@@ -272,6 +296,7 @@ class Shoper_Ajax {
 		$name          = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '';
 		$status        = isset( $_POST['status'] ) ? sanitize_text_field( wp_unslash( $_POST['status'] ) ) : '';
 		$desc          = isset( $_POST['description'] ) ? wp_kses_post( wp_unslash( $_POST['description'] ) ) : '';
+		$short_desc    = isset( $_POST['short_description'] ) ? wp_kses_post( wp_unslash( $_POST['short_description'] ) ) : '';
 		$specs_raw     = isset( $_POST['specs'] ) ? wp_unslash( $_POST['specs'] ) : '';
 
 		// انتخاب تصاویر توسط کاربر.
@@ -288,6 +313,7 @@ class Shoper_Ajax {
 		// سئو.
 		$seo_title = isset( $_POST['seo_title'] ) ? sanitize_text_field( wp_unslash( $_POST['seo_title'] ) ) : '';
 		$seo_desc  = isset( $_POST['seo_desc'] ) ? sanitize_textarea_field( wp_unslash( $_POST['seo_desc'] ) ) : '';
+		$focus_kw  = isset( $_POST['focus_keyword'] ) ? sanitize_text_field( wp_unslash( $_POST['focus_keyword'] ) ) : '';
 		$tags_raw  = isset( $_POST['tags'] ) ? wp_unslash( $_POST['tags'] ) : '';
 		$tags      = null;
 		if ( '' !== $tags_raw ) {
@@ -333,6 +359,12 @@ class Shoper_Ajax {
 		$args = array();
 		if ( $desc ) {
 			$args['description'] = $desc;
+		}
+		if ( $short_desc ) {
+			$args['short_description'] = $short_desc;
+		}
+		if ( $focus_kw ) {
+			$args['focus_keyword'] = $focus_kw;
 		}
 		if ( $status ) {
 			$args['status'] = $status;
@@ -387,6 +419,9 @@ class Shoper_Ajax {
 		$featured_raw = isset( $_POST['featured_image'] ) ? absint( $_POST['featured_image'] ) : 0;
 		$seo_title    = isset( $_POST['seo_title'] ) ? sanitize_text_field( wp_unslash( $_POST['seo_title'] ) ) : '';
 		$seo_desc     = isset( $_POST['seo_desc'] ) ? sanitize_textarea_field( wp_unslash( $_POST['seo_desc'] ) ) : '';
+		$focus_kw     = isset( $_POST['focus_keyword'] ) ? sanitize_text_field( wp_unslash( $_POST['focus_keyword'] ) ) : '';
+		$desc         = isset( $_POST['description'] ) ? wp_kses_post( wp_unslash( $_POST['description'] ) ) : '';
+		$short_desc   = isset( $_POST['short_description'] ) ? wp_kses_post( wp_unslash( $_POST['short_description'] ) ) : '';
 		$tags         = null;
 		$tags_raw     = isset( $_POST['tags'] ) ? wp_unslash( $_POST['tags'] ) : '';
 		if ( '' !== $tags_raw ) {

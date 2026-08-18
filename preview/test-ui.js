@@ -156,7 +156,7 @@ async function waitFor(fn, timeout = 8000, interval = 100) {
 	console.log('\n[۴.۵] نوار مراحل + انتخاب تصاویر + سئو');
 	// ---------------------------------------------------------------
 	if (gotPreview) {
-		check('نوار مراحل (Stepper) ساخته شد', doc.querySelectorAll('.shoper-step').length === 3,
+		check('نوار مراحل (Stepper) ساخته شد', doc.querySelectorAll('.shoper-step').length === 4,
 			doc.querySelectorAll('.shoper-step').length + ' مرحله');
 		check('مرحله‌ی «دریافت اطلاعات» فعال است',
 			doc.querySelector('.shoper-step[data-step="info"]').classList.contains('is-active'));
@@ -179,6 +179,8 @@ async function waitFor(fn, timeout = 8000, interval = 100) {
 				doc.querySelectorAll('.shoper-img-featured:checked')[0].getAttribute('data-idx') === '1');
 		}
 
+		check('مرحله بازنویسی هوشمند هست', !!doc.querySelector('.shoper-step[data-step="ai"]'));
+		check('مرحله نظارت هست', !!doc.querySelector('.shoper-step[data-step="review"]'));
 		check('فیلدهای سئو رندر شدند',
 			!!doc.querySelector('#shoper-p-seo-title') &&
 			!!doc.querySelector('#shoper-p-seo-desc') &&

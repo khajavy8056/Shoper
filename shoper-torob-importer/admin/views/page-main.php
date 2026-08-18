@@ -23,6 +23,8 @@ if ( isset( $_POST['shoper_save_settings'] ) && check_admin_referer( 'shoper_set
 		'shoper_use_default_gateways' => isset( $_POST['use_default_gateways'] ) ? 'yes' : 'no',
 		'shoper_extra_gateways' => isset( $_POST['extra_gateways'] ) ? sanitize_textarea_field( wp_unslash( $_POST['extra_gateways'] ) ) : '',
 		'shoper_debug'         => isset( $_POST['debug'] ) ? '1' : '',
+		'shoper_ai_enabled'    => isset( $_POST['ai_enabled'] ) ? 'yes' : 'no',
+		'shoper_ai_auto'       => isset( $_POST['ai_auto'] ) ? 'yes' : 'no',
 	);
 	foreach ( $options as $k => $v ) {
 		update_option( $k, $v );
@@ -41,17 +43,26 @@ $fetch_mode = get_option( 'shoper_fetch_mode', 'auto' );
 $use_default_gateways = get_option( 'shoper_use_default_gateways', 'yes' );
 $extra_gateways = get_option( 'shoper_extra_gateways', '' );
 $shoper_debug = get_option( 'shoper_debug', '' );
+$ai_enabled = get_option( 'shoper_ai_enabled', 'yes' );
+$ai_auto = get_option( 'shoper_ai_auto', 'yes' );
 ?>
 <div class="wrap shoper-wrap" dir="rtl">
-	<h1 class="wp-heading-inline">🛒 Shoper — درون‌ریز محصول از ترب</h1>
+	<div class="shoper-brand">
+		<div class="shoper-brand-mark" aria-hidden="true">S</div>
+		<div class="shoper-brand-text">
+			<h1 class="wp-heading-inline">Shoper Studio</h1>
+			<p class="shoper-brand-tag">سازنده هوشمند محصول ووکامرس — از نام تا صفحه فروش، با نظارت شما</p>
+			<p class="shoper-brand-author">طراحی و توسعه: <strong>خواجوی</strong> · نسخه <?php echo esc_html( SHOPER_VERSION ); ?></p>
+		</div>
+	</div>
 	<hr class="wp-header-end">
 
 	<div class="shoper-layout">
 		<div class="shoper-main-col">
 			<div class="shoper-card">
-				<h2>۱. جستجوی محصول در ترب</h2>
+				<h2>۱. جستجوی محصول</h2>
 				<p class="description">
-					نام محصول را بنویسید تا از ترب پیدا کنیم. می‌توانید لینک مستقیم محصول ترب را هم بچسبانید.
+					نام محصول را بنویسید. کاتالوگ، تصاویر، مشخصات و بعد متن کارشناسی آماده می‌شود؛ شما ناظر نهایی هستید.
 				</p>
 				<div class="notice notice-info inline" style="margin:10px 0 0;">
 					<p>نام محصول را بنویسید. افزونه اول از <strong>دیجی‌کالا</strong> مشخصات، توضیحات و تصاویر کامل می‌گیرد (هر مشخصه یک ویژگی ووکامرس). اگر لازم شد سراغ ترب می‌رود. لینک <code>digikala.com/product/dkp-…</code> هم قبول است.</p>
@@ -76,10 +87,9 @@ $shoper_debug = get_option( 'shoper_debug', '' );
 			</div>
 
 			<div class="shoper-card" id="shoper-preview-card" style="display:none;">
-				<h2>۲. پیش‌نمایش و ویرایش</h2>
+				<h2>۲. پیش‌نمایش، بازنویسی و نظارت</h2>
 				<p class="description">
-					اطلاعات دریافت‌شده از ترب را بررسی کنید. می‌توانید قبل از ساخت، عنوان و توضیحات را ویرایش کنید
-					و تیک مشخصات فنی‌ که می‌خواهید به‌عنوان ویژگی اضافه شوند را بزنید.
+					مرحله‌ها: اطلاعات → تصاویر → بازنویسی هوشمند (تحلیل و بررسی) → نظارت شما روی متن و سئو.
 				</p>
 				<div id="shoper-preview"></div>
 
@@ -91,8 +101,10 @@ $shoper_debug = get_option( 'shoper_debug', '' );
 							<option value="pending" <?php selected( $product_status, 'pending' ); ?>>در انتظار بررسی</option>
 						</select>
 					</label>
+					<button type="button" class="button" id="shoper-prev-step">مرحله قبل</button>
+					<button type="button" class="button" id="shoper-next-step">مرحله بعد</button>
 					<button type="button" class="button button-primary button-hero" id="shoper-create-btn">
-						✅ ساخت محصول در ووکامرس
+						تأیید ناظر و ساخت محصول
 					</button>
 				</div>
 			</div>
@@ -198,11 +210,12 @@ $shoper_debug = get_option( 'shoper_debug', '' );
 			<div class="shoper-card shoper-help">
 				<h3>راهنما</h3>
 				<ul>
-					<li>اگر ترب IP هاست را مسدود کند، افزونه از درگاه پیش‌فرض تست‌شده و بعد از مرورگر شما داده را می‌گیرد؛ کلیک روی پیشنهاد دیگر جزئیات را خالی نمی‌گذارد.</li>
-					<li>تصاویر ابتدا در <strong>کتابخانه‌ی رسانه‌ی</strong> وردپرس ذخیره و سپس به محصول وصل می‌شوند.</li>
-					<li>هر مشخصه‌ی فنی مانند «پردازنده»، «وزن» و «نوع شنا» به‌صورت <strong>یک ویژگی مجزا</strong> در تب ویژگی‌ها ثبت می‌شود.</li>
-					<li>برای جلوگیری از تکرار، SKU محصول برابر با <code>TRB-{random_key}</code> قرار می‌گیرد.</li>
-					<li>پیش‌فرض محصول به‌صورت پیش‌نویس ساخته می‌شود تا قبل از انتشار بررسی کنید.</li>
+					<li>جریان کار: <strong>نام</strong> → <strong>تصاویر</strong> → <strong>بازنویسی هوشمند</strong> → <strong>نظارت شما</strong>.</li>
+					<li>توضیحات شامل معرفی، تحلیل کارشناسی، بررسی نقاط قوت و سئو است؛ نظر جعلی مشتری ساخته نمی‌شود.</li>
+					<li>هر مشخصه به‌صورت <strong>یک ویژگی مجزا</strong> در تب ویژگی‌های ووکامرس ثبت می‌شود.</li>
+					<li>تصاویر در <strong>کتابخانه رسانه</strong> با نام محصول ذخیره می‌شوند.</li>
+					<li>محصول پیش‌فرض پیش‌نویس است تا ناظر قبل از انتشار تأیید کند.</li>
+					<li>طراحی و توسعه: <strong>خواجوی</strong>.</li>
 				</ul>
 			</div>
 		</aside>

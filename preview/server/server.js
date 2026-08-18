@@ -354,6 +354,23 @@ const handlers = {
 	 * همان چیزی که افزونه در دیتابیس می‌نویسد را برمی‌گرداند تا قبل از
 	 * نصب روی سایت بتوانید نتیجه را بازبینی کنید.
 	 */
+	async shoper_enhance(params, res) {
+		let data = null;
+		const productJson = params.get('product_json') || '';
+		if (productJson) {
+			try { data = JSON.parse(productJson); } catch (e) { data = null; }
+		}
+		if (!data || (!data.random_key && !data.name1)) {
+			return fail(res, 'دادهٔ محصول برای بازنویسی ناقص است.');
+		}
+		try {
+			const enh = logic.enhanceProduct(data);
+			return ok(res, enh);
+		} catch (err) {
+			return fail(res, err.message);
+		}
+	},
+
 	async shoper_create(params, res) {
 		const prk = (params.get('prk') || '').trim();
 		if (!prk) return fail(res, 'شناسه محصول نامعتبر است.');
@@ -445,7 +462,7 @@ const handlers = {
 				product: {
 					name: data.name1,
 					status,
-					sku: 'TRB-' + data.random_key,
+					sku: (String(data.random_key || '').indexOf('DKP-') === 0 || String(data.random_key || '').indexOf('TRB-') === 0) ? data.random_key : ('TRB-' + data.random_key),
 					regular_price: data.price,
 					short_description: logic.buildShortDescription(data),
 					description,
@@ -560,7 +577,7 @@ const handlers = {
 					short_description: shortDescription,                // ← تب «توضیح کوتاه»
 					description,                                        // ← تب «توضیحات»
 					regular_price: data.price,                          // ← فیلد قیمت عادی (General)
-					sku: 'TRB-' + data.random_key,                      // ← فیلد SKU (Inventory)
+					sku: (String(data.random_key || '').indexOf('DKP-') === 0 || String(data.random_key || '').indexOf('TRB-') === 0) ? data.random_key : ('TRB-' + data.random_key),
 					attributes: built.attrs,                            // ← تب «ویژگی‌ها»
 					images: {
 						featured: keptUrls[0] || '',                     // ← تصویر شاخص
@@ -690,13 +707,13 @@ const server = http.createServer(async (req, res) => {
 	}
 
 	// --- دانلود آخرین نسخه‌ی افزونه (ZIP) ---
-	if (pathname === '/download/latest' || pathname === '/download/shoper-torob-importer-1.4.0.zip') {
-		const zip = path.join(ROOT, 'dist', 'shoper-torob-importer-1.4.0.zip');
+	if (pathname === '/download/latest' || pathname === '/download/shoper-torob-importer-1.5.0.zip') {
+		const zip = path.join(ROOT, 'dist', 'shoper-torob-importer-1.5.0.zip');
 		try {
 			const data = await fsp.readFile(zip);
 			res.writeHead(200, {
 				'Content-Type': 'application/zip',
-				'Content-Disposition': 'attachment; filename="shoper-torob-importer-1.3.2.zip"',
+				'Content-Disposition': 'attachment; filename="shoper-torob-importer-1.5.0.zip"',
 				'Content-Length': data.length,
 				'Cache-Control': 'no-store',
 			});

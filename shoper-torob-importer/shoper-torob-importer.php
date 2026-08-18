@@ -1,11 +1,11 @@
 <?php
 /**
- * Plugin Name:       Shoper – درون‌ریز محصول از ترب
+ * Plugin Name:       Shoper Studio – سازنده هوشمند محصول
  * Plugin URI:        https://github.com/khajavy8056/Shoper
- * Description:       با نوشتن نام محصول یا چسباندن لینک ترب، اطلاعات کامل محصول (نام، توضیحات، تصاویر و تمام مشخصات فنی به‌صورت ویژگی‌های مجزا) را از ترب دریافت و یک محصول کامل ووکامرس بسازید.
- * Version:           1.4.0
- * Author:            Shoper
- * Author URI:        https://github.com/khajavy8056/Shoper
+ * Description:       از نام محصول تا صفحه فروش: مشخصات دانه‌دانه، گالری تصاویر، توضیحات کارشناسی، بررسی و سئو — بازنویسی هوشمند با چرخش سرویس‌های رایگان و نظارت شما قبل از انتشار.
+ * Version:           1.5.0
+ * Author:            خواجوی
+ * Author URI:        https://github.com/khajavy8056
  * License:           GPL v2 or later
  * Text Domain:       shoper
  * Domain Path:       /languages
@@ -22,7 +22,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // تعریف ثابت‌های افزونه.
-define( 'SHOPER_VERSION', '1.4.0' );
+define( 'SHOPER_VERSION', '1.5.0' );
+define( 'SHOPER_AUTHOR', 'خواجوی' );
 define( 'SHOPER_PLUGIN_FILE', __FILE__ );
 define( 'SHOPER_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SHOPER_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -112,6 +113,8 @@ if ( ! class_exists( 'Shoper_Torob_Importer' ) ) {
 		require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-seller-aggregator.php';
 		require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-image-handler.php';
 		require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-attribute-handler.php';
+		require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-copywriter.php';
+		require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-ai-client.php';
 		require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-product-builder.php';
 		require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-ajax.php';
 		require_once SHOPER_PLUGIN_DIR . 'admin/class-shoper-admin.php';
@@ -182,6 +185,8 @@ function shoper_activate() {
 		'connect_timeout'  => 10,
 		'proxy_url'        => '',
 		'debug'            => '', // فعال‌سازی لاگ اشکال‌زدایی.
+		'ai_enabled'       => 'yes',
+		'ai_auto'          => 'yes',
 	);
 	foreach ( $defaults as $key => $value ) {
 		if ( false === get_option( 'shoper_' . $key ) ) {

@@ -239,10 +239,20 @@ class Shoper_Product_Builder {
 		$product->set_name( sanitize_text_field( $data['name1'] ) );
 		$product->set_status( in_array( $status, array( 'draft', 'publish', 'pending', 'private' ), true ) ? $status : 'draft' );
 		$product->set_catalog_visibility( 'visible' );
-		$product->set_short_description( wp_kses_post( $this->build_short_description( $data ) ) );
+
+		$ai_meta = $this->maybe_enhance( $data, $args );
+		if ( ! empty( $args['short_description'] ) ) {
+			$product->set_short_description( wp_kses_post( $args['short_description'] ) );
+		} elseif ( ! empty( $ai_meta['short_description'] ) ) {
+			$product->set_short_description( wp_kses_post( $ai_meta['short_description'] ) );
+		} else {
+			$product->set_short_description( wp_kses_post( $this->build_short_description( $data ) ) );
+		}
 
 		if ( ! empty( $args['description'] ) ) {
 			$product->set_description( wp_kses_post( $args['description'] ) );
+		} elseif ( ! empty( $ai_meta['description_html'] ) ) {
+			$product->set_description( wp_kses_post( $ai_meta['description_html'] ) );
 		} else {
 			$product->set_description( $this->build_description_html( $data ) );
 		}
@@ -305,28 +315,16 @@ class Shoper_Product_Builder {
 		}
 
 		// سئو و برچسب‌ها.
-		$seo = $this->build_seo( $data );
-		$seo_title = ! empty( $args['seo_title'] )
-			? sanitize_text_field( $args['seo_title'] )
-			: $seo['title'];
-		$seo_desc  = ! empty( $args['seo_desc'] )
-			? sanitize_textarea_field( $args['seo_desc'] )
-			: $seo['description'];
-		$tags      = ( ! empty( $args['tags'] ) && is_array( $args['tags'] ) )
-			? array_map( 'sanitize_text_field', $args['tags'] )
-			: $seo['tags'];
+		$seo = $this->compose_seo( $data, $args, $ai_meta );
+		$seo_title = $seo['title'];
+		$seo_desc  = $seo['description'];
+		$tags      = $seo['tags'];
+		$focus_kw  = $seo['keyword'];
 
 		if ( ! empty( $tags ) ) {
 			wp_set_object_terms( $product_id, $tags, 'product_tag' );
 		}
-		update_post_meta( $product_id, '_shoper_seo_title', $seo_title );
-		update_post_meta( $product_id, '_shoper_seo_desc', $seo_desc );
-
-		// اگر Yoast نصب باشد، متادیتای آن را هم پر می‌کنیم.
-		if ( defined( 'WPSEO_VERSION' ) || class_exists( '\Yoast\WP\SEO\Main' ) ) {
-			update_post_meta( $product_id, '_yoast_wpseo_title', $seo_title );
-			update_post_meta( $product_id, '_yoast_wpseo_metadesc', $seo_desc );
-		}
+		$this->save_seo_meta( $product_id, $seo_title, $seo_desc, $focus_kw, $ai_meta );
 
 		return array(
 			'product_id'    => $product_id,
@@ -364,8 +362,21 @@ class Shoper_Product_Builder {
 		$data = $this->enrich( $data );
 
 		$product->set_name( sanitize_text_field( $data['name1'] ) );
-		$product->set_short_description( wp_kses_post( $this->build_short_description( $data ) ) );
-		$product->set_description( $this->build_description_html( $data ) );
+		$ai_meta = $this->maybe_enhance( $data, $args );
+		if ( ! empty( $args['short_description'] ) ) {
+			$product->set_short_description( wp_kses_post( $args['short_description'] ) );
+		} elseif ( ! empty( $ai_meta['short_description'] ) ) {
+			$product->set_short_description( wp_kses_post( $ai_meta['short_description'] ) );
+		} else {
+			$product->set_short_description( wp_kses_post( $this->build_short_description( $data ) ) );
+		}
+		if ( ! empty( $args['description'] ) ) {
+			$product->set_description( wp_kses_post( $args['description'] ) );
+		} elseif ( ! empty( $ai_meta['description_html'] ) ) {
+			$product->set_description( wp_kses_post( $ai_meta['description_html'] ) );
+		} else {
+			$product->set_description( $this->build_description_html( $data ) );
+		}
 
 		if ( ! empty( $data['price'] ) && ! $product->get_regular_price() ) {
 			$product->set_regular_price( (string) (int) $data['price'] );
@@ -413,21 +424,15 @@ class Shoper_Product_Builder {
 		}
 
 		// سئو و برچسب.
-		$seo       = $this->build_seo( $data );
-		$seo_title = ! empty( $args['seo_title'] ) ? sanitize_text_field( $args['seo_title'] ) : $seo['title'];
-		$seo_desc  = ! empty( $args['seo_desc'] ) ? sanitize_textarea_field( $args['seo_desc'] ) : $seo['description'];
-		$tags      = ( ! empty( $args['tags'] ) && is_array( $args['tags'] ) )
-			? array_map( 'sanitize_text_field', $args['tags'] )
-			: $seo['tags'];
+		$seo       = $this->compose_seo( $data, $args, $ai_meta );
+		$seo_title = $seo['title'];
+		$seo_desc  = $seo['description'];
+		$tags      = $seo['tags'];
+		$focus_kw  = $seo['keyword'];
 		if ( ! empty( $tags ) ) {
 			wp_set_object_terms( $post_id, $tags, 'product_tag' );
 		}
-		update_post_meta( $post_id, '_shoper_seo_title', $seo_title );
-		update_post_meta( $post_id, '_shoper_seo_desc', $seo_desc );
-		if ( defined( 'WPSEO_VERSION' ) || class_exists( '\Yoast\WP\SEO\Main' ) ) {
-			update_post_meta( $post_id, '_yoast_wpseo_title', $seo_title );
-			update_post_meta( $post_id, '_yoast_wpseo_metadesc', $seo_desc );
-		}
+		$this->save_seo_meta( $post_id, $seo_title, $seo_desc, $focus_kw, $ai_meta );
 
 		return array(
 			'post_id'     => $post_id,
@@ -636,8 +641,9 @@ class Shoper_Product_Builder {
 		// منبع.
 		if ( ! empty( $data['page_url'] ) ) {
 			$html .= '<p class="shoper-source" style="font-size:12px;color:#888;margin-top:20px;">';
-			$html .= 'این محصول توسط افزونه‌ی <strong>Shoper</strong> از ';
-			$html .= '<a href="' . esc_url( $data['page_url'] ) . '" target="_blank" rel="nofollow">ترب</a> وارد شده است.';
+			$html .= 'متن و مشخصات توسط <strong>Shoper Studio</strong> — خواجوی آماده شده است. منبع: ';
+			$src_label = ( ! empty( $data['provider'] ) && 'digikala' === $data['provider'] ) ? 'دیجی‌کالا' : 'ترب';
+			$html .= '<a href="' . esc_url( $data['page_url'] ) . '" target="_blank" rel="nofollow">' . esc_html( $src_label ) . '</a>.';
 			$html .= '</p>';
 		}
 
@@ -737,4 +743,87 @@ class Shoper_Product_Builder {
 		$html .= '</tbody></table>';
 		return $html;
 	}
+
+	/**
+	 * اگر ناظر متن نفرستاده، استودیو/هوش مصنوعی متن را کامل می‌کند.
+	 *
+	 * @param array $data داده.
+	 * @param array $args آرگومان.
+	 * @return array
+	 */
+	private function maybe_enhance( $data, $args ) {
+		if ( ! empty( $args['description'] ) ) {
+			return array();
+		}
+		if ( 'no' === get_option( 'shoper_ai_enabled', 'yes' ) ) {
+			return array();
+		}
+		if ( ! class_exists( 'Shoper_AI_Client' ) ) {
+			return array();
+		}
+		$client = new Shoper_AI_Client();
+		return $client->enhance( $data );
+	}
+
+	/**
+	 * ترکیب سئوی منبع + استودیو + ویرایش ناظر.
+	 *
+	 * @param array $data  داده.
+	 * @param array $args  آرگومان.
+	 * @param array $ai    خروجی هوش مصنوعی.
+	 * @return array
+	 */
+	private function compose_seo( $data, $args, $ai ) {
+		$seo = $this->build_seo( $data );
+		if ( ! empty( $ai['seo_title'] ) ) {
+			$seo['title'] = $ai['seo_title'];
+		}
+		if ( ! empty( $ai['seo_desc'] ) ) {
+			$seo['description'] = $ai['seo_desc'];
+		}
+		if ( ! empty( $ai['tags'] ) && is_array( $ai['tags'] ) ) {
+			$seo['tags'] = $ai['tags'];
+		}
+		$title = ! empty( $args['seo_title'] ) ? sanitize_text_field( $args['seo_title'] ) : $seo['title'];
+		$desc  = ! empty( $args['seo_desc'] ) ? sanitize_textarea_field( $args['seo_desc'] ) : $seo['description'];
+		$tags  = ( ! empty( $args['tags'] ) && is_array( $args['tags'] ) ) ? array_map( 'sanitize_text_field', $args['tags'] ) : $seo['tags'];
+		$kw    = ! empty( $args['focus_keyword'] ) ? sanitize_text_field( $args['focus_keyword'] ) : ( ! empty( $ai['focus_keyword'] ) ? sanitize_text_field( $ai['focus_keyword'] ) : $title );
+		return array(
+			'title'       => $title,
+			'description' => $desc,
+			'tags'        => $tags,
+			'keyword'     => $kw,
+		);
+	}
+
+	/**
+	 * ذخیره متادیتای سئو و افزونه‌های رایج.
+	 *
+	 * @param int    $post_id شناسه.
+	 * @param string $title   عنوان.
+	 * @param string $desc    توضیح.
+	 * @param string $keyword کلمه کلیدی.
+	 * @param array  $ai      متای هوش مصنوعی.
+	 * @return void
+	 */
+	private function save_seo_meta( $post_id, $title, $desc, $keyword, $ai ) {
+		update_post_meta( $post_id, '_shoper_seo_title', $title );
+		update_post_meta( $post_id, '_shoper_seo_desc', $desc );
+		update_post_meta( $post_id, '_shoper_focus_keyword', $keyword );
+		if ( ! empty( $ai['provider'] ) ) {
+			update_post_meta( $post_id, '_shoper_ai_provider', sanitize_text_field( $ai['provider'] ) );
+			update_post_meta( $post_id, '_shoper_ai_at', current_time( 'mysql' ) );
+		}
+		if ( defined( 'WPSEO_VERSION' ) || class_exists( '\Yoast\WP\SEO\Main' ) ) {
+			update_post_meta( $post_id, '_yoast_wpseo_title', $title );
+			update_post_meta( $post_id, '_yoast_wpseo_metadesc', $desc );
+			update_post_meta( $post_id, '_yoast_wpseo_focuskw', $keyword );
+		}
+		if ( defined( 'RANK_MATH_VERSION' ) || class_exists( '\RankMath' ) ) {
+			update_post_meta( $post_id, 'rank_math_title', $title );
+			update_post_meta( $post_id, 'rank_math_description', $desc );
+			update_post_meta( $post_id, 'rank_math_focus_keyword', $keyword );
+		}
+	}
+
 }

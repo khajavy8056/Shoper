@@ -37,8 +37,8 @@ class Shoper_Admin {
 	public function add_menu() {
 		add_submenu_page(
 			'woocommerce',
-			'درون‌ریز از ترب — Shoper',
-			'🛒 Shoper (از ترب)',
+			'Shoper Studio — سازنده هوشمند محصول',
+			'✦ Shoper Studio',
 			'manage_woocommerce',
 			'shoper',
 			array( $this, 'render_admin_page' )
@@ -53,7 +53,7 @@ class Shoper_Admin {
 	public function add_meta_box() {
 		add_meta_box(
 			'shoper_importer',
-			'🛒 پر کردن از ترب (Shoper)',
+			'✦ پر کردن با Shoper Studio',
 			array( $this, 'render_meta_box' ),
 			'product',
 			'side',
@@ -112,11 +112,15 @@ class Shoper_Admin {
 				'fetchMode'  => get_option( 'shoper_fetch_mode', 'auto' ),
 				'relayUrl'   => (string) get_option( 'shoper_relay_url', '' ),
 				'gateways'   => Shoper_Torob_Client::active_gateways(),
+				'aiEnabled'  => get_option( 'shoper_ai_enabled', 'yes' ),
+				'aiAuto'     => get_option( 'shoper_ai_auto', 'yes' ),
+				'author'     => defined( 'SHOPER_AUTHOR' ) ? SHOPER_AUTHOR : 'خواجوی',
 				'i18n'    => array(
-					'searching'    => 'در حال جستجو در ترب…',
+					'searching'    => 'در حال جستجو در کاتالوگ…',
 					'loading'      => 'در حال دریافت اطلاعات محصول…',
 					'creating'     => 'در حال ساخت محصول در ووکامرس…',
 					'filling'      => 'در حال پر کردن محصول…',
+					'enhancing'    => 'در حال بازنویسی توضیحات، تحلیل و سئو…',
 					'empty_query'  => 'نام محصول را وارد کنید.',
 					'select_one'   => 'یک محصول را انتخاب کنید.',
 					'done'         => 'انجام شد!',
@@ -168,7 +172,8 @@ class Shoper_Admin {
 		if ( 'shoper_source' === $column ) {
 			$key = get_post_meta( $post_id, '_shoper_random_key', true );
 			if ( $key ) {
-				echo '<span title="منبع: ترب" style="color:#2271b1;">🛒 ترب</span>';
+				$label = ( 0 === strpos( (string) $key, 'DKP-' ) ) ? 'دیجی‌کالا' : 'ترب';
+				echo '<span title="منبع: ' . esc_attr( $label ) . '" style="color:#1b3a4b;">✦ ' . esc_html( $label ) . '</span>';
 			} else {
 				echo '—';
 			}

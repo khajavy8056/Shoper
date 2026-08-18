@@ -671,6 +671,141 @@ function normalizeDigikalaDetails(data) {
 	};
 }
 
+function detectCategory(hay) {
+	const t = String(hay || '').toLowerCase();
+	if (/گوشی|موبایل|galaxy|iphone|redmi|poco|xiaomi|سامسونگ/.test(t)) return 'phone';
+	if (/لپ[\s-]?تاپ|macbook|notebook/.test(t)) return 'laptop';
+	if (/تبلت|ipad/.test(t)) return 'tablet';
+	if (/هدفون|هندزفری|ایرپاد|earbuds/.test(t)) return 'headphone';
+	if (/ساعت هوشمند|smartwatch/.test(t)) return 'watch';
+	if (/تلویزیون|smart tv/.test(t)) return 'tv';
+	return 'generic';
+}
+
+function specOf(specs, names) {
+	for (const n of names) {
+		if (specs && specs[n]) return String(specs[n]).trim();
+	}
+	return '';
+}
+
+function enhanceProduct(data) {
+	const name = String((data && data.name1) || '');
+	const name2 = String((data && data.name2) || '');
+	const specs = (data && data.specs) || {};
+	const keys = (data && data.key_specs) || {};
+	const source = String((data && data.description) || '').replace(/\s+/g, ' ').trim();
+	const cat = detectCategory(name + ' ' + name2);
+	const brand = specOf(specs, ['برند', 'سازنده']);
+	const highlights = [];
+	const prefer = ['برند', 'مدل', 'مقدار رم', 'حافظه RAM', 'حافظه داخلی', 'گنجایش باتری', 'ظرفیت باتری', 'دوربین اصلی', 'اندازه صفحه نمایش', 'پردازنده'];
+	for (const k of prefer) {
+		const bag = Object.assign({}, keys, specs);
+		if (bag[k]) highlights.push(k + ': ' + bag[k]);
+		if (highlights.length >= 6) break;
+	}
+	if (highlights.length < 4) {
+		for (const [k, v] of Object.entries(Object.assign({}, keys, specs))) {
+			const line = k + ': ' + v;
+			if (!highlights.includes(line)) highlights.push(line);
+			if (highlights.length >= 6) break;
+		}
+	}
+	const ram = specOf(specs, ['مقدار رم', 'حافظه RAM', 'رم']);
+	const rom = specOf(specs, ['حافظه داخلی']);
+	const bat = specOf(specs, ['گنجایش باتری', 'ظرفیت باتری']);
+	const cam = specOf(specs, ['دوربین اصلی', 'کیفیت دوربین اصلی']);
+	let analysis = 'تحلیل زیر فقط از مشخصات اعلام‌شده برای «' + name + '» استخراج شده است؛ هیچ قابلیت خارج از داده اضافه نشده.';
+	const bits = [];
+	if (ram) bits.push('رم «' + ram + '» برای چندوظیفگی معیار عملی است.');
+	if (rom) bits.push('حافظه «' + rom + '» سقف نگهداری فایل را مشخص می‌کند.');
+	if (cam) bits.push('دوربین اصلی «' + cam + '» معیار عکاسی روزمره این مدل است.');
+	if (bat) bits.push('باتری «' + bat + '» یکی از معیارهای دوام روزانه است.');
+	if (bits.length) analysis += '\n\n' + bits.join(' ');
+	if (source) analysis += '\n\nتوضیح کارشناسی منبع در معرفی حفظ شده است.';
+
+	const pros = [];
+	const cons = [];
+	if (brand) pros.push('برند مشخص: ' + brand);
+	if (ram && /(\d+)/.test(ram) && parseInt(RegExp.$1, 10) >= 8) pros.push('رم نسبتاً بالا (' + ram + ')');
+	if (bat) pros.push('ظرفیت باتری اعلام‌شده: ' + bat);
+	if (!pros.length) {
+		highlights.slice(0, 3).forEach((h) => pros.push(h));
+	}
+	if (!specOf(specs, ['گواهی ضدآب'])) cons.push('مقاومت رسمی در برابر آب در مشخصات دیده نشد.');
+	cons.push('قیمت نهایی را فروشگاه تعیین می‌کند؛ این بررسی روی مشخصات است.');
+	let review = 'بررسی کارشناسی «' + name + '» — نه نظر ساختگی مشتری.\n\nنقاط قوت:\n';
+	pros.slice(0, 5).forEach((p) => { review += '• ' + p + '\n'; });
+	review += '\nنکات قابل توجه:\n';
+	cons.slice(0, 4).forEach((c) => { review += '• ' + c + '\n'; });
+	review += '\nجمع‌بندی بررسی: اگر مشخصات با نیاز خریدار هم‌خوان است، مدل برای انتشار در فروشگاه شفاف است.';
+
+	const audience = cat === 'phone'
+		? 'مناسب استفاده روزمره، شبکه‌های اجتماعی و کار اداری سبک. خریدار حرفه‌ای جدول دوربین و باتری را خط‌به‌خط بسنجد.'
+		: 'خریدارانی که می‌خواهند مشخصات، تصاویر و متن فروش را قبل از انتشار خودشان تأیید کنند.';
+	const verdict = name + ' با دادهٔ کامل کاتالوگ برای انتشار در ووکامرس آماده است. ارزش صفحه در شفافیت مشخصات و متن کارشناسی است.';
+	const intro = name + ' برای فروشگاه آماده شده است.' + (brand ? ' برند: ' + brand + '.' : '') + (name2 ? ' شناسه بین‌المللی: ' + name2 + '.' : '') + (source ? ' ' + source.slice(0, 420) : ' در ادامه تحلیل و بررسی کارشناسی آمده است.');
+
+	let descriptionHtml = '<div class="shoper-studio-copy">';
+	descriptionHtml += '<h2>معرفی محصول</h2><p>' + escHtml(intro) + '</p>';
+	if (highlights.length) {
+		descriptionHtml += '<h2>نکات برجسته</h2><ul>' + highlights.map((h) => '<li>' + escHtml(h) + '</li>').join('') + '</ul>';
+	}
+	descriptionHtml += '<h2>تحلیل کارشناسی</h2>' + analysis.split(/\n\n/).map((p) => '<p>' + escHtml(p) + '</p>').join('');
+	descriptionHtml += '<h2>بررسی محصول</h2>';
+	review.split(/\n+/).forEach((line) => {
+		if (line === 'نقاط قوت:') descriptionHtml += '<h3>نقاط قوت</h3>';
+		else if (line === 'نکات قابل توجه:') descriptionHtml += '<h3>نکات قابل توجه</h3>';
+		else if (line.indexOf('• ') === 0) descriptionHtml += '<p>• ' + escHtml(line.slice(2)) + '</p>';
+		else if (line) descriptionHtml += '<p>' + escHtml(line) + '</p>';
+	});
+	descriptionHtml += '<h2>مناسب برای چه کسانی؟</h2><p>' + escHtml(audience) + '</p>';
+	if (keys && Object.keys(keys).length) {
+		descriptionHtml += '<h2>مشخصات کلیدی</h2>' + renderSpecTable(keys);
+	}
+	if (data.spec_groups && data.spec_groups.length) {
+		descriptionHtml += '<h2>مشخصات فنی کامل</h2>';
+		data.spec_groups.forEach((g) => {
+			if (!g.specs || !Object.keys(g.specs).length) return;
+			if (g.header) descriptionHtml += '<h3>' + escHtml(g.header) + '</h3>';
+			descriptionHtml += renderSpecTable(g.specs);
+		});
+	} else if (specs && Object.keys(specs).length) {
+		descriptionHtml += '<h2>مشخصات فنی کامل</h2>' + renderSpecTable(specs);
+	}
+	descriptionHtml += '<h2>جمع‌بندی خرید</h2><p>' + escHtml(verdict) + '</p>';
+	descriptionHtml += '<p class="shoper-source">متن فروش توسط <strong>Shoper Studio</strong> — خواجوی آماده شده است.</p></div>';
+
+	const seo = buildSeo(data);
+	const seoTitle = ('خرید ' + name).slice(0, 70);
+	let seoDesc = 'خرید ' + name + ' با مشخصات کامل، بررسی کارشناسی و تصاویر واقعی.';
+	if (name2) seoDesc += ' ' + name2;
+	if (seoDesc.length > 155) seoDesc = seoDesc.slice(0, 152) + '…';
+	const tags = seo.tags.slice();
+	if (brand && tags.indexOf(brand) < 0) tags.unshift(brand);
+
+	const shortItems = Object.entries(keys).slice(0, 5).map(([k, v]) => '<li><strong>' + escHtml(k) + ':</strong> ' + escHtml(v) + '</li>').join('');
+	const short = (name2 ? '<p>' + escHtml(name2) + '</p>' : '') + '<p>' + escHtml(name) + ' — مشخصات فنی، تصاویر و متن کارشناسی آمادهٔ انتشار.</p>' + (shortItems ? '<ul>' + shortItems + '</ul>' : '');
+
+	return {
+		title: name,
+		short_description: short,
+		description_html: descriptionHtml,
+		analysis,
+		review,
+		highlights,
+		audience,
+		verdict,
+		seo_title: seoTitle,
+		seo_desc: seoDesc,
+		focus_keyword: brand ? (brand + ' ' + name.split(' ')[0]) : name,
+		tags: tags.slice(0, 12),
+		provider: 'studio',
+		provider_label: 'استودیوی نویسندگی خواجوی',
+		category: cat,
+	};
+}
+
 module.exports = {
 	normalizeSearch,
 	normalizeDetails,
@@ -684,4 +819,6 @@ module.exports = {
 	fileBase,
 	numberFormatFa,
 	escHtml,
+	enhanceProduct,
+	detectCategory,
 };
