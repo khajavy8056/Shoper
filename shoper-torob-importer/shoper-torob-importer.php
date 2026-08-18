@@ -1,11 +1,11 @@
 <?php
 /**
- * Plugin Name:       Shoper – درون‌ریز محصول از ترب
+ * Plugin Name:       Shoper Studio – سازنده هوشمند محصول
  * Plugin URI:        https://github.com/khajavy8056/Shoper
- * Description:       با نوشتن نام محصول یا چسباندن لینک ترب، اطلاعات کامل محصول (نام، توضیحات، تصاویر و تمام مشخصات فنی به‌صورت ویژگی‌های مجزا) را از ترب دریافت و یک محصول کامل ووکامرس بسازید.
- * Version:           1.2.2
- * Author:            Shoper
- * Author URI:        https://github.com/khajavy8056/Shoper
+ * Description:       از نام محصول تا صفحه فروش: معرفی و بررسی، جدول مشخصات، گالری تصاویر و ویژگی‌های دانه‌دانه.
+ * Version:           1.5.7
+ * Author:            خواجوی
+ * Author URI:        https://github.com/khajavy8056
  * License:           GPL v2 or later
  * Text Domain:       shoper
  * Domain Path:       /languages
@@ -22,7 +22,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // تعریف ثابت‌های افزونه.
-define( 'SHOPER_VERSION', '1.2.2' );
+define( 'SHOPER_VERSION', '1.5.7' );
+define( 'SHOPER_AUTHOR', 'خواجوی' );
 define( 'SHOPER_PLUGIN_FILE', __FILE__ );
 define( 'SHOPER_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SHOPER_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -104,14 +105,19 @@ if ( ! class_exists( 'Shoper_Torob_Importer' ) ) {
 		 * @return void
 		 */
 		private function includes() {
-			require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-debug.php';
-			require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-diagnostics.php';
-			require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-torob-client.php';
-			require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-image-handler.php';
-			require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-attribute-handler.php';
-			require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-product-builder.php';
-			require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-ajax.php';
-			require_once SHOPER_PLUGIN_DIR . 'admin/class-shoper-admin.php';
+		require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-debug.php';
+		require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-diagnostics.php';
+		require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-torob-client.php';
+		require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-digikala-client.php';
+		require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-catalog.php';
+		require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-seller-aggregator.php';
+		require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-image-handler.php';
+		require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-attribute-handler.php';
+		require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-copywriter.php';
+		require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-ai-client.php';
+		require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-product-builder.php';
+		require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-ajax.php';
+		require_once SHOPER_PLUGIN_DIR . 'admin/class-shoper-admin.php';
 		}
 
 		/**
@@ -130,6 +136,7 @@ if ( ! class_exists( 'Shoper_Torob_Importer' ) ) {
 
 			// اعلام سازگاری با HPOS ووکامرس.
 			add_action( 'before_woocommerce_init', array( $this, 'declare_hpos_compatibility' ) );
+			add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_storefront' ) );
 		}
 
 		/**
@@ -155,6 +162,23 @@ if ( ! class_exists( 'Shoper_Torob_Importer' ) ) {
 				);
 			}
 		}
+
+		/**
+		 * استایل ثابت صفحه محصول در فروشگاه.
+		 *
+		 * @return void
+		 */
+		public function enqueue_storefront() {
+			if ( ! function_exists( 'is_product' ) || ! is_product() ) {
+				return;
+			}
+			wp_enqueue_style(
+				'shoper-storefront',
+				SHOPER_PLUGIN_URL . 'assets/css/storefront.css',
+				array(),
+				SHOPER_VERSION
+			);
+		}
 	}
 }
 
@@ -167,7 +191,8 @@ add_action( 'plugins_loaded', array( 'Shoper_Torob_Importer', 'instance' ) );
 register_activation_hook( __FILE__, 'shoper_activate' );
 function shoper_activate() {
 	$defaults = array(
-		'data_source'      => 'direct', // direct | mock.
+		'data_source'      => 'auto',
+		'catalog_source'   => 'auto',
 		'product_status'   => 'draft',  // draft | publish | pending.
 		'product_type'     => 'simple', // simple در فاز اول.
 		'import_gallery'   => 'yes',
@@ -178,6 +203,8 @@ function shoper_activate() {
 		'connect_timeout'  => 10,
 		'proxy_url'        => '',
 		'debug'            => '', // فعال‌سازی لاگ اشکال‌زدایی.
+		'ai_enabled'       => 'yes',
+		'ai_auto'          => 'yes',
 	);
 	foreach ( $defaults as $key => $value ) {
 		if ( false === get_option( 'shoper_' . $key ) ) {

@@ -21,8 +21,11 @@ class Shoper_Ajax {
 		add_action( 'wp_ajax_shoper_suggest', array( $this, 'suggest' ) );
 		add_action( 'wp_ajax_shoper_search', array( $this, 'search' ) );
 		add_action( 'wp_ajax_shoper_preview', array( $this, 'preview' ) );
+		add_action( 'wp_ajax_shoper_ingest', array( $this, 'ingest' ) );
 		add_action( 'wp_ajax_shoper_create', array( $this, 'create' ) );
 		add_action( 'wp_ajax_shoper_fill', array( $this, 'fill' ) );
+		add_action( 'wp_ajax_shoper_enhance', array( $this, 'enhance' ) );
+		add_action( 'wp_ajax_shoper_ai_probe', array( $this, 'ai_probe' ) );
 		add_action( 'wp_ajax_shoper_test_connection', array( $this, 'test_connection' ) );
 		add_action( 'wp_ajax_shoper_diagnostics', array( $this, 'diagnostics' ) );
 	}
@@ -105,6 +108,56 @@ class Shoper_Ajax {
 	}
 
 	/**
+	 * خواندن JSON محصول ارسال‌شده از مرورگر (بدون تماس دوباره با ترب).
+	 *
+	 * @return array|null
+	 */
+	private function posted_product_payload() {
+		if ( empty( $_POST['product_json'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+			return null;
+		}
+		$raw = wp_unslash( $_POST['product_json'] ); // phpcs:ignore
+		$data = is_array( $raw ) ? $raw : json_decode( $raw, true );
+		return is_array( $data ) ? $data : null;
+	}
+
+	/**
+	 * نرمال‌سازی JSON خام ترب که مرورگر/رله گرفته است.
+	 *
+	 * @return void
+	 */
+	public function ingest() {
+		$this->guard();
+
+		$kind = isset( $_POST['kind'] ) ? sanitize_key( wp_unslash( $_POST['kind'] ) ) : 'details';
+		$raw  = isset( $_POST['raw'] ) ? wp_unslash( $_POST['raw'] ) : ''; // phpcs:ignore
+
+		if ( is_string( $raw ) ) {
+			$decoded = json_decode( $raw, true );
+		} elseif ( is_array( $raw ) ) {
+			$decoded = $raw;
+		} else {
+			$decoded = null;
+		}
+
+		if ( ! is_array( $decoded ) ) {
+			wp_send_json_error( array( 'code' => 'invalid_json', 'message' => 'دادهٔ دریافتی از مرورگر قابل پردازش نیست.' ) );
+		}
+
+		$builder = new Shoper_Product_Builder();
+		$result  = $builder->preview_from_raw( $kind, $decoded );
+		if ( is_wp_error( $result ) ) {
+			$this->send_error( $result );
+		}
+
+		if ( is_array( $result ) && empty( $result['_source'] ) ) {
+			$result['_source'] = 'browser';
+		}
+
+		wp_send_json_success( $result );
+	}
+
+	/**
 	 * پیشنهاد نام محصول برای نوار کشویی زیر فیلد جستجو.
 	 *
 	 * @return void
@@ -122,8 +175,6 @@ class Shoper_Ajax {
 		$result  = $builder->suggest( $term );
 
 		if ( is_wp_error( $result ) ) {
-			// پیشنهاد یک قابلیت کمکی است؛ خطایش نباید مزاحم تایپ کاربر شود.
-			// اما علت واقعی در لاگ اشکال‌زدایی ثبت می‌شود.
 			Shoper_Debug::log(
 				'suggest_error',
 				array(
@@ -131,9 +182,14 @@ class Shoper_Ajax {
 					'message' => $result->get_error_message(),
 				)
 			);
-			$payload = array( 'suggestions' => array() );
-			if ( Shoper_Debug::enabled() ) {
-				$payload['debug'] = $result->get_error_code();
+			$payload = array(
+				'suggestions' => array(),
+				'error'       => $result->get_error_code(),
+				'message'     => $result->get_error_message(),
+			);
+			$err_data = $result->get_error_data();
+			if ( is_array( $err_data ) && isset( $err_data['status'] ) ) {
+				$payload['status'] = (int) $err_data['status'];
 			}
 			wp_send_json_success( $payload );
 		}
@@ -205,6 +261,60 @@ class Shoper_Ajax {
 	}
 
 	/**
+	 * بازنویسی هوشمند توضیحات / تحلیل / سئو.
+	 *
+	 * @return void
+	 */
+	public function enhance() {
+		$this->guard();
+
+		$payload = $this->posted_product_payload();
+		if ( ! $payload ) {
+			wp_send_json_error( array( 'code' => 'invalid_payload', 'message' => 'دادهٔ محصول برای بازنویسی ناقص است.' ) );
+		}
+
+		if ( ! class_exists( 'Shoper_AI_Client' ) ) {
+			wp_send_json_error( array( 'code' => 'ai_missing', 'message' => 'موتور نویسندگی در دسترس نیست.' ), 500 );
+		}
+
+		$client = new Shoper_AI_Client();
+		$mode   = isset( $_POST['mode'] ) ? sanitize_key( wp_unslash( $_POST['mode'] ) ) : 'auto';
+		$remote = null;
+		if ( ! empty( $_POST['remote_json'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+			$raw_remote = json_decode( wp_unslash( $_POST['remote_json'] ), true ); // phpcs:ignore
+			if ( is_array( $raw_remote ) ) {
+				$remote = $raw_remote;
+			}
+		}
+		if ( $remote ) {
+			$studio = Shoper_Copywriter::enhance( $payload );
+			$result = $client->merge( $studio, $remote, $payload );
+			$from   = isset( $_POST['remote_provider'] ) ? sanitize_text_field( wp_unslash( $_POST['remote_provider'] ) ) : 'browser';
+			$result['provider']       = $from ? $from : 'browser';
+			$result['provider_label'] = ( $from ? $from : 'مدل مرورگر' ) . ' + استودیو خواجوی';
+			$result['remote']         = true;
+		} else {
+			$result = $client->enhance( $payload, $mode );
+		}
+		$result['rotation'] = $client->status_snapshot();
+		wp_send_json_success( $result );
+	}
+
+	/**
+	 * پروب اتصال سرویس‌های نویسندگی.
+	 *
+	 * @return void
+	 */
+	public function ai_probe() {
+		$this->guard();
+		if ( ! class_exists( 'Shoper_AI_Client' ) ) {
+			wp_send_json_error( array( 'code' => 'ai_missing', 'message' => 'موتور نویسندگی در دسترس نیست.' ), 500 );
+		}
+		$client = new Shoper_AI_Client();
+		wp_send_json_success( $client->probe() );
+	}
+
+	/**
 	 * ساخت محصول جدید.
 	 *
 	 * @return void
@@ -218,6 +328,7 @@ class Shoper_Ajax {
 		$name          = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '';
 		$status        = isset( $_POST['status'] ) ? sanitize_text_field( wp_unslash( $_POST['status'] ) ) : '';
 		$desc          = isset( $_POST['description'] ) ? wp_kses_post( wp_unslash( $_POST['description'] ) ) : '';
+		$short_desc    = isset( $_POST['short_description'] ) ? wp_kses_post( wp_unslash( $_POST['short_description'] ) ) : '';
 		$specs_raw     = isset( $_POST['specs'] ) ? wp_unslash( $_POST['specs'] ) : '';
 
 		// انتخاب تصاویر توسط کاربر.
@@ -234,6 +345,7 @@ class Shoper_Ajax {
 		// سئو.
 		$seo_title = isset( $_POST['seo_title'] ) ? sanitize_text_field( wp_unslash( $_POST['seo_title'] ) ) : '';
 		$seo_desc  = isset( $_POST['seo_desc'] ) ? sanitize_textarea_field( wp_unslash( $_POST['seo_desc'] ) ) : '';
+		$focus_kw  = isset( $_POST['focus_keyword'] ) ? sanitize_text_field( wp_unslash( $_POST['focus_keyword'] ) ) : '';
 		$tags_raw  = isset( $_POST['tags'] ) ? wp_unslash( $_POST['tags'] ) : '';
 		$tags      = null;
 		if ( '' !== $tags_raw ) {
@@ -243,12 +355,17 @@ class Shoper_Ajax {
 			}
 		}
 
-		if ( ! $prk ) {
+		if ( ! $prk && ! $this->posted_product_payload() ) {
 			wp_send_json_error( array( 'code' => 'invalid_prk', 'message' => 'شناسه محصول نامعتبر است.' ) );
 		}
 
 		$builder = new Shoper_Product_Builder();
-		$data    = $builder->preview( $prk, $search_id, $more_info_url );
+		$payload = $this->posted_product_payload();
+		if ( $payload ) {
+			$data = $builder->preview_from_payload( $payload );
+		} else {
+			$data = $builder->preview( $prk, $search_id, $more_info_url );
+		}
 		if ( is_wp_error( $data ) ) {
 			$this->send_error( $data );
 		}
@@ -268,12 +385,21 @@ class Shoper_Ajax {
 					}
 				}
 				$data['specs'] = $filtered;
+				if ( class_exists( 'Shoper_Copywriter' ) ) {
+					$data['spec_groups'] = Shoper_Copywriter::spec_groups( $data );
+				}
 			}
 		}
 
 		$args = array();
 		if ( $desc ) {
 			$args['description'] = $desc;
+		}
+		if ( $short_desc ) {
+			$args['short_description'] = $short_desc;
+		}
+		if ( $focus_kw ) {
+			$args['focus_keyword'] = $focus_kw;
 		}
 		if ( $status ) {
 			$args['status'] = $status;
@@ -328,6 +454,9 @@ class Shoper_Ajax {
 		$featured_raw = isset( $_POST['featured_image'] ) ? absint( $_POST['featured_image'] ) : 0;
 		$seo_title    = isset( $_POST['seo_title'] ) ? sanitize_text_field( wp_unslash( $_POST['seo_title'] ) ) : '';
 		$seo_desc     = isset( $_POST['seo_desc'] ) ? sanitize_textarea_field( wp_unslash( $_POST['seo_desc'] ) ) : '';
+		$focus_kw     = isset( $_POST['focus_keyword'] ) ? sanitize_text_field( wp_unslash( $_POST['focus_keyword'] ) ) : '';
+		$desc         = isset( $_POST['description'] ) ? wp_kses_post( wp_unslash( $_POST['description'] ) ) : '';
+		$short_desc   = isset( $_POST['short_description'] ) ? wp_kses_post( wp_unslash( $_POST['short_description'] ) ) : '';
 		$tags         = null;
 		$tags_raw     = isset( $_POST['tags'] ) ? wp_unslash( $_POST['tags'] ) : '';
 		if ( '' !== $tags_raw ) {
@@ -337,12 +466,17 @@ class Shoper_Ajax {
 			}
 		}
 
-		if ( ! $post_id || ! $prk ) {
+		if ( ! $post_id || ( ! $prk && ! $this->posted_product_payload() ) ) {
 			wp_send_json_error( array( 'code' => 'invalid_prk', 'message' => 'شناسه محصول یا post_id نامعتبر است.' ) );
 		}
 
 		$builder = new Shoper_Product_Builder();
-		$data    = $builder->preview( $prk, $search_id, $more_info_url );
+		$payload = $this->posted_product_payload();
+		if ( $payload ) {
+			$data = $builder->preview_from_payload( $payload );
+		} else {
+			$data = $builder->preview( $prk, $search_id, $more_info_url );
+		}
 		if ( is_wp_error( $data ) ) {
 			$this->send_error( $data );
 		}
@@ -389,15 +523,18 @@ class Shoper_Ajax {
 	 */
 	public function test_connection() {
 		$this->guard();
+		$dk = new Shoper_Digikala_Client();
+		$dk_result = $dk->test_connection();
+		if ( ! empty( $dk_result['ok'] ) ) {
+			wp_send_json_success( $dk_result );
+		}
 		$client = new Shoper_Torob_Client();
 		$result = $client->test_connection();
-
 		if ( ! empty( $result['ok'] ) ) {
 			wp_send_json_success( $result );
 		}
-
-		$code    = isset( $result['code'] ) ? $result['code'] : 'connection_failed';
-		$message = isset( $result['message'] ) ? $result['message'] : 'اتصال به ترب برقرار نشد.';
+		$code    = isset( $dk_result['code'] ) ? $dk_result['code'] : ( isset( $result['code'] ) ? $result['code'] : 'connection_failed' );
+		$message = 'دیجی‌کالا: ' . ( isset( $dk_result['message'] ) ? $dk_result['message'] : 'ناموفق' ) . ' | ترب: ' . ( isset( $result['message'] ) ? $result['message'] : 'ناموفق' );
 		$error   = new WP_Error( $code, $message );
 		$this->send_error( $error );
 	}

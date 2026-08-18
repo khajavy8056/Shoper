@@ -1,0 +1,92 @@
+/**
+ * قالب ثابت نقد و بررسی محصول Shoper Studio.
+ */
+.product-description-wrapper {
+	direction: rtl;
+	text-align: right;
+	font-family: Tahoma, Arial, sans-serif;
+	color: #263238;
+	line-height: 2;
+	max-width: 100%;
+}
+.product-description-header {
+	border-bottom: 1px solid #e5e7eb;
+	margin-bottom: 22px;
+	padding-bottom: 14px;
+}
+.product-description-brand {
+	color: #64748b;
+	font-size: 13px;
+	margin: 0;
+}
+.product-description-section {
+	border: 1px solid #e5e7eb;
+	border-radius: 12px;
+	margin: 0 0 20px;
+	padding: 20px;
+}
+.product-overview {
+	background: #f8fafc;
+	border-right: 5px solid #2563eb;
+}
+.product-highlights {
+	background: #f0fdf4;
+	border-right: 5px solid #16a34a;
+}
+.product-specifications {
+	background: #fff;
+	overflow: hidden;
+}
+.product-analysis {
+	background: #fffbeb;
+	border-right: 5px solid #d97706;
+}
+.product-verdict {
+	background: #eff6ff;
+	border-right: 5px solid #4f46e5;
+}
+.product-pros {
+	background: #ecfdf5;
+	border-radius: 9px;
+	color: #166534;
+	padding: 14px;
+	margin-bottom: 14px;
+}
+.product-cons {
+	background: #fef2f2;
+	border-radius: 9px;
+	color: #991b1b;
+	padding: 14px;
+}
+.product-specs-table {
+	border-collapse: collapse;
+	min-width: 620px;
+	width: 100%;
+}
+.product-specs-table th,
+.product-specs-table td {
+	border: 1px solid #dbe3ea;
+	padding: 11px 13px;
+	text-align: right;
+	vertical-align: top;
+}
+.product-specs-table thead th {
+	background: #e8f1ff;
+	color: #173b73;
+}
+.product-specs-table tbody th {
+	background: #f8fafc;
+	color: #334155;
+	width: 31%;
+}
+.product-table-wrap {
+	overflow-x: auto;
+}
+.product-spec-group {
+	margin: 0 0 18px;
+}
+.product-spec-group-title {
+	color: #173b73;
+	font-size: 16px;
+	margin: 0 0 8px;
+}

@@ -9,6 +9,8 @@
 	var Shoper = {
 		currentData: null,
 		selectedPid: null,
+		pendingItem: null,
+		lastResults: [],
 
 		// وضعیت نوار پیشنهاد (autocomplete).
 		sugTimer: null,
@@ -136,6 +138,27 @@
 				self.create();
 			});
 
+			$(document).on('click', '#shoper-next-step', function (e) {
+				e.preventDefault();
+				self.stepDelta(1);
+			});
+			$(document).on('click', '#shoper-prev-step', function (e) {
+				e.preventDefault();
+				self.stepDelta(-1);
+			});
+			$(document).on('click', '#shoper-ai-rerun', function (e) {
+				e.preventDefault();
+				if (self.currentData) { self.queueEnhance(self.currentData, true); }
+			});
+			$(document).on('click', '.shoper-ai-tab', function (e) {
+				e.preventDefault();
+				var tab = $(this).data('tab');
+				self.$preview.find('.shoper-ai-tab').removeClass('is-active');
+				$(this).addClass('is-active');
+				self.$preview.find('.shoper-ai-pane').hide();
+				self.$preview.find('.shoper-ai-pane[data-pane="' + tab + '"]').show();
+			});
+
 			this.$testConn.on('click', function (e) {
 				e.preventDefault();
 				self.testConnection();
@@ -144,6 +167,11 @@
 			this.$diagBtn.on('click', function (e) {
 				e.preventDefault();
 				self.diagnostics();
+			});
+
+			$(document).on('click', '#shoper-download-relay', function (e) {
+				e.preventDefault();
+				self.downloadRelay();
 			});
 
 			// پر کردن محصول فعلی (در صفحه ویرایش).
@@ -155,6 +183,180 @@
 
 		getMode: function () {
 			return $('input[name="shoper_input_mode"]:checked, input[name="shoper_mode"]:checked').val() || 'query';
+		},
+
+		cfg: function (key, fallback) {
+			if (typeof ShoperData !== 'undefined' && ShoperData && ShoperData[key] !== undefined && ShoperData[key] !== null && ShoperData[key] !== '') {
+				return ShoperData[key];
+			}
+			return fallback;
+		},
+
+		fetchMode: function () {
+			return this.cfg('fetchMode', 'auto');
+		},
+
+		isDkp: function (value) {
+			return /^(DKP-)?\d{4,}$/i.test(String(value || '')) || /dkp-\d+/i.test(String(value || ''));
+		},
+
+		extractDkp: function (value) {
+			var m = String(value || '').match(/dkp-(\d+)/i) || String(value || '').match(/^(\d{4,})$/);
+			return m ? m[1] : '';
+		},
+
+		dkSearchUrl: function (query) {
+			var base = this.cfg('dkApiBase', 'https://api.digikala.com');
+			return base + '/v1/search/?q=' + encodeURIComponent(query) + '&page=1';
+		},
+
+		dkDetailsUrl: function (id) {
+			var base = this.cfg('dkApiBase', 'https://api.digikala.com');
+			return base + '/v2/product/' + encodeURIComponent(id) + '/';
+		},
+
+		torobSearchUrl: function (query, size) {
+			var base = this.cfg('apiBase', 'https://api.torob.com');
+			var path = this.cfg('searchPath', '/v4/base-product/search/');
+			return base + path + '?page=0&size=' + (size || 10) + '&q=' + encodeURIComponent(query) + '&source=next_desktop';
+		},
+
+		torobDetailsUrl: function (prk, moreInfo) {
+			if (moreInfo && /torob\.(com|ir)/i.test(String(moreInfo))) {
+				return moreInfo;
+			}
+			var base = this.cfg('apiBase', 'https://api.torob.com');
+			var path = this.cfg('detailsPath', '/v4/base-product/details/');
+			return base + path + '?prk=' + encodeURIComponent(prk) + '&source=next_desktop';
+		},
+
+		wrapRelay: function (url) {
+			var relay = this.cfg('relayUrl', '');
+			if (!relay) {
+				return url;
+			}
+			return relay + (relay.indexOf('?') >= 0 ? '&' : '?') + 'url=' + encodeURIComponent(url);
+		},
+
+		wrapGateway: function (gateway, url) {
+			if (!gateway) {
+				return '';
+			}
+			if (gateway.style === 'template' && gateway.template) {
+				return String(gateway.template).replace('{url}', encodeURIComponent(url));
+			}
+			var base = gateway.base ? String(gateway.base).replace(/\/+$/, '') : '';
+			if (!base) {
+				return '';
+			}
+			if (gateway.style === 'query') {
+				var param = gateway.param || 'url';
+				return base + (base.indexOf('?') >= 0 ? '&' : '?') + param + '=' + encodeURIComponent(url);
+			}
+			return base + '/' + url;
+		},
+
+		activeGateways: function () {
+			var list = this.cfg('gateways', []);
+			return Array.isArray(list) ? list : [];
+		},
+
+		/**
+		 * یک GET و خواندن JSON. در خطا null.
+		 */
+		fetchOne: function (target, timeoutMs) {
+			var dfd = $.Deferred();
+			if (!window.fetch || !target) {
+				return dfd.resolve(null).promise();
+			}
+			var ctrl = window.AbortController ? new AbortController() : null;
+			var timer = setTimeout(function () {
+				if (ctrl) { ctrl.abort(); }
+			}, timeoutMs || 4000);
+			fetch(target, {
+				method: 'GET',
+				mode: 'cors',
+				credentials: 'omit',
+				headers: { 'Accept': 'application/json, text/plain, */*' },
+				signal: ctrl ? ctrl.signal : undefined
+			}).then(function (res) {
+				clearTimeout(timer);
+				if (!res.ok) {
+					dfd.resolve(null);
+					return null;
+				}
+				return res.json();
+			}).then(function (json) {
+				if (dfd.state() !== 'pending') {
+					return;
+				}
+				if (json && typeof json === 'object' && !json.error && !json.corsfix_error) {
+					dfd.resolve(json);
+				} else {
+					dfd.resolve(null);
+				}
+			}).catch(function () {
+				clearTimeout(timer);
+				if (dfd.state() === 'pending') {
+					dfd.resolve(null);
+				}
+			});
+			return dfd.promise();
+		},
+
+		/**
+		 * دریافت JSON از مرورگر: مستقیم، رله، بعد درگاه‌های تست‌شده.
+		 */
+		browserFetch: function (url) {
+			var self = this;
+			var mode = this.fetchMode();
+			if (mode === 'server') {
+				return $.Deferred().resolve(null).promise();
+			}
+			if (!window.fetch) {
+				return $.Deferred().resolve(null).promise();
+			}
+
+			var targets = [];
+			if (mode === 'relay' || this.cfg('relayUrl', '')) {
+				targets.push(this.wrapRelay(url));
+			}
+			if (mode !== 'relay') {
+				targets.push(url);
+				this.activeGateways().forEach(function (g) {
+					var wrapped = self.wrapGateway(g, url);
+					if (wrapped && targets.indexOf(wrapped) < 0) {
+						targets.push(wrapped);
+					}
+				});
+			}
+
+			var dfd = $.Deferred();
+			var i = 0;
+			var next = function () {
+				if (i >= targets.length) {
+					dfd.resolve(null);
+					return;
+				}
+				var target = targets[i++];
+				var wait = (i === 1) ? 2500 : 5000;
+				self.fetchOne(target, wait).done(function (json) {
+					if (json && (json.results || json.random_key || json.name1 || (json.data && (json.data.products || json.data.product)))) {
+						dfd.resolve(json);
+					} else {
+						next();
+					}
+				});
+			};
+			next();
+			return dfd.promise();
+		},
+
+		ingest: function (kind, raw, onSuccess, onError) {
+			return this.ajax('shoper_ingest', {
+				kind: kind,
+				raw: JSON.stringify(raw)
+			}, onSuccess, onError);
 		},
 
 		/* ------------------------------------------------------------------
@@ -221,6 +423,16 @@
 		 *
 		 * @param {string} term عبارت.
 		 */
+		applySuggestList: function (term, list) {
+			if (this.$queryInput.val().trim() !== term) {
+				return;
+			}
+			this.sugLastTerm = term;
+			this.sugItems = list || [];
+			this.sugIndex = -1;
+			this.renderSuggest(this.sugItems, term);
+		},
+
 		fetchSuggest: function (term) {
 			var self = this;
 
@@ -231,24 +443,92 @@
 
 			this.showSuggestLoading();
 
-			this.sugXhr = $.post(ShoperData.ajaxUrl, {
-				action: 'shoper_suggest',
-				nonce: ShoperData.nonce,
-				term: term
-			}).done(function (resp) {
-				// اگر کاربر در این فاصله عبارت را عوض کرده، نتیجه را دور بریز.
-				if (self.$queryInput.val().trim() !== term) {
+			var runServer = function () {
+				self.sugXhr = $.post(ShoperData.ajaxUrl, {
+					action: 'shoper_suggest',
+					nonce: ShoperData.nonce,
+					term: term
+				}).done(function (resp) {
+					var list = (resp && resp.success && resp.data && resp.data.suggestions) ? resp.data.suggestions : [];
+					if (!list.length && resp && resp.data && resp.data.error && self.$suggest) {
+						var msg = resp.data.message || 'اتصال به ترب برقرار نشد.';
+						self.$suggest.html('<div class="shoper-suggest-empty">' + self.esc(msg) + '</div>').show();
+						self.sugOpen = true;
+						return;
+					}
+					self.applySuggestList(term, list);
+				}).fail(function (xhr, status) {
+					if (status !== 'abort') {
+						self.closeSuggest();
+					}
+				});
+			};
+
+			this.browserFetch(this.dkSearchUrl(term)).done(function (raw) {
+				if (raw && raw.data) {
+					self.ingest('dk_search', raw, function (data) {
+						var list = [];
+						var seen = {};
+						(data.results || []).forEach(function (item) {
+							if (!item.name1 || seen[item.name1]) { return; }
+							seen[item.name1] = true;
+							list.push({
+								label: item.name1,
+								name2: item.name2 || '',
+								random_key: item.random_key || '',
+								search_id: '',
+								image_url: item.image_url || '',
+								price: item.price || 0,
+								price_text: item.price_text || '',
+								shop_text: item.shop_text || 'دیجی‌کالا',
+								more_info_url: '',
+								gallery: item.gallery || [],
+								page_url: item.page_url || '',
+								provider: 'digikala'
+							});
+						});
+						if (list.length) {
+							self.lastResults = data.results || [];
+							self.applySuggestList(term, list.slice(0, 8));
+							return;
+						}
+						runServer();
+					}, function () { runServer(); });
 					return;
 				}
-				var list = (resp && resp.success && resp.data && resp.data.suggestions) ? resp.data.suggestions : [];
-				self.sugLastTerm = term;
-				self.sugItems = list;
-				self.sugIndex = -1;
-				self.renderSuggest(list, term);
-			}).fail(function (xhr, status) {
-				if (status !== 'abort') {
-					self.closeSuggest();
+				if (!raw || !raw.results) {
+					runServer();
+					return;
 				}
+				self.ingest('search', raw, function (data) {
+					var list = [];
+					var seen = {};
+					(data.results || []).forEach(function (item) {
+						if (item.is_adv || !item.name1 || seen[item.name1]) { return; }
+						seen[item.name1] = true;
+						list.push({
+							label: item.name1,
+							name2: item.name2 || '',
+							random_key: item.random_key || '',
+							search_id: item.search_id || '',
+							image_url: item.image_url || '',
+							price: item.price || 0,
+							price_text: item.price_text || '',
+							shop_text: item.shop_text || '',
+							more_info_url: item.more_info_url || '',
+							gallery: item.gallery || [],
+							page_url: item.page_url || ''
+						});
+					});
+					if (list.length) {
+						self.lastResults = data.results || [];
+						self.applySuggestList(term, list.slice(0, 8));
+					} else {
+						runServer();
+					}
+				}, function () {
+					runServer();
+				});
 			});
 		},
 
@@ -257,7 +537,7 @@
 				return;
 			}
 			this.$suggest
-				.html('<div class="shoper-suggest-loading"><span class="shoper-loading-inline"></span> در حال گرفتن پیشنهاد از ترب…</div>')
+				.html('<div class="shoper-suggest-loading"><span class="shoper-loading-inline"></span> در حال گرفتن پیشنهاد…</div>')
 				.show();
 			this.sugOpen = true;
 		},
@@ -379,10 +659,11 @@
 			}
 			this.$queryInput.val(it.label);
 			this.closeSuggest();
+			this.pendingItem = it;
 
 			// چون prk را از قبل داریم، مستقیم به پیش‌نمایش می‌رویم.
 			if (it.random_key) {
-				this.preview(it.random_key, it.search_id || '');
+				this.preview(it.random_key, it.search_id || '', it.more_info_url || '', it);
 			} else {
 				this.search();
 			}
@@ -556,13 +837,16 @@
 					return;
 				}
 				this.status(ShoperData.i18n.loading, 'loading');
-				// برای لینک: ابتدا prk را استخراج و سپس مستقیم prevew می‌کنیم.
+				var dkp = this.extractDkp(url);
+				if (dkp) {
+					this.preview('DKP-' + dkp);
+					return;
+				}
 				var uuidMatch = url.match(/\/p\/([0-9a-f\-]{36})/i);
 				if (uuidMatch) {
 					this.preview(uuidMatch[1]);
 					return;
 				}
-				// اگر فرمت URL شناخته‌شده نبود، به‌عنوان query استفاده می‌کنیم.
 				query = url;
 			}
 
@@ -575,9 +859,33 @@
 			this.$previewCard.hide();
 			this.status(ShoperData.i18n.searching, 'loading');
 
-			this.ajax('shoper_search', { query: query }, function (data) {
+			var showSearch = function (data) {
 				self.clearStatus();
-				self.renderResults(data.results || []);
+				self.lastResults = data.results || [];
+				self.renderResults(self.lastResults);
+			};
+
+			var searchFail = function (info) {
+				var msg = (info && info.message) ? info.message : 'جستجو ناموفق بود.';
+				if (info && (info.code === 'blocked' || info.status === 490 || info.status === 403)) {
+					msg += ' مسیر مستقیم مسدود است. درگاه پیش‌فرض باید لیست را بیاورد؛ اگر نیامد اتصال هاست به درگاه را در عیب‌یابی ببینید.';
+				}
+				self.status(msg, 'error');
+			};
+			this.browserFetch(this.dkSearchUrl(query)).done(function (raw) {
+				if (raw && raw.data) {
+					self.ingest('dk_search', raw, showSearch, function () {
+						self.ajax('shoper_search', { query: query }, showSearch, searchFail);
+					});
+					return;
+				}
+				if (raw && raw.results) {
+					self.ingest('search', raw, showSearch, function () {
+						self.ajax('shoper_search', { query: query }, showSearch, searchFail);
+					});
+					return;
+				}
+				self.ajax('shoper_search', { query: query }, showSearch, searchFail);
 			});
 		},
 
@@ -616,24 +924,75 @@
 			this.$results.html(html).show();
 		},
 
-		preview: function (prk, searchId, moreInfo) {
+		preview: function (prk, searchId, moreInfo, fallbackItem) {
 			var self = this;
 			if (!prk) return;
 			this.status(ShoperData.i18n.loading, 'loading');
 			this.$results.find('.shoper-result-item').removeClass('selected');
 			this.$results.find('[data-prk="' + prk + '"]').addClass('selected');
 
-			this.ajax('shoper_preview', {
-				prk: prk,
-				search_id: searchId || '',
-				more_info_url: moreInfo || ''
-			}, function (data) {
+			if (!fallbackItem) {
+				fallbackItem = this.pendingItem && this.pendingItem.random_key === prk ? this.pendingItem : null;
+				if (!fallbackItem && this.lastResults && this.lastResults.length) {
+					for (var i = 0; i < this.lastResults.length; i++) {
+						if (this.lastResults[i].random_key === prk) {
+							fallbackItem = this.lastResults[i];
+							break;
+						}
+					}
+				}
+			}
+
+			var showPreview = function (data) {
 				self.clearStatus();
 				self.currentData = data;
 				self.selectedPid = prk;
 				self.renderPreview(data);
 				self.$previewCard.show();
-				$('html, body').animate({ scrollTop: self.$previewCard.offset().top - 40 }, 400);
+				if (self.$previewCard.offset()) {
+					$('html, body').animate({ scrollTop: self.$previewCard.offset().top - 40 }, 400);
+				}
+			};
+
+			var fromFallback = function (err) {
+				if (fallbackItem) {
+					self.ingest('search_item', fallbackItem, function (data) {
+						data._source = data._source || 'partial';
+						showPreview(data);
+					}, function () {
+						self.status((err && err.message) ? err.message : 'جزئیات محصول دریافت نشد.', 'error');
+					});
+					return;
+				}
+				self.status((err && err.message) ? err.message : 'جزئیات محصول دریافت نشد.', 'error');
+			};
+
+			var runServerPreview = function () {
+				self.ajax('shoper_preview', {
+					prk: prk,
+					search_id: searchId || '',
+					more_info_url: moreInfo || ''
+				}, showPreview, fromFallback);
+			};
+
+			if (self.isDkp(prk)) {
+				var dkp = self.extractDkp(prk);
+				self.browserFetch(self.dkDetailsUrl(dkp)).done(function (raw) {
+					if (raw && raw.data && raw.data.product) {
+						self.ingest('dk_details', raw, showPreview, runServerPreview);
+						return;
+					}
+					runServerPreview();
+				});
+				return;
+			}
+
+			this.browserFetch(this.torobDetailsUrl(prk, moreInfo)).done(function (raw) {
+				if (raw && (raw.random_key || raw.name1)) {
+					self.ingest('details', raw, showPreview, runServerPreview);
+					return;
+				}
+				runServerPreview();
 			});
 		},
 
@@ -649,12 +1008,18 @@
 				html += '<div class="shoper-stepper">';
 				html += '<div class="shoper-step is-active" data-step="info"><span class="shoper-step-num">۱</span> دریافت اطلاعات</div>';
 				html += '<div class="shoper-step" data-step="images"><span class="shoper-step-num">۲</span> انتخاب تصاویر</div>';
-				html += '<div class="shoper-step" data-step="seo"><span class="shoper-step-num">۳</span> سئو و برچسب</div>';
+				html += '<div class="shoper-step" data-step="ai"><span class="shoper-step-num">۳</span> معرفی و بررسی</div>';
+				html += '<div class="shoper-step" data-step="review"><span class="shoper-step-num">۴</span> نظارت و سئو</div>';
 				html += '</div>';
 			}
 
 			// --- بخش ۱: اطلاعات ---
 			html += '<div class="shoper-step-body" data-step-body="info">';
+			if (d.partial) {
+				html += '<div class="notice notice-warning" style="margin:0 0 12px;"><p>جزئیات کامل ترب در دسترس نبود (احتمالاً مسدودسازی ۴۹۰). پیش‌نمایش از نتیجهٔ جستجو ساخته شد؛ نام، قیمت و تصاویر وارد می‌شوند. مشخصات فنی ممکن است خالی باشد.</p></div>';
+			} else if (d._source === 'browser') {
+				html += '<p class="description" style="margin:0 0 10px;">داده از مرورگر شما دریافت شد — مناسب هاست خارج از ایران.</p>';
+			}
 			html += '<div class="shoper-preview-header">';
 			if (d.image_url) {
 				html += '<img src="' + this.esc(d.image_url) + '" alt="">';
@@ -749,17 +1114,39 @@
 				html += '</div>';
 			}
 
-			// --- بخش ۳: سئو و برچسب ---
+			// --- بخش ۳: بازنویسی هوشمند ---
 			if (isMain) {
+				html += '<div class="shoper-step-body" data-step-body="ai">';
+			html += '<div id="shoper-ai-status" class="shoper-ai-status">معرفی و بررسی از روی اطلاعات محصول آماده می‌شود؛ مشخصات در جدول جدا می‌ماند.</div>';
+			html += '<div class="shoper-ai-tabs">';
+			html += '<button type="button" class="shoper-ai-tab is-active" data-tab="analysis">معرفی و بررسی</button>';
+			html += '<button type="button" class="shoper-ai-tab" data-tab="verdict">تحلیل و نتیجه</button>';
+			html += '<button type="button" class="shoper-ai-tab" data-tab="review">خلاصه مشخصات</button>';
+			html += '</div>';
+			html += '<div class="shoper-ai-pane" data-pane="analysis"><textarea id="shoper-p-analysis" rows="8"></textarea></div>';
+			html += '<div class="shoper-ai-pane" data-pane="verdict" style="display:none;"><textarea id="shoper-p-verdict" rows="6"></textarea></div>';
+			html += '<div class="shoper-ai-pane" data-pane="review" style="display:none;"><textarea id="shoper-p-review" rows="8"></textarea></div>';
+			html += '<textarea id="shoper-p-audience" style="display:none;"></textarea>';
+			html += '<p class="description">مدل اول دادهٔ منبع را می‌گیرد، برای هر عنوان نمونه حدود ده خط می‌نویسد، بعد خودش راستی‌آزمایی می‌کند. اگر ادعای تازه باشد آن بخش کنار می‌رود. مدل از فروشگاه به اینترنت دسترسی ندارد.</p>';
+			html += '<p><button type="button" class="button" id="shoper-ai-rerun">ساخت دوباره معرفی</button></p>';
+				html += '</div>';
+
 				var seo = this.buildSeo(d);
-				html += '<div class="shoper-step-body" data-step-body="seo">';
+				html += '<div class="shoper-step-body" data-step-body="review">';
+				html += '<div class="shoper-supervisor">';
+				html += '<strong>میز نظارت خواجوی</strong> — قبل از ساخت، عنوان، توضیحات کامل و سئو را تأیید کنید.';
+				html += '</div>';
+				html += '<div class="shoper-field-group"><label>توضیح کوتاه</label>';
+				html += '<textarea id="shoper-p-short">' + this.esc(d.short_description || '') + '</textarea></div>';
 				html += '<div class="shoper-field-group"><label>عنوان سئو (Meta Title)</label>';
 				html += '<input type="text" id="shoper-p-seo-title" value="' + this.esc(seo.title) + '"></div>';
 				html += '<div class="shoper-field-group"><label>توضیح متا (Meta Description)</label>';
 				html += '<textarea id="shoper-p-seo-desc">' + this.esc(seo.description) + '</textarea></div>';
+				html += '<div class="shoper-field-group"><label>کلمه کلیدی اصلی</label>';
+				html += '<input type="text" id="shoper-p-focus" value="' + this.esc(seo.title) + '"></div>';
 				html += '<div class="shoper-field-group"><label>برچسب‌ها (جدا با ویرگول)</label>';
 				html += '<input type="text" id="shoper-p-tags" value="' + this.esc(seo.tags.join('، ')) + '"></div>';
-				html += '<p class="description">این مقادیر به‌عنوان برچسب محصول (product_tag) و متادیتای سئو ثبت می‌شوند؛ اگر Yoast نصب باشد متادیتای آن هم پر می‌شود.</p>';
+				html += '<p class="description">اگر Yoast یا Rank Math نصب باشد، عنوان، توضیح متا و کلمه کلیدی همان‌جا هم نوشته می‌شود.</p>';
 				html += '</div>';
 
 				// نوار پیشرفت.
@@ -784,6 +1171,9 @@
 					self.updateImgCount();
 				});
 				this.goStep('info');
+				if (this.cfg('aiAuto', 'yes') !== 'no' && this.cfg('aiEnabled', 'yes') !== 'no') {
+					this.queueEnhance(d, false);
+				}
 			}
 
 			// در متاباکس ویرایش محصول، دکمه‌ی «پر کردن» را نشان بده.
@@ -816,7 +1206,7 @@
 		 * @param {string} name info | images | seo
 		 */
 		goStep: function (name) {
-			var order = ['info', 'images', 'seo'];
+			var order = ['info', 'images', 'ai', 'review'];
 			var idx = order.indexOf(name);
 			if (idx < 0) idx = 0;
 			this.$preview.find('.shoper-step').removeClass('is-active is-done');
@@ -866,17 +1256,20 @@
 		 * @return {Object}
 		 */
 		buildSeo: function (d) {
-			var title = d.name1 || '';
+			var title = 'خرید ' + (d.name1 || '');
+			if (title.length > 60) { title = title.slice(0, 57) + '…'; }
+			if (title.length < 50) { title = (title + ' | مشخصات کامل').slice(0, 60); }
 			var parts = [];
 			if (d.name2) { parts.push(d.name2); }
 			var ks = d.key_specs || {};
 			var i = 0;
 			for (var k in ks) {
 				if (!ks.hasOwnProperty(k)) continue;
-				if (i++ >= 5) break;
-				parts.push(k + ': ' + ks[k]);
+				if (i++ >= 2) break;
+				parts.push(k + ' ' + ks[k]);
 			}
-			var desc = parts.join(' | ');
+			var desc = 'خرید ' + (d.name1 || '') + ' با مشخصات کامل، بررسی کارشناسی و تصاویر واقعی. ' + parts.join(' | ');
+			if (desc.length < 140) { desc += ' همین حالا مشخصات را ببینید و مقایسه کنید.'; }
 			if (desc.length > 155) { desc = desc.slice(0, 152) + '…'; }
 
 			var tags = [];
@@ -966,13 +1359,16 @@
 				more_info_url: $('#shoper-p-moreinfo').val(),
 				name: $('#shoper-p-name').val(),
 				description: $('#shoper-p-desc').val(),
+				short_description: $('#shoper-p-short').val() || '',
+				focus_keyword: $('#shoper-p-focus').val() || '',
 				specs: JSON.stringify(specs),
 				status: $('#shoper-create-status').val() || $('select#shoper-create-status').val() || 'draft',
 				selected_images: JSON.stringify(imgSel.selected || []),
 				featured_image: imgSel.featured || 0,
 				seo_title: seoTitle,
 				seo_desc: seoDesc,
-				tags: JSON.stringify(tags)
+				tags: JSON.stringify(tags),
+				product_json: this.currentData ? JSON.stringify(this.currentData) : ''
 			};
 
 			this.status(ShoperData.i18n.creating, 'loading');
@@ -1052,7 +1448,11 @@
 				featured_image: imgSel.featured || 0,
 				seo_title: seoTitle,
 				seo_desc: seoDesc,
-				tags: JSON.stringify(tags)
+				focus_keyword: $('#shoper-p-focus').val() || '',
+				description: $('#shoper-p-desc').val() || '',
+				short_description: $('#shoper-p-short').val() || '',
+				tags: JSON.stringify(tags),
+				product_json: this.currentData ? JSON.stringify(this.currentData) : ''
 			}, function (data) {
 				self.$fillBtn.prop('disabled', false);
 				self.showProgress('انجام شد!');
@@ -1069,11 +1469,18 @@
 
 		testConnection: function () {
 			var self = this;
-			this.$connResult.html('<span class="shoper-loading-inline"></span> در حال تست...');
-			this.ajax('shoper_test_connection', {}, function (data) {
-				self.$connResult.html('<span style="color:#00a32a;">✓ ' + self.esc(data.message) + '</span>');
-			}, function (info) {
-				self.$connResult.html('<span style="color:#d63638;">✗ ' + self.esc(info.message) + '</span>');
+			this.$connResult.html('<span class="shoper-loading-inline"></span> در حال تست مرورگر و سرور...');
+			this.browserFetch(this.torobSearchUrl('s25', 1)).done(function (raw) {
+				if (raw && raw.results) {
+					self.$connResult.html('<span style="color:#00a32a;">✓ اتصال از مرورگر شما برقرار است. همین حالا جستجو کنید.</span>');
+					return;
+				}
+				self.ajax('shoper_test_connection', {}, function (data) {
+					self.$connResult.html('<span style="color:#00a32a;">✓ ' + self.esc(data.message) + '</span>');
+				}, function (info) {
+					var msg = info.message || '';
+					self.$connResult.html('<span style="color:#dba617;">⚠ سرور مسدود است (' + self.esc(msg) + '). اگر جستجوی بالا هم نتیجه نداد، رله ایران را تنظیم کنید.</span>');
+				});
 			});
 		},
 
@@ -1091,8 +1498,11 @@
 			this.$diag.show().html('<div class="shoper-diag-loading"><span class="shoper-loading-inline"></span> در حال اجرای عیب‌یابی کامل… این کار چند ده ثانیه طول می‌کشد.</div>');
 
 			this.ajax('shoper_diagnostics', {}, function (data) {
-				self.$diagBtn.prop('disabled', false);
-				self.renderDiagnostics(data);
+				self.browserFetch(self.torobSearchUrl('s25', 2)).done(function (raw) {
+					self.$diagBtn.prop('disabled', false);
+					self.mergeBrowserDiag(data, raw);
+					self.renderDiagnostics(data);
+				});
 			}, function (info) {
 				self.$diagBtn.prop('disabled', false);
 				self.$diag.html('<div class="shoper-diag-error">خطا در اجرای عیب‌یابی: ' + self.esc(info.message) + '</div>');
@@ -1104,11 +1514,41 @@
 		 *
 		 * @param {Object} d گزارش.
 		 */
+		mergeBrowserDiag: function (d, raw) {
+			d.checks = d.checks || [];
+			var ok = !!(raw && raw.results && raw.results.length);
+			var check = {
+				id: 'browser',
+				label: 'مرورگر مدیر (مسیر اصلی افزونه ۱.۳)',
+				method: 'browser',
+				status: ok ? 'ok' : 'fail',
+				has_results: ok,
+				results_count: ok ? raw.results.length : 0,
+				note: ok
+					? 'مرورگر شما به ترب دسترسی دارد. جستجو را از کادر بالا انجام دهید؛ نیازی به سبز شدن تست سرور نیست.'
+					: 'مرورگر مستقیم JSON ترب را نخواند (معمولاً CORS). اگر درگاه پیش‌فرض در عیب‌یابی سرور موفق باشد، جستجو باید کار کند.'
+			};
+			d.checks.unshift(check);
+			d.summary = d.summary || {};
+			if (ok) {
+				d.summary.verdict = 'ok';
+				d.summary.message = 'سرور مسدود است اما مرورگر شما به ترب وصل شد. افزونه باید کار کند — در کادر جستجو نام محصول را بنویسید.';
+			} else if (d.summary.verdict === 'blocked' || d.summary.verdict === 'fail') {
+				d.summary.verdict = 'fail';
+				d.summary.message = 'مرورگر مستقیم به ترب نرسید. اگر درگاه پیش‌فرض در همین گزارش موفق است، در کادر بالا جستجو کنید.';
+			}
+			if (d.text) {
+				var line = '[ ' + (ok ? 'OK' : 'FAIL') + ' ] مرورگر مدیر — ' + check.note + '\n';
+				d.text = d.text.replace('[نتیجه‌ی کلی]', line + '\n[نتیجه‌ی کلی]');
+				d.text = d.text.replace(/\[نتیجه‌ی کلی\][^\n]*/, '[نتیجه‌ی کلی] ' + (d.summary.verdict || '').toUpperCase() + ' — ' + d.summary.message);
+			}
+		},
+
 		renderDiagnostics: function (d) {
 			var html = '';
 			var verdict = (d.summary && d.summary.verdict) || 'unknown';
-			var verdictLabel = { ok: 'اتصال برقرار است', warn: 'پاسخ غیرمعتبر', fail: 'اتصال برقرار نشد' }[verdict] || 'نامشخص';
-			var verdictColor = { ok: '#00a32a', warn: '#dba617', fail: '#d63638' }[verdict] || '#555';
+			var verdictLabel = { ok: 'افزونه می‌تواند کار کند', warn: 'پاسخ غیرمعتبر', fail: 'اتصال برقرار نشد', blocked: 'سرور مسدود است — از مرورگر استفاده کنید' }[verdict] || 'نامشخص';
+			var verdictColor = { ok: '#00a32a', warn: '#dba617', fail: '#d63638', blocked: '#dba617' }[verdict] || '#555';
 
 			html += '<div class="shoper-diag">';
 			html += '<div class="shoper-diag-summary" style="border:1px solid ' + verdictColor + ';color:' + verdictColor + ';">';
@@ -1203,6 +1643,319 @@
 		 */
 		diagRow: function (k, v) {
 			return '<tr><th>' + this.esc(k) + '</th><td>' + this.esc(v === undefined || v === null ? '—' : v) + '</td></tr>';
+		},
+
+		downloadRelay: function () {
+			var token = 'shoper-' + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6);
+			var php = [
+				'<?php',
+				'declare(strict_types=1);',
+				"header('X-Content-Type-Options: nosniff');",
+				"$TOKEN = '" + token + "';",
+				"$origin = isset($_SERVER['HTTP_ORIGIN']) ? (string) $_SERVER['HTTP_ORIGIN'] : '*';",
+				"header('Access-Control-Allow-Origin: ' . $origin);",
+				"header('Access-Control-Allow-Methods: GET, OPTIONS');",
+				"header('Access-Control-Allow-Headers: Accept, Content-Type');",
+				"header('Vary: Origin');",
+				"if ('OPTIONS' === strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'))) { http_response_code(204); exit; }",
+				"if ('GET' !== strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? ''))) { http_response_code(405); header('Content-Type: application/json; charset=utf-8'); echo '{\"error\":\"method\"}'; exit; }",
+				"$tok = isset($_GET['token']) ? (string) $_GET['token'] : '';",
+				"if ($TOKEN === '' || !hash_equals($TOKEN, $tok)) { http_response_code(403); echo '{\"error\":\"forbidden\"}'; exit; }",
+				"$target = isset($_GET['url']) ? (string) $_GET['url'] : '';",
+				"if ($target === '' || !preg_match('#^https://#i', $target)) { http_response_code(400); echo '{\"error\":\"url\"}'; exit; }",
+				"$host = parse_url($target, PHP_URL_HOST);",
+				"if (!is_string($host) || !preg_match('#(^|\\.)torob\\.(com|ir)$#i', $host)) { http_response_code(400); echo '{\"error\":\"host\"}'; exit; }",
+				"$ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';",
+				"$ch = curl_init($target);",
+				"curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER=>true,CURLOPT_FOLLOWLOCATION=>true,CURLOPT_MAXREDIRS=>3,CURLOPT_TIMEOUT=>25,CURLOPT_CONNECTTIMEOUT=>10,CURLOPT_USERAGENT=>$ua,CURLOPT_ENCODING=>'gzip, deflate',CURLOPT_SSL_VERIFYPEER=>true,CURLOPT_SSL_VERIFYHOST=>2,CURLOPT_HTTPHEADER=>['Accept: application/json','Referer: https://torob.com/','Origin: https://torob.com']]);",
+				"$body = curl_exec($ch); $code = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE); $ctype = (string) curl_getinfo($ch, CURLINFO_CONTENT_TYPE); curl_close($ch);",
+				"if ($body === false) { http_response_code(502); echo '{\"error\":\"upstream\"}'; exit; }",
+				"http_response_code($code > 0 ? $code : 200);",
+				"header('Content-Type: ' . ($ctype ?: 'application/json; charset=utf-8'));",
+				"echo $body;"
+			].join('\n');
+			var blob = new Blob([php], { type: 'application/x-httpd-php' });
+			var a = document.createElement('a');
+			a.href = URL.createObjectURL(blob);
+			a.download = 'shoper-relay.php';
+			a.click();
+			URL.revokeObjectURL(a.href);
+			var hint = 'https://YOUR-IRAN-HOST/shoper-relay.php?token=' + token;
+			var $field = $('#shoper-relay-url');
+			if ($field.length && !$field.val()) {
+				$field.val(hint);
+			}
+			alert('فایل رله دانلود شد. آن را روی هاست ایران آپلود کنید و در فیلد رله این آدرس را با دامنهٔ واقعی ذخیره کنید:\n' + hint);
+		},
+
+
+		stepOrder: function () {
+			return ['info', 'images', 'ai', 'review'];
+		},
+
+		currentStep: function () {
+			var $a = this.$preview.find('.shoper-step.is-active').first();
+			return $a.length ? String($a.data('step') || 'info') : 'info';
+		},
+
+		stepDelta: function (delta) {
+			var order = this.stepOrder();
+			var idx = order.indexOf(this.currentStep());
+			if (idx < 0) { idx = 0; }
+			idx = Math.max(0, Math.min(order.length - 1, idx + delta));
+			this.goStep(order[idx]);
+			if (order[idx] === 'ai' && this.currentData && !this._enhancedOnce) {
+				this.queueEnhance(this.currentData, false);
+			}
+		},
+
+		setAiStatus: function (msg, type) {
+			var $el = this.$preview.find('#shoper-ai-status');
+			if (!$el.length) { return; }
+			$el.removeClass('is-loading is-ok is-warn').addClass(type || '');
+			$el.html(type === 'is-loading' ? '<span class="shoper-loading-inline"></span> ' + this.esc(msg) : this.esc(msg));
+		},
+
+		applyEnhance: function (enh) {
+			if (!enh) { return; }
+			this._enhancedOnce = true;
+			this.lastEnhance = enh;
+			if (enh.description_html) {
+				$('#shoper-p-desc').val(enh.description_html);
+			}
+			if (enh.short_description) {
+				$('#shoper-p-short').val(enh.short_description);
+			}
+			if (enh.analysis) { $('#shoper-p-analysis').val(enh.analysis); }
+			if (enh.review) { $('#shoper-p-review').val(enh.review); }
+			if (enh.verdict) { $('#shoper-p-verdict').val(enh.verdict); }
+			if (enh.audience) { $('#shoper-p-audience').val(enh.audience); }
+			if (enh.seo_title) { $('#shoper-p-seo-title').val(enh.seo_title); }
+			if (enh.seo_desc) { $('#shoper-p-seo-desc').val(enh.seo_desc); }
+			if (enh.focus_keyword) { $('#shoper-p-focus').val(enh.focus_keyword); }
+			if (enh.tags && enh.tags.length) { $('#shoper-p-tags').val(enh.tags.join('، ')); }
+			var label = enh.provider_label || 'استودیوی نویسندگی خواجوی';
+			var extra = enh.fallback_reason ? ' — ' + enh.fallback_reason : '';
+			if (enh.verify_note) { extra += ' — ' + enh.verify_note; }
+			this.setAiStatus('آمادهٔ نظارت: ' + label + extra, extra ? 'is-warn' : 'is-ok');
+		},
+
+		buildAiPrompt: function (data, compact) {
+			data = data || {};
+			var lines = [];
+			lines.push('نام: ' + (data.name1 || ''));
+			lines.push('انگلیسی: ' + (data.name2 || ''));
+			var groups = data.spec_groups || [];
+			var maxG = compact ? 4 : 8;
+			var gi = 0;
+			groups.forEach(function (g) {
+				if (gi >= maxG || !g || !g.specs) return;
+				var bits = [];
+				var n = 0;
+				var maxN = compact ? 3 : 6;
+				for (var k in g.specs) {
+					if (!g.specs.hasOwnProperty(k) || n >= maxN) continue;
+					bits.push(k + ' ' + g.specs[k]);
+					n += 1;
+				}
+				if (bits.length) {
+					lines.push('گروه «' + (g.header || 'مشخصات') + '»: ' + bits.join('؛ '));
+					gi += 1;
+				}
+			});
+			if (!groups.length) {
+				var bag = Object.assign({}, data.key_specs || {}, data.specs || {});
+				var specs = [];
+				var i = 0;
+				var max = compact ? 12 : 24;
+				for (var key in bag) {
+					if (!bag.hasOwnProperty(key) || i >= max) continue;
+					specs.push(key + ': ' + bag[key]);
+					i += 1;
+				}
+				if (specs.length) lines.push('مشخصات: ' + specs.join('؛ '));
+			}
+			var source = String(data.description || '').replace(/\s+/g, ' ').slice(0, compact ? 280 : 900);
+			if (source) lines.push('متن منبع: ' + source);
+			var size = compact ? '۶ تا ۱۰ خط' : '۸ تا ۱۲ خط';
+			return 'نقش: نویسنده صفحه نقد و بررسی همین کالا.\n'
+				+ 'مرحله ۱: فقط دادهٔ منبع زیر را بخوان. اینترنت نداری؛ چیزی از بیرون اضافه نکن.\n'
+				+ 'مرحله ۲: برای هر عنوان نمونه، متن مخصوص همین کالا بنویس. نه خیلی بلند نه خیلی کوتاه؛ معرفی و تحلیل حدود ' + size + '. کالا ساده کوتاه‌تر.\n'
+				+ 'عنوان‌ها: intro=معرفی و بررسی محصول؛ highlights=ویژگی‌های برجسته؛ analysis=تحلیل و آنالیز فنی؛ verdict=نتیجه‌گیری و پیشنهاد خرید.\n'
+				+ 'لحن متقاعدکننده اما نامحسوس. شعار نزن. نظر مشتری نساز. مشخصه تازه اختراع نکن.\n'
+				+ 'مرحله ۳: خودت راستی‌آزمایی کن. اگر عدد یا ادعایی در منبع نیست حذفش کن. اگر مطمئن نیستی checked را false بگذار.\n'
+				+ 'سئو: seo_title بین ۵۰ تا ۶۰ نویسه و با خرید؛ seo_desc بین ۱۴۰ تا ۱۵۵ با ۲ مشخصه واقعی؛ focus_keyword دو تا چهار کلمه؛ tags هشت مورد.\n'
+				+ 'خروجی فقط JSON با کلیدهای: intro, highlights, analysis, pros, cons, verdict, seo_title, seo_desc, focus_keyword, tags, checked\n'
+				+ 'دادهٔ منبع همین کالا:\n' + lines.join('\n');
+		},
+
+		parseAiJson: function (text) {
+			if (!text) return null;
+			text = String(text).trim();
+			var fence = text.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
+			if (fence) text = fence[1];
+			var a = text.indexOf('{');
+			var b = text.lastIndexOf('}');
+			if (a < 0 || b <= a) return null;
+			try {
+				var obj = JSON.parse(text.slice(a, b + 1));
+				if (obj && (obj.analysis || obj.review || obj.seo_title || obj.intro)) return obj;
+			} catch (e) { return null; }
+			return null;
+		},
+
+		aiProviderList: function () {
+			var list = this.cfg('aiProviders', []);
+			if (Array.isArray(list) && list.length) {
+				return list;
+			}
+			return [
+				{ id: 'pollinations_get', label: 'Pollinations GPT-OSS', type: 'pollinations_get', url: 'https://text.pollinations.ai/', model: 'openai-fast' },
+				{ id: 'llm7_gptoss', label: 'LLM7 GPT-OSS 20B', type: 'openai', url: 'https://api.llm7.io/v1/chat/completions', model: 'gpt-oss:20b', key: 'unused' },
+				{ id: 'ovh_gptoss', label: 'OVH GPT-OSS 20B', type: 'openai', url: 'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/chat/completions', model: 'gpt-oss-20b' }
+			];
+		},
+
+		callAiProvider: function (provider, prompt) {
+			var dfd = $.Deferred();
+			if (!window.fetch || !provider) return dfd.resolve(null).promise();
+			var ctrl = window.AbortController ? new AbortController() : null;
+			var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 16000);
+			var opts = {
+				mode: 'cors',
+				credentials: 'omit',
+				signal: ctrl ? ctrl.signal : undefined
+			};
+			if (provider.type === 'pollinations_get') {
+				opts.method = 'GET';
+				opts.headers = { 'Accept': 'application/json, text/plain, */*' };
+				var url = String(provider.url || 'https://text.pollinations.ai/').replace(/\/+$/, '') + '/' + encodeURIComponent(prompt) + '?model=' + encodeURIComponent(provider.model || 'openai-fast');
+				fetch(url, opts).then(function (res) {
+					clearTimeout(timer);
+					if (!res.ok) return null;
+					return res.text();
+				}).then(function (text) {
+					dfd.resolve(text || null);
+				}).catch(function () {
+					clearTimeout(timer);
+					dfd.resolve(null);
+				});
+				return dfd.promise();
+			}
+			opts.method = 'POST';
+			opts.headers = { 'Accept': 'application/json', 'Content-Type': 'application/json' };
+			if (provider.key) {
+				opts.headers.Authorization = 'Bearer ' + provider.key;
+			}
+			opts.body = JSON.stringify({
+				model: provider.model || 'openai-fast',
+				messages: [
+					{ role: 'system', content: 'Three steps: read supplied source, write each sample heading for this product only, self-check. No internet. Do not invent specs or fake reviews. JSON only.' },
+					{ role: 'user', content: prompt }
+				],
+				temperature: 0.25,
+				max_tokens: 2600
+			});
+			fetch(provider.url, opts).then(function (res) {
+				clearTimeout(timer);
+				if (!res.ok) return null;
+				return res.text();
+			}).then(function (text) {
+				if (!text) { dfd.resolve(null); return; }
+				try {
+					var json = JSON.parse(text);
+					if (json && json.choices && json.choices[0] && json.choices[0].message) {
+						dfd.resolve(json.choices[0].message.content || null);
+						return;
+					}
+				} catch (e) { /* raw text */ }
+				dfd.resolve(text);
+			}).catch(function () {
+				clearTimeout(timer);
+				dfd.resolve(null);
+			});
+			return dfd.promise();
+		},
+
+		browserEnhance: function (data) {
+			var self = this;
+			var dfd = $.Deferred();
+			var list = this.aiProviderList();
+			var i = 0;
+			var next = function () {
+				if (i >= list.length) {
+					dfd.resolve(null, '');
+					return;
+				}
+				var provider = list[i++];
+				var compact = provider.type === 'pollinations_get';
+				self.callAiProvider(provider, self.buildAiPrompt(data, compact)).done(function (text) {
+					var parsed = self.parseAiJson(text);
+					if (parsed && (parsed.analysis || parsed.seo_title || parsed.intro)) {
+						dfd.resolve(parsed, provider);
+						return;
+					}
+					next();
+				});
+			};
+			next();
+			return dfd.promise();
+		},
+
+		queueEnhance: function (data, force) {
+			var self = this;
+			if (this.cfg('aiEnabled', 'yes') === 'no') { return; }
+			if (this._enhancing && !force) { return; }
+			this._enhancing = true;
+			this.setAiStatus((typeof ShoperData !== 'undefined' && ShoperData.i18n && ShoperData.i18n.enhancing) ? ShoperData.i18n.enhancing : 'در حال آماده‌سازی معرفی و بررسی…', 'is-loading');
+			var payload = data || this.currentData || {};
+			var finish = function (resp) {
+				self._enhancing = false;
+				self.applyEnhance(resp);
+			};
+			var keepStudio = function (msg) {
+				self._enhancing = false;
+				if (self.lastEnhance) {
+					self.setAiStatus(msg || 'مدل ابری قطع بود؛ متن کامل استودیو باقی ماند.', 'is-warn');
+				} else {
+					self.setAiStatus(msg || 'بازنویسی ناموفق بود؛ متن منبع باقی ماند.', 'is-warn');
+				}
+			};
+			var tryCloud = function () {
+				self.browserEnhance(payload).done(function (parsed, provider) {
+					if (parsed) {
+						self.ajax('shoper_enhance', {
+							product_json: JSON.stringify(payload),
+							remote_json: JSON.stringify(parsed),
+							remote_provider: provider && provider.label ? provider.label : 'browser'
+						}, finish, function () {
+							self.ajax('shoper_enhance', {
+								product_json: JSON.stringify(payload),
+								mode: 'remote'
+							}, finish, function (info) {
+								keepStudio(info && info.message);
+							});
+						});
+						return;
+					}
+					self.ajax('shoper_enhance', {
+						product_json: JSON.stringify(payload),
+						mode: 'remote'
+					}, finish, function (info) {
+						keepStudio(info && info.message);
+					});
+				});
+			};
+			this.ajax('shoper_enhance', {
+				product_json: JSON.stringify(payload),
+				mode: 'studio'
+			}, function (resp) {
+				self.applyEnhance(resp);
+				self.setAiStatus('معرفی آماده شد؛ در حال تقویت با مدل ابری رایگان…', 'is-loading');
+				tryCloud();
+			}, function () {
+				tryCloud();
+			});
 		},
 
 		esc: function (str) {

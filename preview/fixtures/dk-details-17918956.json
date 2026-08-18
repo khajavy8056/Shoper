@@ -1,0 +1,74 @@
+{
+  "status": 200,
+  "data": {
+    "product": {
+      "id": 17918956,
+      "title_fa": "گوشی موبایل سامسونگ مدل Galaxy S25 Ultra دو سیم کارت ظرفیت 256 گیگابایت و رم 12 گیگابایت - پک ویتنام",
+      "title_en": "Samsung Galaxy S25 Ultra Dual SIM 256GB And 12GB RAM Mobile Phone - Vietnam Pack",
+      "url": { "uri": "/product/dkp-17918956/galaxy-s25-ultra" },
+      "status": "marketable",
+      "brand": { "title_fa": "سامسونگ" },
+      "images": {
+        "main": {
+          "url": ["https://dkstatics-public.digikala.com/digikala-products/s25u-main.jpg"]
+        },
+        "list": [
+          { "url": ["https://dkstatics-public.digikala.com/digikala-products/s25u-1.jpg"] },
+          { "url": ["https://dkstatics-public.digikala.com/digikala-products/s25u-2.jpg"] },
+          { "url": ["https://dkstatics-public.digikala.com/digikala-products/s25u-3.jpg"] }
+        ]
+      },
+      "default_variant": { "price": { "selling_price": 1421900000 } },
+      "review": {
+        "description": "گلکسی S25 اولترا پرچمدار سامسونگ با نمایشگر بزرگ، دوربین چندگانه و بدنه مقاوم است. مناسب کاربرانی که مشخصات کامل و تصاویر واضح می‌خواهند."
+      },
+      "specifications": [
+        {
+          "title": "مشخصات کلی",
+          "attributes": [
+            { "title": "ابعاد", "values": ["162.8×77.6×8.2 میلی‌متر"] },
+            { "title": "وزن", "values": ["218 گرم"] },
+            { "title": "تعداد سیم کارت", "values": ["دو سیم کارت"] }
+          ]
+        },
+        {
+          "title": "پردازنده",
+          "attributes": [
+            { "title": "تراشه", "values": ["Snapdragon 8 Elite"] },
+            { "title": "پردازنده مرکزی", "values": ["8 هسته‌ای"] }
+          ]
+        },
+        {
+          "title": "حافظه",
+          "attributes": [
+            { "title": "حافظه داخلی", "values": ["256 گیگابایت"] },
+            { "title": "مقدار RAM", "values": ["12 گیگابایت"] }
+          ]
+        },
+        {
+          "title": "صفحه نمایش",
+          "attributes": [
+            { "title": "اندازه صفحه نمایش", "values": ["6.9 اینچ"] },
+            { "title": "نوع صفحه نمایش", "values": ["Dynamic AMOLED 2X"] },
+            { "title": "نرخ نوسازی تصویر", "values": ["120 هرتز"] }
+          ]
+        },
+        {
+          "title": "دوربین",
+          "attributes": [
+            { "title": "دوربین اصلی", "values": ["200 مگاپیکسل"] },
+            { "title": "دوربین سلفی", "values": ["12 مگاپیکسل"] }
+          ]
+        },
+        {
+          "title": "سایر مشخصات",
+          "attributes": [
+            { "title": "سیستم عامل", "values": ["Android"] },
+            { "title": "ظرفیت باتری", "values": ["5000 میلی‌آمپرساعت"] },
+            { "title": "گواهی ضدآب", "values": ["IP68"] }
+          ]
+        }
+      ]
+    }
+  }
+}

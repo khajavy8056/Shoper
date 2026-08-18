@@ -146,6 +146,11 @@ function filterFixtureSearch(normalized, query) {
 }
 
 async function getDetails(prk, searchId, mode) {
+	if (String(prk || '').indexOf('DKP-') === 0 || /^\d{4,}$/.test(String(prk || ''))) {
+		const raw = await readFixture('dk-details-17918956.json');
+		const data = logic.normalizeDigikalaDetails(raw);
+		return { data, source: 'fixture', note: '' };
+	}
 	if (mode !== 'fixture') {
 		try {
 			const raw = await torobFetch('/v4/base-product/details/', {
@@ -231,6 +236,9 @@ const handlers = {
 				price: item.price,
 				price_text: item.price_text,
 				shop_text: item.shop_text,
+				more_info_url: item.more_info_url || '',
+				gallery: item.gallery || [],
+				page_url: item.page_url || '',
 			});
 			if (suggestions.length >= 8) break;
 		}
@@ -253,6 +261,57 @@ const handlers = {
 			const out = await getSearch(query, mode);
 			if (!out.data.results.length) return fail(res, 'نتیجه‌ای برای این عبارت یافت نشد.');
 			ok(res, { ...out.data, _source: out.source, _note: out.note });
+		} catch (err) {
+			fail(res, err.message);
+		}
+	},
+
+	async shoper_ingest(params, res) {
+		const kind = (params.get('kind') || 'details').trim();
+		let raw = params.get('raw') || '';
+		let decoded = null;
+		try { decoded = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch (e) { decoded = null; }
+		if (!decoded || typeof decoded !== 'object') return fail(res, 'دادهٔ دریافتی از مرورگر قابل پردازش نیست.');
+
+		try {
+			if (kind === 'dk_search') {
+				const data = logic.normalizeDigikalaSearch(decoded);
+				return ok(res, { ...data, _source: 'browser' });
+			}
+			if (kind === 'dk_details') {
+				const data = logic.normalizeDigikalaDetails(decoded);
+				data.aggregate = logic.aggregate([], 3, 'score');
+				data.description_html = logic.buildDescriptionHtml(data);
+				data._source = 'browser';
+				return ok(res, data);
+			}
+			if (kind === 'search') {
+				const data = logic.normalizeSearch(decoded);
+				return ok(res, { ...data, _source: 'browser' });
+			}
+			if (kind === 'search_item') {
+				const item = decoded.name1 ? decoded : (logic.normalizeSearch({ results: [decoded] }).results[0] || {});
+				const data = {
+					...item,
+					description: '',
+					specs: {},
+					key_specs: {},
+					sellers: [],
+					sellers_count: 0,
+					partial: true,
+					gallery: item.gallery && item.gallery.length ? item.gallery : (item.image_url ? [item.image_url] : []),
+				};
+				data.aggregate = logic.aggregate([], 3, 'score');
+				data.description_html = logic.buildDescriptionHtml(data);
+				data._source = 'partial';
+				return ok(res, data);
+			}
+			const data = logic.normalizeDetails(decoded);
+			data.aggregate = logic.aggregate(data.sellers, 3, 'score');
+			if (data.aggregate.price) data.price = data.aggregate.price;
+			data.description_html = logic.buildDescriptionHtml(data);
+			data._source = 'browser';
+			return ok(res, data);
 		} catch (err) {
 			fail(res, err.message);
 		}
@@ -295,6 +354,65 @@ const handlers = {
 	 * همان چیزی که افزونه در دیتابیس می‌نویسد را برمی‌گرداند تا قبل از
 	 * نصب روی سایت بتوانید نتیجه را بازبینی کنید.
 	 */
+	async shoper_enhance(params, res) {
+		let data = null;
+		const productJson = params.get('product_json') || '';
+		if (productJson) {
+			try { data = JSON.parse(productJson); } catch (e) { data = null; }
+		}
+		if (!data || (!data.random_key && !data.name1)) {
+			return fail(res, 'دادهٔ محصول برای بازنویسی ناقص است.');
+		}
+		try {
+			const enh = logic.enhanceProduct(data);
+			const remoteRaw = params.get('remote_json') || '';
+			if (remoteRaw) {
+				try {
+					const remote = JSON.parse(remoteRaw);
+					if (remote && typeof remote === 'object') {
+					const rejected = (remote.checked === false || remote.checked === 'false' || remote.checked === 0);
+					if (!rejected) {
+						['review', 'audience', 'verdict', 'seo_title', 'seo_desc', 'focus_keyword'].forEach((k) => {
+							if (remote[k] && String(remote[k]).length > 18) {
+								const cleaned = logic.factCheck(String(remote[k]), data);
+								if (cleaned) enh[k] = cleaned;
+							}
+						});
+						if (remote.intro && String(remote.intro).length > 40) {
+							const intro = logic.factCheck(remote.intro, data);
+							if (intro.length >= 40) enh.analysis = intro;
+						}
+						if (Array.isArray(remote.highlights)) {
+							const hs = logic.filterClaims(remote.highlights, data);
+							if (hs.length) enh.highlights = hs;
+						}
+						if (remote.analysis) {
+							const tech = logic.factCheck(remote.analysis, data);
+							if (tech.length >= 40) enh.tech_analysis = tech;
+						}
+					} else {
+						enh.verify_note = 'مدل خودش مطمئن نبود؛ متن استودیو از مشخصات منبع ماند.';
+					}
+					if (Array.isArray(remote.tags) && remote.tags.length) enh.tags = remote.tags.slice(0, 12);
+					if (Array.isArray(remote.faq) && remote.faq.length) enh.faq = remote.faq.slice(0, 5);
+					enh.description_html = logic.assembleProductHtml(data, enh.analysis, enh.highlights || [], enh.faq || [], {
+						pros: enh.pros || [],
+						cons: enh.cons || [],
+						analysis: enh.tech_analysis || '',
+						verdict: enh.verdict || '',
+					});
+					enh.provider = params.get('remote_provider') || 'browser';
+					enh.provider_label = (enh.provider) + ' + استودیو خواجوی';
+					enh.remote = true;
+					}
+				} catch (e) { /* keep studio */ }
+			}
+			return ok(res, enh);
+		} catch (err) {
+			return fail(res, err.message);
+		}
+	},
+
 	async shoper_create(params, res) {
 		const prk = (params.get('prk') || '').trim();
 		if (!prk) return fail(res, 'شناسه محصول نامعتبر است.');
@@ -330,10 +448,24 @@ const handlers = {
 		} catch (e) { /* ignore */ }
 
 		try {
-			const out = await getDetails(prk, params.get('search_id') || '', mode);
-			const data = out.data;
+			let out = { source: 'fixture' };
+			let data = null;
+			const productJson = params.get('product_json') || '';
+			if (productJson) {
+				try {
+					const parsed = JSON.parse(productJson);
+					if (parsed && (parsed.random_key || parsed.name1)) {
+						data = parsed;
+						out.source = parsed._source || 'payload';
+					}
+				} catch (e) { /* fall through */ }
+			}
+			if (!data) {
+				out = await getDetails(prk, params.get('search_id') || '', mode);
+				data = out.data;
+			}
 
-			data.aggregate = logic.aggregate(data.sellers, limit, strategy);
+			data.aggregate = data.aggregate || logic.aggregate(data.sellers || [], limit, strategy);
 			if (data.aggregate.price) data.price = data.aggregate.price;
 			if (nameOverride) data.name1 = nameOverride;
 
@@ -372,7 +504,7 @@ const handlers = {
 				product: {
 					name: data.name1,
 					status,
-					sku: 'TRB-' + data.random_key,
+					sku: (String(data.random_key || '').indexOf('DKP-') === 0 || String(data.random_key || '').indexOf('TRB-') === 0) ? data.random_key : ('TRB-' + data.random_key),
 					regular_price: data.price,
 					short_description: logic.buildShortDescription(data),
 					description,
@@ -487,7 +619,7 @@ const handlers = {
 					short_description: shortDescription,                // ← تب «توضیح کوتاه»
 					description,                                        // ← تب «توضیحات»
 					regular_price: data.price,                          // ← فیلد قیمت عادی (General)
-					sku: 'TRB-' + data.random_key,                      // ← فیلد SKU (Inventory)
+					sku: (String(data.random_key || '').indexOf('DKP-') === 0 || String(data.random_key || '').indexOf('TRB-') === 0) ? data.random_key : ('TRB-' + data.random_key),
 					attributes: built.attrs,                            // ← تب «ویژگی‌ها»
 					images: {
 						featured: keptUrls[0] || '',                     // ← تصویر شاخص
@@ -617,13 +749,13 @@ const server = http.createServer(async (req, res) => {
 	}
 
 	// --- دانلود آخرین نسخه‌ی افزونه (ZIP) ---
-	if (pathname === '/download/latest' || pathname === '/download/shoper-torob-importer-1.2.1.zip') {
-		const zip = path.join(ROOT, 'build', 'shoper-torob-importer-1.2.1.zip');
+	if (pathname === '/download/latest' || pathname === '/download/shoper-torob-importer-1.5.7.zip') {
+		const zip = path.join(ROOT, 'dist', 'shoper-torob-importer-1.5.7.zip');
 		try {
 			const data = await fsp.readFile(zip);
 			res.writeHead(200, {
 				'Content-Type': 'application/zip',
-				'Content-Disposition': 'attachment; filename="shoper-torob-importer-1.2.1.zip"',
+				'Content-Disposition': 'attachment; filename="shoper-torob-importer-1.5.7.zip"',
 				'Content-Length': data.length,
 				'Cache-Control': 'no-store',
 			});

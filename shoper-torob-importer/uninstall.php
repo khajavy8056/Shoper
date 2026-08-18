@@ -21,6 +21,12 @@ $options = array(
 	'shoper_price_behavior',
 	'shoper_user_agent',
 	'shoper_request_timeout',
+	'shoper_catalog_source',
+	'shoper_ai_enabled',
+	'shoper_ai_auto',
+	'shoper_ai_rotation',
+	'shoper_relay_url',
+	'shoper_fetch_mode',
 );
 foreach ( $options as $opt ) {
 	delete_option( $opt );

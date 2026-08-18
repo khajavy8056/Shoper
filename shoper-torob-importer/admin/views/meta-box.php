@@ -16,9 +16,8 @@ $is_new_product = ( $post_id && 'auto-draft' === get_post_status( $post_id ) ) |
 ?>
 <div class="shoper-metabox">
 	<p class="shoper-hint">
-		بخشی از نام محصول را بنویسید — <strong>لازم نیست نام کامل را بدانید</strong>؛
-		نام‌های کامل به‌صورت کشویی پیشنهاد می‌شوند. سپس عنوان، توضیحات، تصاویر و
-		<strong>همه‌ی مشخصات فنی به‌صورت ویژگی‌های مجزا</strong> برای این محصول پر می‌شود.
+		نام محصول را بنویسید. Shoper Studio مشخصات، تصاویر، تحلیل کارشناسی و سئو را آماده می‌کند؛
+		<strong>شما ناظر نهایی</strong> هستید. هر مشخصه یک ویژگی جدا در ووکامرس می‌شود.
 	</p>
 
 	<div class="shoper-field">
@@ -45,7 +44,7 @@ $is_new_product = ( $post_id && 'auto-draft' === get_post_status( $post_id ) ) |
 	</div>
 
 	<button type="button" class="button button-primary" id="shoper-search-btn">
-		🔍 جستجو در ترب
+		جستجو در کاتالوگ
 	</button>
 
 	<div id="shoper-results" class="shoper-results" style="display:none;"></div>

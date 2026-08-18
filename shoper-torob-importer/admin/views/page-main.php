@@ -12,37 +12,68 @@ if ( ! defined( 'ABSPATH' ) ) {
 // ذخیره‌ی تنظیمات.
 if ( isset( $_POST['shoper_save_settings'] ) && check_admin_referer( 'shoper_settings' ) ) {
 	$options = array(
-		'shoper_data_source'    => isset( $_POST['data_source'] ) ? sanitize_text_field( wp_unslash( $_POST['data_source'] ) ) : 'direct',
+		'shoper_data_source'    => isset( $_POST['data_source'] ) ? sanitize_text_field( wp_unslash( $_POST['data_source'] ) ) : 'auto',
+		'shoper_catalog_source' => isset( $_POST['catalog_source'] ) ? sanitize_text_field( wp_unslash( $_POST['catalog_source'] ) ) : 'auto',
 		'shoper_product_status' => isset( $_POST['product_status'] ) ? sanitize_text_field( wp_unslash( $_POST['product_status'] ) ) : 'draft',
 		'shoper_import_gallery' => isset( $_POST['import_gallery'] ) ? 'yes' : 'no',
 		'shoper_price_behavior' => isset( $_POST['price_behavior'] ) ? sanitize_text_field( wp_unslash( $_POST['price_behavior'] ) ) : 'cheapest',
 		'shoper_proxy_url'      => isset( $_POST['proxy_url'] ) ? esc_url_raw( wp_unslash( $_POST['proxy_url'] ) ) : '',
+		'shoper_relay_url'      => isset( $_POST['relay_url'] ) ? esc_url_raw( wp_unslash( $_POST['relay_url'] ) ) : '',
+		'shoper_fetch_mode'     => isset( $_POST['fetch_mode'] ) ? sanitize_text_field( wp_unslash( $_POST['fetch_mode'] ) ) : 'auto',
+		'shoper_use_default_gateways' => isset( $_POST['use_default_gateways'] ) ? 'yes' : 'no',
+		'shoper_extra_gateways' => isset( $_POST['extra_gateways'] ) ? sanitize_textarea_field( wp_unslash( $_POST['extra_gateways'] ) ) : '',
 		'shoper_debug'         => isset( $_POST['debug'] ) ? '1' : '',
+		'shoper_ai_enabled'    => isset( $_POST['ai_enabled'] ) ? 'yes' : 'no',
+		'shoper_ai_auto'       => isset( $_POST['ai_auto'] ) ? 'yes' : 'no',
 	);
 	foreach ( $options as $k => $v ) {
 		update_option( $k, $v );
 	}
+	if ( isset( $_POST['hf_token'] ) ) {
+		$hf_in = sanitize_text_field( wp_unslash( $_POST['hf_token'] ) );
+		if ( '' !== $hf_in ) {
+			update_option( 'shoper_hf_token', $hf_in );
+		}
+	}
 	echo '<div class="notice notice-success is-dismissible"><p>تنظیمات ذخیره شد.</p></div>';
 }
 
-$data_source    = get_option( 'shoper_data_source', 'direct' );
+$data_source    = get_option( 'shoper_data_source', 'auto' );
+$catalog_source = get_option( 'shoper_catalog_source', 'auto' );
 $product_status = get_option( 'shoper_product_status', 'draft' );
 $import_gallery = get_option( 'shoper_import_gallery', 'yes' );
 $price_behavior = get_option( 'shoper_price_behavior', 'cheapest' );
 $proxy_url = get_option( 'shoper_proxy_url', '' );
+$relay_url = get_option( 'shoper_relay_url', '' );
+$fetch_mode = get_option( 'shoper_fetch_mode', 'auto' );
+$use_default_gateways = get_option( 'shoper_use_default_gateways', 'yes' );
+$extra_gateways = get_option( 'shoper_extra_gateways', '' );
 $shoper_debug = get_option( 'shoper_debug', '' );
+$ai_enabled = get_option( 'shoper_ai_enabled', 'yes' );
+$ai_auto = get_option( 'shoper_ai_auto', 'yes' );
+$hf_token = get_option( 'shoper_hf_token', '' );
 ?>
 <div class="wrap shoper-wrap" dir="rtl">
-	<h1 class="wp-heading-inline">🛒 Shoper — درون‌ریز محصول از ترب</h1>
+	<div class="shoper-brand">
+		<div class="shoper-brand-mark" aria-hidden="true">S</div>
+		<div class="shoper-brand-text">
+			<h1 class="wp-heading-inline">Shoper Studio</h1>
+			<p class="shoper-brand-tag">سازنده هوشمند محصول ووکامرس — از نام تا صفحه فروش، با نظارت شما</p>
+			<p class="shoper-brand-author">طراحی و توسعه: <strong>خواجوی</strong> · نسخه <?php echo esc_html( SHOPER_VERSION ); ?></p>
+		</div>
+	</div>
 	<hr class="wp-header-end">
 
 	<div class="shoper-layout">
 		<div class="shoper-main-col">
 			<div class="shoper-card">
-				<h2>۱. جستجوی محصول در ترب</h2>
+				<h2>۱. جستجوی محصول</h2>
 				<p class="description">
-					نام محصول را بنویسید تا از ترب پیدا کنیم. می‌توانید لینک مستقیم محصول ترب را هم بچسبانید.
+					نام محصول را بنویسید. کاتالوگ، تصاویر، مشخصات و بعد معرفی و بررسی آماده می‌شود؛ شما ناظر نهایی هستید.
 				</p>
+				<div class="notice notice-info inline" style="margin:10px 0 0;">
+					<p>نام محصول را بنویسید. افزونه اول از <strong>دیجی‌کالا</strong> مشخصات، توضیحات و تصاویر کامل می‌گیرد (هر مشخصه یک ویژگی ووکامرس). اگر لازم شد سراغ ترب می‌رود. لینک <code>digikala.com/product/dkp-…</code> هم قبول است.</p>
+				</div>
 
 				<div class="shoper-field shoper-mode-toggle">
 					<label><input type="radio" name="shoper_mode" value="query" checked> جستجو با نام</label>
@@ -63,10 +94,9 @@ $shoper_debug = get_option( 'shoper_debug', '' );
 			</div>
 
 			<div class="shoper-card" id="shoper-preview-card" style="display:none;">
-				<h2>۲. پیش‌نمایش و ویرایش</h2>
+				<h2>۲. پیش‌نمایش، معرفی و بررسی، نظارت</h2>
 				<p class="description">
-					اطلاعات دریافت‌شده از ترب را بررسی کنید. می‌توانید قبل از ساخت، عنوان و توضیحات را ویرایش کنید
-					و تیک مشخصات فنی‌ که می‌خواهید به‌عنوان ویژگی اضافه شوند را بزنید.
+					مرحله‌ها: اطلاعات → تصاویر → معرفی و بررسی → نظارت شما روی متن و سئو.
 				</p>
 				<div id="shoper-preview"></div>
 
@@ -78,8 +108,10 @@ $shoper_debug = get_option( 'shoper_debug', '' );
 							<option value="pending" <?php selected( $product_status, 'pending' ); ?>>در انتظار بررسی</option>
 						</select>
 					</label>
+					<button type="button" class="button" id="shoper-prev-step">مرحله قبل</button>
+					<button type="button" class="button" id="shoper-next-step">مرحله بعد</button>
 					<button type="button" class="button button-primary button-hero" id="shoper-create-btn">
-						✅ ساخت محصول در ووکامرس
+						تأیید ناظر و ساخت محصول
 					</button>
 				</div>
 			</div>
@@ -94,13 +126,46 @@ $shoper_debug = get_option( 'shoper_debug', '' );
 						<tr>
 							<th>منبع داده</th>
 							<td>
-								<select name="data_source">
-									<option value="direct" <?php selected( $data_source, 'direct' ); ?>>API مستقیم ترب</option>
-									<option value="mock" <?php selected( $data_source, 'mock' ); ?>>داده نمونه (آزمایشی)</option>
+								<select name="catalog_source">
+									<option value="auto" <?php selected( $catalog_source, 'auto' ); ?>>خودکار (دیجی‌کالا، بعد ترب)</option>
+									<option value="digikala" <?php selected( $catalog_source, 'digikala' ); ?>>فقط دیجی‌کالا</option>
+									<option value="torob" <?php selected( $catalog_source, 'torob' ); ?>>فقط ترب</option>
+									<option value="mock" <?php selected( $catalog_source, 'mock' ); ?>>داده نمونه</option>
 								</select>
+								<input type="hidden" name="data_source" value="auto">
 							</td>
 						</tr>
-						<tr><th>پروکسی ترب</th><td><input type="url" class="regular-text" name="proxy_url" value="<?php echo esc_attr( $proxy_url ); ?>" placeholder="http://user:pass@proxy.example:8080"><p class="description">اختیاری؛ برای خطای 490 از پروکسی خروجی مناسب استفاده کنید.</p></td></tr>
+						<tr>
+							<th>روش دریافت از ترب</th>
+							<td>
+								<select name="fetch_mode">
+									<option value="auto" <?php selected( $fetch_mode, 'auto' ); ?>>خودکار (مرورگر، بعد سرور)</option>
+									<option value="browser" <?php selected( $fetch_mode, 'browser' ); ?>>فقط مرورگر (هاست مسدود / خارج)</option>
+									<option value="server" <?php selected( $fetch_mode, 'server' ); ?>>فقط سرور</option>
+									<option value="relay" <?php selected( $fetch_mode, 'relay' ); ?>>رله ایران</option>
+								</select>
+								<p class="description">اگر عیب‌یابی سرور کد ۴۹۰ داد نگران نباشید؛ آن فقط IP هاست را می‌سنجد. جستجو را از کادر بالا امتحان کنید.</p>
+							</td>
+						</tr>
+						<tr>
+							<th>درگاه پیش‌فرض</th>
+							<td>
+								<label><input type="checkbox" name="use_default_gateways" value="yes" <?php checked( $use_default_gateways, 'yes' ); ?>>
+									استفاده از درگاه تست‌شده (CORS.SH) وقتی ترب IP هاست را مسدود کند
+								</label>
+								<p class="description">فقط درگاهی که در تست زنده JSON ترب برگرداند به‌صورت پیش‌فرض فعال است. پروکسی‌های باز تصادفی اضافه نشدند چون قابل اعتماد و امن نبودند.</p>
+							</td>
+						</tr>
+						<tr>
+							<th>درگاه سفارشی</th>
+							<td>
+								<textarea class="large-text" rows="3" name="extra_gateways" placeholder="https://your-gateway.example/&#10;https://other.example/?url={url}"><?php echo esc_textarea( $extra_gateways ); ?></textarea>
+								<p class="description">اختیاری؛ هر خط یک پیشوند یا الگو با <code>{url}</code>.</p>
+							</td>
+						</tr>
+						<tr><th>پروکسی خروجی</th><td><input type="url" class="regular-text" name="proxy_url" value="<?php echo esc_attr( $proxy_url ); ?>" placeholder="http://user:pass@proxy.example:8080"><p class="description">پروکسی HTTP CONNECT اختیاری. فقط اگر خودتان پروکسی معتبر دارید پر کنید.</p></td></tr>
+						<tr><th>آدرس رله ایران</th><td><input type="url" class="regular-text" name="relay_url" id="shoper-relay-url" value="<?php echo esc_attr( $relay_url ); ?>" placeholder="https://your-iran-host.com/shoper-relay.php?token=..."><p class="description">اگر جستجو از مرورگر هم کار نکرد، فایل <code>tools/shoper-relay.php</code> را روی یک هاست ایران بگذارید و آدرسش را اینجا ذخیره کنید.</p>
+							<p><button type="button" class="button" id="shoper-download-relay">دانلود فایل رله</button></p></td></tr>
 						<tr>
 							<th>لاگ اشکال‌زدایی</th>
 							<td>
@@ -136,6 +201,22 @@ $shoper_debug = get_option( 'shoper_debug', '' );
 								</label>
 							</td>
 						</tr>
+						<tr>
+							<th>معرفی و بررسی</th>
+							<td>
+								<label><input type="checkbox" name="ai_enabled" value="yes" <?php checked( $ai_enabled, 'yes' ); ?>>
+									فعال — معرفی کوتاه از منبع و مشخصات با Pollinations + LLM7 + OVH
+								</label>
+								<label style="display:block;margin-top:8px;"><input type="checkbox" name="ai_auto" value="yes" <?php checked( $ai_auto, 'yes' ); ?>>
+									بعد از دریافت محصول، معرفی و بررسی شروع شود
+								</label>
+								<p class="description" style="margin-top:8px;">مدل اول دادهٔ منبع همین کالا را می‌گیرد، برای هر عنوان نمونه حدود ده خط می‌نویسد، بعد راستی‌آزمایی می‌کند. مدل از فروشگاه به اینترنت دسترسی ندارد. اگر قطع باشد یا ادعای تازه بسازد، <strong>استودیوی خواجوی</strong> همان قالب را از مشخصات منبع پر می‌کند.</p>
+								<p style="margin-top:8px;"><label>توکن اختیاری Hugging Face<br>
+									<input type="password" class="regular-text" name="hf_token" value="<?php echo esc_attr( $hf_token ); ?>" autocomplete="off" placeholder="hf_… فقط اگر خودتان دارید">
+								</label></p>
+								<p class="description">Hugging Face در ۲۰۲۶ بدون توکن Hub کار نمی‌کند. اگر حساب رایگان دارید توکن را اینجا بگذارید؛ لازم نیست.</p>
+							</td>
+						</tr>
 					</table>
 					<p><button type="submit" name="shoper_save_settings" class="button">ذخیره تنظیمات</button></p>
 				</form>
@@ -152,10 +233,12 @@ $shoper_debug = get_option( 'shoper_debug', '' );
 			<div class="shoper-card shoper-help">
 				<h3>راهنما</h3>
 				<ul>
-					<li>تصاویر ابتدا در <strong>کتابخانه‌ی رسانه‌ی</strong> وردپرس ذخیره و سپس به محصول وصل می‌شوند.</li>
-					<li>هر مشخصه‌ی فنی مانند «پردازنده»، «وزن» و «نوع شنا» به‌صورت <strong>یک ویژگی مجزا</strong> در تب ویژگی‌ها ثبت می‌شود.</li>
-					<li>برای جلوگیری از تکرار، SKU محصول برابر با <code>TRB-{random_key}</code> قرار می‌گیرد.</li>
-					<li>پیش‌فرض محصول به‌صورت پیش‌نویس ساخته می‌شود تا قبل از انتشار بررسی کنید.</li>
+					<li>جریان کار: <strong>نام</strong> → <strong>تصاویر</strong> → <strong>مرتب‌سازی متن منبع</strong> → <strong>نظارت شما</strong>.</li>
+					<li>هوش مصنوعی محتوا نمی‌سازد؛ متن دیجی‌کالا را تمیز، پاراگراف‌بندی و در صورت نقص از مشخصات واقعی کامل می‌کند.</li>
+					<li>هر مشخصه به‌صورت <strong>یک ویژگی مجزا</strong> در تب ویژگی‌های ووکامرس ثبت می‌شود.</li>
+					<li>تصاویر در <strong>کتابخانه رسانه</strong> با نام محصول ذخیره می‌شوند.</li>
+					<li>محصول پیش‌فرض پیش‌نویس است تا ناظر قبل از انتشار تأیید کند.</li>
+					<li>طراحی و توسعه: <strong>خواجوی</strong>.</li>
 				</ul>
 			</div>
 		</aside>

@@ -3,7 +3,7 @@
 
 # Allow the published install packages under dist/
 !dist/
-dist/*.zip
+!dist/*.zip
 
 # OS files
 .DS_Store

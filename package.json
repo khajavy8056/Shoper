@@ -1,6 +1,16 @@
 {
   "name": "shoper-torob-importer",
-  "version": "1.2.2",
+  "version": "1.5.7",
   "private": true,
-  "scripts": { "build": "node scripts/build.js" }
+  "scripts": {
+    "build": "node scripts/build.js",
+    "preview": "node preview/server/server.js",
+    "test": "node preview/test-ui.js",
+    "test:editor": "node preview/test-editor.js",
+    "verify": "node preview/verify-create.js",
+    "test:v13": "node tools/shoper-v13-node-test.js"
+  },
+  "devDependencies": {
+    "jsdom": "^24.1.0"
+  }
 }

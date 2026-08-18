@@ -446,6 +446,40 @@ if ( ! function_exists( 'curl_init' ) ) {
 	skip( '19. no-curl', 'cURL موجود است؛ این تست فقط در PHP بدون cURL اجرا می‌شود' );
 }
 
+/* 21) ingest + relay + payload ----------------------------------------------- */
+reset_state();
+$raw_search = json_decode(search_body(2, 'گوشی تست'), true);
+$ing = $client->ingest_search($raw_search);
+check('21. ingest_search: نتایج نرمال می‌شوند', ! is_wp_error($ing) && 2 === count($ing['results']));
+$ing_bad = $client->ingest_search(array('foo' => 1));
+check('21b. ingest_search: ساختار نامعتبر خطا است', is_wp_error($ing_bad) && 'invalid_response' === $ing_bad->get_error_code());
+
+$raw_details = json_decode(details_body(), true);
+$ingd = $client->ingest_details($raw_details);
+check('21c. ingest_details: جزئیات نرمال می‌شود', ! is_wp_error($ingd) && 'گوشی تست' === $ingd['name1']);
+check('21d. ingest_details: فروشنده availability دارد', ! empty($ingd['sellers'][0]['availability']));
+
+$item = $client->ingest_search_item(array(
+	'name1' => 'گوشی تست',
+	'random_key' => TEST_PRK,
+	'price' => 1000,
+	'image_url' => 'https://image.torob.com/x.webp',
+	'more_info_url' => 'https://api.torob.com/v4/base-product/details/?prk=' . TEST_PRK,
+));
+check('21e. ingest_search_item: پیش‌نمایش جزئی ساخته می‌شود', ! is_wp_error($item) && ! empty($item['partial']) && 1 === count($item['gallery']));
+
+$GLOBALS['shoper_options']['shoper_relay_url'] = 'https://relay.example/shoper-relay.php?token=abc';
+$relay_client = new Shoper_Torob_Client();
+$wrapped = $relay_client->wrap_relay_url('https://api.torob.com/v4/base-product/search/?q=s25');
+check('21f. wrap_relay_url: توکن و url حفظ می‌شوند', false !== strpos($wrapped, 'token=abc') && false !== strpos($wrapped, 'url='));
+
+$sug = $client->suggest('گوشی', 8);
+// suggest will hit mock/http depending on state; reset and stub.
+reset_state();
+$GLOBALS['http_responder'] = function ( $t, $url ) { return array( 'code' => 200, 'body' => search_body( 1, 'گوشی تست' ) ); };
+$sug = $client->suggest('گوشی', 8);
+check('21g. suggest: more_info_url در پیشنهاد هست', ! is_wp_error($sug) && ! empty($sug['suggestions'][0]['more_info_url']));
+
 /* 20) test_connection -------------------------------------------------------- */
 reset_state();
 $GLOBALS['http_responder'] = function ( $t, $url ) { return array( 'code' => 200, 'body' => search_body( 1 ) ); };

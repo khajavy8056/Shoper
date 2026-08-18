@@ -53,11 +53,17 @@ class Shoper_Seller_Aggregator {
 		}
 
 		// فقط فروشندگان موجود با قیمت معتبر.
+		// اگر کلید availability نباشد، قیمت مثبت به‌معنای موجود بودن است.
 		$available = array();
 		foreach ( $sellers as $s ) {
-			if ( ! empty( $s['price'] ) && (int) $s['price'] > 0 && ! empty( $s['availability'] ) ) {
-				$available[] = $s;
+			$price = isset( $s['price'] ) ? (int) $s['price'] : 0;
+			if ( $price <= 0 ) {
+				continue;
 			}
+			if ( array_key_exists( 'availability', $s ) && ! $s['availability'] ) {
+				continue;
+			}
+			$available[] = $s;
 		}
 		if ( empty( $available ) ) {
 			return $result;
