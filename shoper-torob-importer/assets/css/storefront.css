@@ -1,71 +1,84 @@
 /**
- * قالب ثابت صفحه محصول Shoper Studio.
+ * قالب ثابت نقد و بررسی محصول Shoper Studio.
  */
-.shoper-page {
-	max-width: 860px;
-	margin: 0 auto;
-	color: #3f4064;
-	font-size: 15px;
+.product-description-wrapper {
+	direction: rtl;
+	text-align: right;
+	font-family: Tahoma, Arial, sans-serif;
+	color: #263238;
 	line-height: 2;
+	max-width: 100%;
 }
-.shoper-sec {
-	margin: 0 0 28px;
+.product-description-header {
+	border-bottom: 1px solid #e5e7eb;
+	margin-bottom: 22px;
+	padding-bottom: 14px;
 }
-.shoper-sec-title {
-	font-size: 18px;
-	font-weight: 700;
-	color: #23254e;
-	margin: 0 0 16px;
-	padding: 0 0 10px;
-	border-bottom: 2px solid #e0e0e2;
+.product-description-brand {
+	color: #64748b;
+	font-size: 13px;
+	margin: 0;
 }
-.shoper-sec-review .shoper-sec-title {
-	border-bottom-color: #ef394e;
-}
-.shoper-sec-specs .shoper-sec-title {
-	border-bottom-color: #19bfd3;
-}
-.shoper-prose {
-	text-align: justify;
-}
-.shoper-prose p {
-	margin: 0 0 14px;
-}
-.shoper-sec-highlights {
-	background: #f7f7f8;
+.product-description-section {
+	border: 1px solid #e5e7eb;
 	border-radius: 12px;
-	padding: 16px 18px;
+	margin: 0 0 20px;
+	padding: 20px;
 }
-.shoper-sec-highlights .shoper-sec-title {
-	font-size: 16px;
-	border: 0;
-	padding: 0;
-	margin: 0 0 10px;
+.product-overview {
+	background: #f8fafc;
+	border-right: 5px solid #2563eb;
 }
-.shoper-specs-table {
-	width: 100%;
+.product-highlights {
+	background: #f0fdf4;
+	border-right: 5px solid #16a34a;
+}
+.product-specifications {
+	background: #fff;
+	overflow: hidden;
+}
+.product-analysis {
+	background: #fffbeb;
+	border-right: 5px solid #d97706;
+}
+.product-verdict {
+	background: #eff6ff;
+	border-right: 5px solid #4f46e5;
+}
+.product-pros {
+	background: #ecfdf5;
+	border-radius: 9px;
+	color: #166534;
+	padding: 14px;
+	margin-bottom: 14px;
+}
+.product-cons {
+	background: #fef2f2;
+	border-radius: 9px;
+	color: #991b1b;
+	padding: 14px;
+}
+.product-specs-table {
 	border-collapse: collapse;
-	margin: 0 0 12px;
+	min-width: 620px;
+	width: 100%;
 }
-.shoper-specs-table th,
-.shoper-specs-table td {
-	padding: 10px 14px;
-	border: 1px solid #f0f0f1;
+.product-specs-table th,
+.product-specs-table td {
+	border: 1px solid #dbe3ea;
+	padding: 11px 13px;
 	text-align: right;
 	vertical-align: top;
 }
-.shoper-specs-table th {
-	width: 38%;
-	color: #62666d;
-	font-weight: 500;
-	background: #f7f7f8;
+.product-specs-table thead th {
+	background: #e8f1ff;
+	color: #173b73;
 }
-.shoper-specs-table tr:nth-child(even) th,
-.shoper-specs-table tr:nth-child(even) td {
-	background: #fff;
+.product-specs-table tbody th {
+	background: #f8fafc;
+	color: #334155;
+	width: 31%;
 }
-.shoper-source {
-	font-size: 12px;
-	color: #888;
-	margin-top: 20px;
+.product-table-wrap {
+	overflow-x: auto;
 }

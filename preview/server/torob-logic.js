@@ -818,40 +818,151 @@ function paragraphsHtml(text) {
 		.map((p) => '<p style="margin:0 0 14px;">' + escHtml(p) + '</p>').join('');
 }
 
-function assembleProductHtml(data, body, highlights, faq) {
+function contentDepth(cat, specs) {
+	const count = Object.keys(specs || {}).length;
+	if (['phone', 'laptop', 'tablet', 'console', 'tv', 'watch'].indexOf(cat) >= 0 && count >= 8) return 'full';
+	if (count >= 5) return 'medium';
+	return 'light';
+}
+
+function analysisPros(cat, specs, keys) {
+	const bag = Object.assign({}, keys || {}, specs || {});
+	const out = [];
+	const cpu = specOf(bag, ['پردازنده', 'پردازنده مرکزی', 'تراشه']);
+	const ram = specOf(bag, ['مقدار رم', 'حافظه RAM', 'رم', 'مقدار RAM']);
+	const stor = specOf(bag, ['حافظه داخلی', 'ظرفیت حافظه']);
+	const scr = specOf(bag, ['اندازه صفحه نمایش']);
+	const type = specOf(bag, ['نوع صفحه نمایش']);
+	const hz = specOf(bag, ['نرخ نوسازی تصویر']);
+	const cam = specOf(bag, ['دوربین اصلی', 'کیفیت دوربین اصلی']);
+	const bat = specOf(bag, ['گنجایش باتری', 'ظرفیت باتری']);
+	const ip = specOf(bag, ['گواهی ضدآب']);
+	if (cpu) out.push('پردازنده ' + cpu + ' عملکرد روزمره را روان نگه می‌دارد');
+	if (ram) out.push('رم ' + ram + ' برای چندکارگی هم‌زمان مناسب است');
+	if (stor) out.push('حافظه داخلی ' + stor + ' فضای نصب برنامه و فایل را پوشش می‌دهد');
+	if (scr) out.push('نمایشگر ' + scr + (type ? (' از نوع ' + type) : '') + (hz ? (' با نرخ نوسازی ' + hz) : ''));
+	else if (hz) out.push('نرخ نوسازی ' + hz + ' تصویر روان‌تری می‌سازد');
+	if (cam) out.push('دوربین اصلی ' + cam + ' ثبت تصویر روزمره را پوشش می‌دهد');
+	if (bat) out.push('باتری ' + bat + ' برای استفاده روزانه در نظر گرفته شده است');
+	if (ip) out.push('گواهی ' + ip + ' مقاومت در برابر آب و گردوغبار را نشان می‌دهد');
+	return out.slice(0, 6);
+}
+
+function analysisCons(cat, specs, keys) {
+	const bag = Object.assign({}, keys || {}, specs || {});
+	const out = [];
+	const w = specOf(bag, ['وزن']);
+	const stor = specOf(bag, ['حافظه داخلی', 'ظرفیت حافظه']);
+	const m = w && w.match(/(\d{2,4})/);
+	if (m && ['phone', 'tablet'].indexOf(cat) >= 0 && parseInt(m[1], 10) >= 210) {
+		out.push('وزن ' + w + ' ممکن است برای استفاده طولانی کمی سنگین حس شود');
+	}
+	if (stor && /\b(16|32|64)\b/.test(stor)) {
+		out.push('حافظه داخلی ' + stor + ' برای آرشیو سنگین ممکن است محدود باشد');
+	}
+	Object.keys(bag).forEach((k) => {
+		const v = String(bag[k] || '').trim();
+		if (['ندارد', 'خیر', 'پشتیبانی نمی‌شود'].indexOf(v) >= 0 && out.length < 3) {
+			out.push(k + ' در مشخصات این مدل «' + v + '» ثبت شده است');
+		}
+	});
+	return out.slice(0, 3);
+}
+
+function analysisText(cat, name, specs, pros, cons) {
+	if (contentDepth(cat, specs) === 'light') return '';
+	let text = 'تحلیل «' + (name || 'این محصول') + '» فقط از روی مشخصات ثبت‌شده همین کالا انجام شده است. ';
+	text += pros && pros.length ? 'نقاط قوت از عددها و امکانات واقعی خوانده می‌شود، نه از شعار تبلیغاتی. ' : '';
+	text += cons && cons.length ? 'محدودیت‌های احتمالی هم فقط جایی آمده که در جدول مشخصات نشانه دارد.' : 'در جدول مشخصات محدودیت واضحی دیده نشد.';
+	return text.trim();
+}
+
+function verdictText(cat, name, brand, specs, keys) {
+	const who = name || 'این محصول';
+	if (contentDepth(cat, specs) === 'light') {
+		return who + ' با مشخصات ثبت‌شده در همین صفحه معرفی شده است. اگر این مشخصات با نیازتان جور است، خرید آن می‌تواند انتخاب ساده‌ای باشد.';
+	}
+	const bag = Object.assign({}, keys || {}, specs || {});
+	const bits = [];
+	const ram = specOf(bag, ['مقدار رم', 'حافظه RAM', 'رم', 'مقدار RAM']);
+	const cam = specOf(bag, ['دوربین اصلی', 'کیفیت دوربین اصلی']);
+	const bat = specOf(bag, ['گنجایش باتری', 'ظرفیت باتری']);
+	if (ram) bits.push('رم ' + ram);
+	if (cam) bits.push('دوربین ' + cam);
+	if (bat) bits.push('باتری ' + bat);
+	let text = who + (brand ? (' از برند ' + brand) : '') + ' است.';
+	if (bits.length) text += ' ترکیب ' + bits.join('، ') + ' روی کاغذ برای کار روزمره منطقی به نظر می‌رسد.';
+	text += ' اگر همین مشخصات با نیازتان هم‌خوان است، همین صفحه برای تصمیم خرید کافی است.';
+	return text;
+}
+
+function productSpecsTable(pairs, caption) {
+	const entries = Object.entries(pairs || {});
+	if (!entries.length) return '';
+	let html = '<div class="product-table-wrap" style="overflow-x:auto;"><table class="product-specs-table" style="border-collapse:collapse;min-width:620px;width:100%;">';
+	if (caption) html += '<caption style="color:#64748b;font-size:13px;padding:0 0 10px;text-align:right;">جدول مشخصات فنی ' + escHtml(caption) + '</caption>';
+	html += '<thead><tr><th style="background:#e8f1ff;border:1px solid #dbe3ea;color:#173b73;padding:11px 13px;text-align:right;" scope="col">مشخصه</th><th style="background:#e8f1ff;border:1px solid #dbe3ea;color:#173b73;padding:11px 13px;text-align:right;" scope="col">مقدار</th></tr></thead><tbody>';
+	entries.forEach(([k, v]) => {
+		html += '<tr><th style="background:#f8fafc;border:1px solid #dbe3ea;color:#334155;font-weight:bold;padding:11px 13px;text-align:right;vertical-align:top;width:31%;" scope="row">' + escHtml(k) + '</th>';
+		html += '<td style="border:1px solid #dbe3ea;padding:11px 13px;text-align:right;vertical-align:top;">' + escHtml(v) + '</td></tr>';
+	});
+	return html + '</tbody></table></div>';
+}
+
+function assembleProductHtml(data, body, highlights, faq, extras) {
+	extras = extras || {};
 	const specs = (data && data.specs) || {};
 	const keys = (data && data.key_specs) || {};
-	let html = '<div class="shoper-page" dir="rtl" lang="fa">';
-	html += '<section class="shoper-sec shoper-sec-review">';
-	html += '<h2 class="shoper-sec-title">معرفی و بررسی محصول</h2>';
-	html += '<div class="shoper-prose">' + paragraphsHtml(body) + '</div></section>';
+	const name = String((data && data.name1) || '');
+	const name2 = String((data && data.name2) || '');
+	const brand = specOf(specs, ['برند', 'سازنده']);
+	const title = name2 || name;
+	const pros = extras.pros || highlights || [];
+	const cons = extras.cons || [];
+	const analysis = extras.analysis || '';
+	const verdict = extras.verdict || '';
+	let html = '<article class="product-description-wrapper" dir="rtl" lang="fa" style="direction:rtl;text-align:right;font-family:Tahoma,Arial,sans-serif;color:#263238;line-height:2;max-width:100%;">';
+	html += '<header class="product-description-header" style="border-bottom:1px solid #e5e7eb;margin-bottom:22px;padding-bottom:14px;">';
+	if (brand) html += '<p class="product-description-brand" style="color:#64748b;font-size:13px;margin:0;">برند: ' + escHtml(brand) + '</p>';
+	html += '<h2 style="color:#111827;font-size:24px;line-height:1.7;margin:4px 0 0;">نقد و بررسی تخصصی ' + escHtml(title) + '</h2></header>';
+	html += '<section class="product-description-section product-overview" style="background:#f8fafc;border:1px solid #e5e7eb;border-right:5px solid #2563eb;border-radius:12px;margin:0 0 20px;padding:20px;" aria-labelledby="overview-title">';
+	html += '<h3 id="overview-title" style="color:#111827;font-size:19px;line-height:1.8;margin:0 0 12px;">معرفی و بررسی محصول</h3>';
+	html += paragraphsHtml(body) + '</section>';
 	if (highlights && highlights.length) {
-		html += '<section class="shoper-sec shoper-sec-highlights"><h2 class="shoper-sec-title">نکات برجسته</h2><ul>';
+		html += '<section class="product-description-section product-highlights" style="background:#f0fdf4;border:1px solid #e5e7eb;border-right:5px solid #16a34a;border-radius:12px;margin:0 0 20px;padding:20px;" aria-labelledby="highlights-title">';
+		html += '<h3 id="highlights-title" style="color:#111827;font-size:19px;line-height:1.8;margin:0 0 12px;">ویژگی‌های برجسته</h3><ul style="margin:0;padding:0 22px 0 0;">';
 		highlights.forEach((h) => { html += '<li>' + escHtml(h) + '</li>'; });
 		html += '</ul></section>';
 	}
-	html += '<section class="shoper-sec shoper-sec-specs"><h2 class="shoper-sec-title">مشخصات فنی</h2>';
-	if (keys && Object.keys(keys).length) {
-		html += '<h3>مشخصات کلیدی</h3>' + renderSpecTable(keys);
+	const pairs = Object.assign({}, keys, specs);
+	if (Object.keys(pairs).length) {
+		html += '<section class="product-description-section product-specifications" style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;margin:0 0 20px;overflow:hidden;padding:20px;" aria-labelledby="specifications-title">';
+		html += '<h3 id="specifications-title" style="color:#111827;font-size:19px;line-height:1.8;margin:0 0 12px;">مشخصات فنی کامل</h3>';
+		html += productSpecsTable(pairs, title) + '</section>';
 	}
-	if (data && data.spec_groups && data.spec_groups.length) {
-		data.spec_groups.forEach((g) => {
-			if (!g.specs || !Object.keys(g.specs).length) return;
-			if (g.header) html += '<h3>' + escHtml(g.header) + '</h3>';
-			html += renderSpecTable(g.specs);
-		});
-	} else if (specs && Object.keys(specs).length) {
-		html += renderSpecTable(specs);
+	if (analysis || (pros && pros.length) || (cons && cons.length)) {
+		html += '<section class="product-description-section product-analysis" style="background:#fffbeb;border:1px solid #e5e7eb;border-right:5px solid #d97706;border-radius:12px;margin:0 0 20px;padding:20px;" aria-labelledby="analysis-title">';
+		html += '<h3 id="analysis-title" style="color:#111827;font-size:19px;line-height:1.8;margin:0 0 12px;">تحلیل و آنالیز فنی</h3>';
+		if (analysis) html += paragraphsHtml(analysis);
+		html += '<div class="product-analysis-columns" style="display:block;">';
+		if (pros && pros.length) {
+			html += '<div class="product-analysis-column product-pros" style="background:#ecfdf5;border-radius:9px;color:#166534;padding:14px;margin-bottom:14px;"><h4 style="font-size:16px;margin:0 0 8px;">مزایا</h4><ul style="margin:0;padding:0 22px 0 0;">';
+			pros.forEach((p) => { html += '<li>' + escHtml(p) + '</li>'; });
+			html += '</ul></div>';
+		}
+		if (cons && cons.length) {
+			html += '<div class="product-analysis-column product-cons" style="background:#fef2f2;border-radius:9px;color:#991b1b;padding:14px;"><h4 style="font-size:16px;margin:0 0 8px;">معایب احتمالی</h4><ul style="margin:0;padding:0 22px 0 0;">';
+			cons.forEach((c) => { html += '<li>' + escHtml(c) + '</li>'; });
+			html += '</ul></div>';
+		}
+		html += '</div></section>';
 	}
-	html += '</section>';
-	if (faq && faq.length) {
-		html += '<section class="shoper-sec shoper-sec-faq"><h2 class="shoper-sec-title">پرسش‌های پرتکرار</h2>';
-		faq.forEach((item) => {
-			html += '<h3>' + escHtml(item.q) + '</h3><p>' + escHtml(item.a) + '</p>';
-		});
-		html += '</section>';
+	if (verdict) {
+		html += '<section class="product-description-section product-verdict" style="background:#eff6ff;border:1px solid #e5e7eb;border-right:5px solid #4f46e5;border-radius:12px;margin:0 0 20px;padding:20px;" aria-labelledby="verdict-title">';
+		html += '<h3 id="verdict-title" style="color:#111827;font-size:19px;line-height:1.8;margin:0 0 12px;">نتیجه‌گیری و پیشنهاد خرید</h3>';
+		html += paragraphsHtml(verdict) + '</section>';
 	}
-	html += '<p class="shoper-source">معرفی و مشخصات توسط <strong>Shoper Studio</strong> خواجوی آماده شده است.</p></div>';
+	html += '</article>';
 	return html;
 }
 
@@ -890,7 +1001,11 @@ function enhanceProduct(data) {
 	Object.keys(qmap).forEach((k) => {
 		if (specs[k] || keys[k]) faq.push({ q: qmap[k], a: String(specs[k] || keys[k]) + ' — طبق مشخصات ثبت‌شده.' });
 	});
-	const descriptionHtml = assembleProductHtml(data, body, highlights, faq);
+	const pros = analysisPros(cat, specs, keys);
+	const cons = analysisCons(cat, specs, keys);
+	const analysis = analysisText(cat, name, specs, pros, cons);
+	const verdict = verdictText(cat, name, brand, specs, keys);
+	const descriptionHtml = assembleProductHtml(data, body, highlights, faq, { pros, cons, analysis, verdict });
 
 	let seoTitle = 'خرید ' + name;
 	if (seoTitle.length < 50) seoTitle += ' | مشخصات کامل';

@@ -38,19 +38,25 @@ class Shoper_Copywriter {
 		$highlights = self::highlights( $cat, $specs, $keys );
 		$summary    = self::spec_summary( $specs, $keys );
 		$faq        = self::faq( $cat, $name, $specs, $keys );
+		$pros       = self::analysis_pros( $cat, $specs, $keys );
+		$cons       = self::analysis_cons( $cat, $specs, $keys );
+		$analysis   = self::analysis_text( $cat, $name, $specs, $keys, $pros, $cons );
+		$verdict    = self::verdict_text( $cat, $name, $brand, $specs, $keys );
 		$short      = self::short_html( $name, $name2, $keys, $highlights );
-		$html       = self::assemble_html( $data, $article, $highlights, $article, $summary, '', '', $faq );
+		$html       = self::assemble_html( $data, $article, $highlights, $analysis, $summary, '', $verdict, $faq, $pros, $cons );
 		$seo        = self::seo( $name, $name2, $brand, $cat, $keys, $specs );
 
 		return array(
 			'title'             => $name,
 			'short_description' => $short,
 			'description_html'  => $html,
-			'analysis'          => $article,
+			'analysis'          => $analysis ? $analysis : $article,
 			'review'            => $summary,
 			'highlights'        => $highlights,
+			'pros'              => $pros,
+			'cons'              => $cons,
 			'audience'          => '',
-			'verdict'           => '',
+			'verdict'           => $verdict,
 			'faq'               => $faq,
 			'seo_title'         => $seo['title'],
 			'seo_desc'          => $seo['description'],
@@ -712,7 +718,199 @@ class Shoper_Copywriter {
 	}
 
 	/**
-	 * HTML ثابت صفحه محصول: معرفی و بررسی + جدول مشخصات.
+	 * عمق محتوا بر اساس دسته و تعداد مشخصات.
+	 *
+	 * @param string $cat   دسته.
+	 * @param array  $specs مشخصات.
+	 * @return string full|medium|light
+	 */
+	public static function content_depth( $cat, $specs ) {
+		$count = is_array( $specs ) ? count( $specs ) : 0;
+		$rich  = array( 'phone', 'laptop', 'tablet', 'console', 'tv', 'watch' );
+		if ( in_array( $cat, $rich, true ) && $count >= 8 ) {
+			return 'full';
+		}
+		if ( $count >= 5 ) {
+			return 'medium';
+		}
+		return 'light';
+	}
+
+	/**
+	 * مزایای واقعی از مشخصات.
+	 *
+	 * @param string $cat   دسته.
+	 * @param array  $specs مشخصات.
+	 * @param array  $keys  کلیدها.
+	 * @return array
+	 */
+	public static function analysis_pros( $cat, $specs, $keys ) {
+		$bag  = array_merge( (array) $keys, (array) $specs );
+		$out  = array();
+		$ram  = self::spec( $bag, array( 'مقدار رم', 'حافظه RAM', 'رم', 'مقدار RAM' ) );
+		$stor = self::spec( $bag, array( 'حافظه داخلی', 'ظرفیت حافظه' ) );
+		$cpu  = self::spec( $bag, array( 'پردازنده', 'پردازنده مرکزی', 'تراشه' ) );
+		$scr  = self::spec( $bag, array( 'اندازه صفحه نمایش' ) );
+		$type = self::spec( $bag, array( 'نوع صفحه نمایش' ) );
+		$hz   = self::spec( $bag, array( 'نرخ نوسازی تصویر' ) );
+		$cam  = self::spec( $bag, array( 'دوربین اصلی', 'کیفیت دوربین اصلی' ) );
+		$bat  = self::spec( $bag, array( 'گنجایش باتری', 'ظرفیت باتری' ) );
+		$ip   = self::spec( $bag, array( 'گواهی ضدآب' ) );
+		$gpu  = self::spec( $bag, array( 'کارت گرافیک' ) );
+		if ( $cpu ) {
+			$out[] = 'پردازنده ' . $cpu . ' عملکرد روزمره را روان نگه می‌دارد';
+		}
+		if ( $ram ) {
+			$out[] = 'رم ' . $ram . ' برای چندکارگی هم‌زمان مناسب است';
+		}
+		if ( $stor ) {
+			$out[] = 'حافظه داخلی ' . $stor . ' فضای نصب برنامه و فایل را پوشش می‌دهد';
+		}
+		if ( $scr ) {
+			$line = 'نمایشگر ' . $scr;
+			if ( $type ) {
+				$line .= ' از نوع ' . $type;
+			}
+			if ( $hz ) {
+				$line .= ' با نرخ نوسازی ' . $hz;
+			}
+			$out[] = $line;
+		} elseif ( $hz ) {
+			$out[] = 'نرخ نوسازی ' . $hz . ' تصویر روان‌تری می‌سازد';
+		}
+		if ( $cam ) {
+			$out[] = 'دوربین اصلی ' . $cam . ' ثبت تصویر روزمره را پوشش می‌دهد';
+		}
+		if ( $bat ) {
+			$out[] = 'باتری ' . $bat . ' برای استفاده روزانه در نظر گرفته شده است';
+		}
+		if ( $ip ) {
+			$out[] = 'گواهی ' . $ip . ' مقاومت در برابر آب و گردوغبار را نشان می‌دهد';
+		}
+		if ( $gpu ) {
+			$out[] = 'کارت گرافیک ' . $gpu;
+		}
+		if ( count( $out ) < 3 ) {
+			foreach ( array_slice( $bag, 0, 8 ) as $k => $v ) {
+				$line = self::s( $k ) . ': ' . self::s( $v );
+				if ( $line && ! in_array( $line, $out, true ) ) {
+					$out[] = $line;
+				}
+				if ( count( $out ) >= 4 ) {
+					break;
+				}
+			}
+		}
+		return array_slice( $out, 0, 6 );
+	}
+
+	/**
+	 * محدودیت محتمل فقط اگر از مشخصات واقعی خوانده شود.
+	 *
+	 * @param string $cat   دسته.
+	 * @param array  $specs مشخصات.
+	 * @param array  $keys  کلیدها.
+	 * @return array
+	 */
+	public static function analysis_cons( $cat, $specs, $keys ) {
+		$bag  = array_merge( (array) $keys, (array) $specs );
+		$out  = array();
+		$w    = self::spec( $bag, array( 'وزن' ) );
+		$stor = self::spec( $bag, array( 'حافظه داخلی', 'ظرفیت حافظه' ) );
+		if ( $w && preg_match( '/(\d{2,4})/', $w, $m ) ) {
+			$grams = (int) $m[1];
+			if ( in_array( $cat, array( 'phone', 'tablet' ), true ) && $grams >= 210 ) {
+				$out[] = 'وزن ' . $w . ' ممکن است برای استفاده طولانی کمی سنگین حس شود';
+			}
+		}
+		if ( $stor && preg_match( '/\b(16|32|64)\b/', $stor ) ) {
+			$out[] = 'حافظه داخلی ' . $stor . ' برای آرشیو سنگین ممکن است محدود باشد';
+		}
+		foreach ( $bag as $k => $v ) {
+			$v = self::s( $v );
+			if ( in_array( $v, array( 'ندارد', 'خیر', 'پشتیبانی نمی‌شود' ), true ) ) {
+				$out[] = self::s( $k ) . ' در مشخصات این مدل «' . $v . '» ثبت شده است';
+			}
+			if ( count( $out ) >= 3 ) {
+				break;
+			}
+		}
+		return array_values( array_unique( array_slice( $out, 0, 3 ) ) );
+	}
+
+	/**
+	 * متن تحلیل فنی.
+	 *
+	 * @param string $cat   دسته.
+	 * @param string $name  نام.
+	 * @param array  $specs مشخصات.
+	 * @param array  $keys  کلیدها.
+	 * @param array  $pros  مزایا.
+	 * @param array  $cons  معایب.
+	 * @return string
+	 */
+	public static function analysis_text( $cat, $name, $specs, $keys, $pros, $cons ) {
+		$depth = self::content_depth( $cat, $specs );
+		if ( 'light' === $depth ) {
+			return '';
+		}
+		$who  = $name ? ( '«' . $name . '»' ) : 'این محصول';
+		$text = 'تحلیل ' . $who . ' فقط از روی مشخصات ثبت‌شده همین کالا انجام شده است. ';
+		if ( $pros ) {
+			$text .= 'نقاط قوت از عددها و امکانات واقعی خوانده می‌شود، نه از شعار تبلیغاتی. ';
+		}
+		if ( $cons ) {
+			$text .= 'محدودیت‌های احتمالی هم فقط جایی آمده که در جدول مشخصات نشانه دارد.';
+		} else {
+			$text .= 'در جدول مشخصات محدودیت واضحی دیده نشد.';
+		}
+		return trim( $text );
+	}
+
+	/**
+	 * نتیجه‌گیری نامحسوس برای تصمیم خرید.
+	 *
+	 * @param string $cat   دسته.
+	 * @param string $name  نام.
+	 * @param string $brand برند.
+	 * @param array  $specs مشخصات.
+	 * @param array  $keys  کلیدها.
+	 * @return string
+	 */
+	public static function verdict_text( $cat, $name, $brand, $specs, $keys ) {
+		$depth = self::content_depth( $cat, $specs );
+		$who   = $name ? $name : 'این محصول';
+		$label = self::category_label( $cat );
+		if ( 'light' === $depth ) {
+			return $who . ' با مشخصات ثبت‌شده در همین صفحه معرفی شده است. اگر این مشخصات با نیازتان جور است، خرید آن می‌تواند انتخاب ساده‌ای باشد.';
+		}
+		$bits = array();
+		$ram  = self::spec( array_merge( (array) $keys, (array) $specs ), array( 'مقدار رم', 'حافظه RAM', 'رم', 'مقدار RAM' ) );
+		$cam  = self::spec( array_merge( (array) $keys, (array) $specs ), array( 'دوربین اصلی', 'کیفیت دوربین اصلی' ) );
+		$bat  = self::spec( array_merge( (array) $keys, (array) $specs ), array( 'گنجایش باتری', 'ظرفیت باتری' ) );
+		if ( $ram ) {
+			$bits[] = 'رم ' . $ram;
+		}
+		if ( $cam ) {
+			$bits[] = 'دوربین ' . $cam;
+		}
+		if ( $bat ) {
+			$bits[] = 'باتری ' . $bat;
+		}
+		$text = $who . ' یک ' . $label;
+		if ( $brand ) {
+			$text .= ' از برند ' . $brand;
+		}
+		$text .= ' است.';
+		if ( $bits ) {
+			$text .= ' ترکیب ' . implode( '، ', $bits ) . ' روی کاغذ برای کار روزمره منطقی به نظر می‌رسد.';
+		}
+		$text .= ' اگر همین مشخصات با نیازتان هم‌خوان است، همین صفحه برای تصمیم خرید کافی است.';
+		return $text;
+	}
+
+	/**
+	 * HTML ثابت صفحه محصول به قالب نقد و بررسی تخصصی.
 	 *
 	 * @param array  $data       داده.
 	 * @param string $intro      معرفی و بررسی.
@@ -724,79 +922,91 @@ class Shoper_Copywriter {
 	 * @param array  $faq        پرسش‌ها.
 	 * @return string
 	 */
-	public static function assemble_html( $data, $intro, $highlights, $analysis, $review, $audience, $verdict, $faq = array() ) {
-		$body = $intro ? $intro : $analysis;
-		$html = '<div class="shoper-page" dir="rtl" lang="fa" style="max-width:860px;margin:0 auto;color:#3f4064;font-size:15px;line-height:2;">';
+	public static function assemble_html( $data, $intro, $highlights, $analysis, $review, $audience, $verdict, $faq = array(), $pros = array(), $cons = array() ) {
+		$name  = self::s( isset( $data['name1'] ) ? $data['name1'] : '' );
+		$name2 = self::s( isset( $data['name2'] ) ? $data['name2'] : '' );
+		$brand = self::spec( isset( $data['specs'] ) ? $data['specs'] : array(), array( 'برند', 'سازنده', 'Brand' ) );
+		$title = $name2 ? $name2 : $name;
+		$body  = $intro ? $intro : $analysis;
+		if ( empty( $pros ) || ! is_array( $pros ) ) {
+			$pros = $highlights;
+		}
 
-		$html .= '<section class="shoper-sec shoper-sec-review" style="margin:0 0 28px;">';
-		$html .= '<h2 class="shoper-sec-title" style="font-size:18px;font-weight:700;color:#23254e;margin:0 0 16px;padding:0 0 10px;border-bottom:2px solid #ef394e;">معرفی و بررسی محصول</h2>';
-		$html .= '<div class="shoper-prose" style="text-align:justify;">';
+		$html  = '<article class="product-description-wrapper" dir="rtl" lang="fa" style="direction:rtl;text-align:right;font-family:Tahoma,Arial,sans-serif;color:#263238;line-height:2;max-width:100%;">';
+		$html .= '<header class="product-description-header" style="border-bottom:1px solid #e5e7eb;margin-bottom:22px;padding-bottom:14px;">';
+		if ( $brand ) {
+			$html .= '<p class="product-description-brand" style="color:#64748b;font-size:13px;margin:0;">برند: ' . esc_html( $brand ) . '</p>';
+		}
+		$html .= '<h2 style="color:#111827;font-size:24px;line-height:1.7;margin:4px 0 0;">نقد و بررسی تخصصی ' . esc_html( $title ? $title : $name ) . '</h2>';
+		$html .= '</header>';
+
+		$html .= '<section class="product-description-section product-overview" style="background:#f8fafc;border:1px solid #e5e7eb;border-right:5px solid #2563eb;border-radius:12px;margin:0 0 20px;padding:20px;" aria-labelledby="overview-title">';
+		$html .= '<h3 id="overview-title" style="color:#111827;font-size:19px;line-height:1.8;margin:0 0 12px;">معرفی و بررسی محصول</h3>';
 		$html .= self::paragraphs_html( $body );
-		$html .= '</div></section>';
+		$html .= '</section>';
 
 		if ( $highlights ) {
-			$html .= '<section class="shoper-sec shoper-sec-highlights" style="margin:0 0 28px;background:#f7f7f8;border-radius:12px;padding:16px 18px;">';
-			$html .= '<h2 class="shoper-sec-title" style="font-size:16px;font-weight:700;color:#23254e;margin:0 0 10px;border:0;padding:0;">نکات برجسته</h2>';
-			$html .= '<ul style="margin:0;padding:0 18px 0 0;">';
+			$html .= '<section class="product-description-section product-highlights" style="background:#f0fdf4;border:1px solid #e5e7eb;border-right:5px solid #16a34a;border-radius:12px;margin:0 0 20px;padding:20px;" aria-labelledby="highlights-title">';
+			$html .= '<h3 id="highlights-title" style="color:#111827;font-size:19px;line-height:1.8;margin:0 0 12px;">ویژگی‌های برجسته</h3>';
+			$html .= '<ul style="margin:0;padding:0 22px 0 0;">';
 			foreach ( $highlights as $h ) {
-				$html .= '<li style="margin:0 0 6px;">' . esc_html( $h ) . '</li>';
+				$html .= '<li>' . esc_html( $h ) . '</li>';
 			}
 			$html .= '</ul></section>';
 		}
 
-		$has_keys   = ! empty( $data['key_specs'] ) && is_array( $data['key_specs'] );
-		$has_groups = ! empty( $data['spec_groups'] ) && is_array( $data['spec_groups'] );
-		$has_specs  = ! empty( $data['specs'] ) && is_array( $data['specs'] );
-		if ( $has_keys || $has_groups || $has_specs ) {
-			$html .= '<section class="shoper-sec shoper-sec-specs" style="margin:0 0 28px;">';
-			$html .= '<h2 class="shoper-sec-title" style="font-size:18px;font-weight:700;color:#23254e;margin:0 0 16px;padding:0 0 10px;border-bottom:2px solid #19bfd3;">مشخصات فنی</h2>';
-			if ( $has_keys ) {
-				$html .= '<h3 style="font-size:14px;color:#62666d;margin:0 0 8px;">مشخصات کلیدی</h3>';
-				$html .= self::table( $data['key_specs'] );
-			}
-			if ( $has_groups ) {
-				foreach ( $data['spec_groups'] as $group ) {
-					if ( empty( $group['specs'] ) ) {
-						continue;
-					}
-					if ( ! empty( $group['header'] ) ) {
-						$html .= '<h3 style="font-size:14px;color:#62666d;margin:18px 0 8px;">' . esc_html( $group['header'] ) . '</h3>';
-					}
-					$html .= self::table( $group['specs'] );
+		$pairs = array();
+		if ( ! empty( $data['key_specs'] ) && is_array( $data['key_specs'] ) ) {
+			$pairs = $data['key_specs'];
+		}
+		if ( ! empty( $data['specs'] ) && is_array( $data['specs'] ) ) {
+			foreach ( $data['specs'] as $k => $v ) {
+				if ( ! isset( $pairs[ $k ] ) ) {
+					$pairs[ $k ] = $v;
 				}
-			} elseif ( $has_specs ) {
-				$html .= self::table( $data['specs'] );
 			}
+		}
+		if ( $pairs ) {
+			$html .= '<section class="product-description-section product-specifications" style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;margin:0 0 20px;overflow:hidden;padding:20px;" aria-labelledby="specifications-title">';
+			$html .= '<h3 id="specifications-title" style="color:#111827;font-size:19px;line-height:1.8;margin:0 0 12px;">مشخصات فنی کامل</h3>';
+			$html .= self::table( $pairs, $title ? $title : $name );
 			$html .= '</section>';
 		}
 
-		if ( $faq && is_array( $faq ) ) {
-			$html .= '<section class="shoper-sec shoper-sec-faq" style="margin:0 0 20px;">';
-			$html .= '<h2 class="shoper-sec-title" style="font-size:18px;font-weight:700;color:#23254e;margin:0 0 16px;padding:0 0 10px;border-bottom:2px solid #e0e0e2;">پرسش‌های پرتکرار</h2>';
-			foreach ( $faq as $item ) {
-				if ( empty( $item['q'] ) || empty( $item['a'] ) ) {
-					continue;
-				}
-				$html .= '<div style="margin:0 0 12px;padding:10px 12px;background:#fafafa;border-radius:8px;">';
-				$html .= '<h3 style="font-size:14px;margin:0 0 4px;color:#23254e;">' . esc_html( $item['q'] ) . '</h3>';
-				$html .= '<p style="margin:0;">' . esc_html( $item['a'] ) . '</p>';
-				$html .= '</div>';
+		if ( $analysis || $pros || $cons ) {
+			$html .= '<section class="product-description-section product-analysis" style="background:#fffbeb;border:1px solid #e5e7eb;border-right:5px solid #d97706;border-radius:12px;margin:0 0 20px;padding:20px;" aria-labelledby="analysis-title">';
+			$html .= '<h3 id="analysis-title" style="color:#111827;font-size:19px;line-height:1.8;margin:0 0 12px;">تحلیل و آنالیز فنی</h3>';
+			if ( $analysis ) {
+				$html .= self::paragraphs_html( $analysis );
 			}
+			$html .= '<div class="product-analysis-columns" style="display:block;">';
+			if ( $pros ) {
+				$html .= '<div class="product-analysis-column product-pros" style="background:#ecfdf5;border-radius:9px;color:#166534;padding:14px;margin-bottom:14px;">';
+				$html .= '<h4 style="font-size:16px;margin:0 0 8px;">مزایا</h4><ul style="margin:0;padding:0 22px 0 0;">';
+				foreach ( $pros as $p ) {
+					$html .= '<li>' . esc_html( $p ) . '</li>';
+				}
+				$html .= '</ul></div>';
+			}
+			if ( $cons ) {
+				$html .= '<div class="product-analysis-column product-cons" style="background:#fef2f2;border-radius:9px;color:#991b1b;padding:14px;">';
+				$html .= '<h4 style="font-size:16px;margin:0 0 8px;">معایب احتمالی</h4><ul style="margin:0;padding:0 22px 0 0;">';
+				foreach ( $cons as $c ) {
+					$html .= '<li>' . esc_html( $c ) . '</li>';
+				}
+				$html .= '</ul></div>';
+			}
+			$html .= '</div></section>';
+		}
+
+		if ( $verdict ) {
+			$html .= '<section class="product-description-section product-verdict" style="background:#eff6ff;border:1px solid #e5e7eb;border-right:5px solid #4f46e5;border-radius:12px;margin:0 0 20px;padding:20px;" aria-labelledby="verdict-title">';
+			$html .= '<h3 id="verdict-title" style="color:#111827;font-size:19px;line-height:1.8;margin:0 0 12px;">نتیجه‌گیری و پیشنهاد خرید</h3>';
+			$html .= self::paragraphs_html( $verdict );
 			$html .= '</section>';
 		}
 
-		$src = 'کاتالوگ';
-		if ( ! empty( $data['provider'] ) && 'digikala' === $data['provider'] ) {
-			$src = 'دیجی‌کالا';
-		} elseif ( ! empty( $data['page_url'] ) && false !== strpos( (string) $data['page_url'], 'torob' ) ) {
-			$src = 'ترب';
-		}
-		$html .= '<p class="shoper-source" style="font-size:12px;color:#888;margin-top:20px;">';
-		$html .= 'معرفی و مشخصات توسط <strong>Shoper Studio</strong> خواجوی آماده شده است. منبع: ' . esc_html( $src ) . '.';
-		if ( ! empty( $data['page_url'] ) ) {
-			$html .= ' <a href="' . esc_url( $data['page_url'] ) . '" target="_blank" rel="nofollow">صفحه منبع</a>.';
-		}
-		$html .= '</p></div>';
+		$html .= '</article>';
 		return $html;
 	}
 
@@ -829,21 +1039,26 @@ class Shoper_Copywriter {
 	 * @param array $pairs زوج‌ها.
 	 * @return string
 	 */
-	private static function table( $pairs ) {
+	private static function table( $pairs, $caption = '' ) {
 		if ( empty( $pairs ) || ! is_array( $pairs ) ) {
 			return '';
 		}
-		$html = '<table class="shoper-specs-table" style="width:100%;border-collapse:collapse;margin:0 0 12px;"><tbody>';
-		$i    = 0;
-		foreach ( $pairs as $k => $v ) {
-			$bg    = ( 0 === $i % 2 ) ? '#f7f7f8' : '#fff';
-			$html .= '<tr style="background:' . esc_attr( $bg ) . ';">';
-			$html .= '<th style="width:38%;text-align:right;padding:10px 14px;border:1px solid #f0f0f1;vertical-align:top;color:#62666d;font-weight:500;">' . esc_html( $k ) . '</th>';
-			$html .= '<td style="padding:10px 14px;border:1px solid #f0f0f1;color:#23254e;">' . esc_html( $v ) . '</td>';
-			$html .= '</tr>';
-			$i++;
+		$html  = '<div class="product-table-wrap" style="overflow-x:auto;">';
+		$html .= '<table class="product-specs-table" style="border-collapse:collapse;min-width:620px;width:100%;">';
+		if ( $caption ) {
+			$html .= '<caption style="color:#64748b;font-size:13px;padding:0 0 10px;text-align:right;">جدول مشخصات فنی ' . esc_html( $caption ) . '</caption>';
 		}
-		$html .= '</tbody></table>';
+		$html .= '<thead><tr>';
+		$html .= '<th style="background:#e8f1ff;border:1px solid #dbe3ea;color:#173b73;padding:11px 13px;text-align:right;" scope="col">مشخصه</th>';
+		$html .= '<th style="background:#e8f1ff;border:1px solid #dbe3ea;color:#173b73;padding:11px 13px;text-align:right;" scope="col">مقدار</th>';
+		$html .= '</tr></thead><tbody>';
+		foreach ( $pairs as $k => $v ) {
+			$html .= '<tr>';
+			$html .= '<th style="background:#f8fafc;border:1px solid #dbe3ea;color:#334155;font-weight:bold;padding:11px 13px;text-align:right;vertical-align:top;width:31%;" scope="row">' . esc_html( $k ) . '</th>';
+			$html .= '<td style="border:1px solid #dbe3ea;padding:11px 13px;text-align:right;vertical-align:top;">' . esc_html( $v ) . '</td>';
+			$html .= '</tr>';
+		}
+		$html .= '</tbody></table></div>';
 		return $html;
 	}
 }

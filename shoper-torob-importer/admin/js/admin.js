@@ -1120,12 +1120,14 @@
 			html += '<div id="shoper-ai-status" class="shoper-ai-status">معرفی و بررسی از روی اطلاعات محصول آماده می‌شود؛ مشخصات در جدول جدا می‌ماند.</div>';
 			html += '<div class="shoper-ai-tabs">';
 			html += '<button type="button" class="shoper-ai-tab is-active" data-tab="analysis">معرفی و بررسی</button>';
+			html += '<button type="button" class="shoper-ai-tab" data-tab="verdict">تحلیل و نتیجه</button>';
 			html += '<button type="button" class="shoper-ai-tab" data-tab="review">خلاصه مشخصات</button>';
 			html += '</div>';
 			html += '<div class="shoper-ai-pane" data-pane="analysis"><textarea id="shoper-p-analysis" rows="8"></textarea></div>';
+			html += '<div class="shoper-ai-pane" data-pane="verdict" style="display:none;"><textarea id="shoper-p-verdict" rows="6"></textarea></div>';
 			html += '<div class="shoper-ai-pane" data-pane="review" style="display:none;"><textarea id="shoper-p-review" rows="8"></textarea></div>';
 			html += '<textarea id="shoper-p-audience" style="display:none;"></textarea>';
-			html += '<p class="description">مدل از متن منبع و مشخصات واقعی، یک معرفی کوتاه مقاله‌ای می‌سازد تا صفحه خالی نماند. مشخصه تازه اختراع نمی‌شود. جدول فنی جداگانه می‌ماند.</p>';
+			html += '<p class="description">قالب ثابت: معرفی، ویژگی‌های برجسته، جدول مشخصات، تحلیل مزایا/معایب و نتیجه‌گیری خرید. لحن فروش نامحسوس است و مشخصه تازه ساخته نمی‌شود.</p>';
 			html += '<p><button type="button" class="button" id="shoper-ai-rerun">ساخت دوباره معرفی</button></p>';
 				html += '</div>';
 
@@ -1726,6 +1728,7 @@
 			}
 			if (enh.analysis) { $('#shoper-p-analysis').val(enh.analysis); }
 			if (enh.review) { $('#shoper-p-review').val(enh.review); }
+			if (enh.verdict) { $('#shoper-p-verdict').val(enh.verdict); }
 			if (enh.audience) { $('#shoper-p-audience').val(enh.audience); }
 			if (enh.seo_title) { $('#shoper-p-seo-title').val(enh.seo_title); }
 			if (enh.seo_desc) { $('#shoper-p-seo-desc').val(enh.seo_desc); }
@@ -1748,12 +1751,12 @@
 				if (++n >= max) break;
 			}
 			var source = String(data.description || '').replace(/\s+/g, ' ').slice(0, compact ? 360 : 1400);
-			return 'نقش: نویسنده معرفی کالا به سبک دیجی‌کالا.\n'
-				+ 'کار: از متن منبع و جدول مشخصات، یک معرفی و بررسی کوتاه و خوانا بنویس (۲ تا ۴ پاراگراف، نه خیلی طولانی). متن منبع را تمیز کن؛ اگر ناقص یا خالی است فقط از مشخصات واقعی مقاله بساز.\n'
-				+ 'ممنوع: نظر مشتری ساختگی، تیتر تحلیل کارشناسی، مناسب برای چه کسانی، قیمت یا گارانتی خارج از داده.\n'
-				+ 'سئو اجباری: seo_title بین ۵۰ تا ۶۰ نویسه و با کلمه خرید؛ seo_desc بین ۱۴۰ تا ۱۵۵ نویسه با ۲ مشخصه واقعی؛ focus_keyword دو تا چهار کلمه؛ tags هشت مورد.\n'
-				+ 'خروجی فقط JSON با کلیدهای: intro, highlights, faq, seo_title, seo_desc, focus_keyword, tags\n'
-				+ 'intro همان معرفی و بررسی محصول است. faq حداکثر ۴ مورد {q,a} از مشخصات واقعی.\n'
+			return 'نقش: نویسنده صفحه محصول فروشگاهی به قالب نقد و بررسی تخصصی.\\n'
+				+ 'کار: از متن منبع و جدول مشخصات معرفی کامل‌تر بنویس. کالا ساده را کوتاه، موبایل را کامل‌تر.\\n'
+				+ 'لحن متقاعدکننده اما نامحسوس. نظر مشتری و مشخصه تازه نساز.\\n'
+				+ 'سئو اجباری: seo_title بین ۵۰ تا ۶۰ نویسه و با کلمه خرید؛ seo_desc بین ۱۴۰ تا ۱۵۵ نویسه با ۲ مشخصه واقعی؛ focus_keyword دو تا چهار کلمه؛ tags هشت مورد.\\n'
+				+ 'خروجی فقط JSON با کلیدهای: intro, highlights, pros, cons, verdict, seo_title, seo_desc, focus_keyword, tags\\n'
+				+ 'intro معرفی و بررسی. pros مزایا از مشخصات. cons فقط اگر در جدول نشانه دارد. verdict نتیجه‌گیری خرید.\\n'
 				+ 'محصول: ' + (data.name1 || '') + '\nانگلیسی: ' + (data.name2 || '') + '\nمنبع: ' + source + '\nمشخصات: ' + specs.join('؛ ');
 		},
 
@@ -1818,7 +1821,7 @@
 			opts.body = JSON.stringify({
 				model: provider.model || 'openai-fast',
 				messages: [
-					{ role: 'system', content: 'You write a short Digikala-style Persian product introduction from the given source and specs only. Do not invent specs, prices, reviews, or audience claims.' },
+					{ role: 'system', content: 'You write a Persian product review page from source and specs only. Subtle sales tone. Do not invent specs or fake reviews.' },
 					{ role: 'user', content: prompt }
 				],
 				temperature: 0.25,

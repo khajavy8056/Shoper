@@ -247,12 +247,12 @@ class Shoper_AI_Client {
 		}
 		$specs = implode( '؛ ', $spec_bits );
 
-		$rules = "نقش: نویسنده معرفی کالا به سبک دیجی‌کالا.\n"
-			. "کار: از متن منبع و جدول مشخصات، یک معرفی و بررسی کوتاه و خوانا بنویس (۲ تا ۴ پاراگراف، نه خیلی طولانی). متن منبع را تمیز و پاراگراف‌بندی کن؛ اگر ناقص یا خالی است فقط از مشخصات واقعی مقاله بساز تا صفحه خالی نماند.\n"
-			. "ممنوع: نظر مشتری ساختگی، تیتر تحلیل کارشناسی، مناسب برای چه کسانی، قیمت یا گارانتی خارج از داده، ادعای بهترین بودن.\n"
+		$rules = "نقش: نویسنده صفحه محصول فروشگاهی به قالب نقد و بررسی تخصصی.\n"
+			. "کار: از متن منبع و جدول مشخصات، معرفی کامل‌تر بنویس. اگر کالا ساده است متن را کوتاه نگه دار؛ برای موبایل و لپ‌تاپ کامل‌تر بنویس.\n"
+			. "لحن: متقاعدکننده اما نامحسوس. شعار نزن. نظر مشتری نساز. مشخصه تازه اختراع نکن.\n"
 			. "سئو اجباری: seo_title بین ۵۰ تا ۶۰ نویسه و با کلمه خرید؛ seo_desc بین ۱۴۰ تا ۱۵۵ نویسه با ۲ مشخصه واقعی؛ focus_keyword دو تا چهار کلمه؛ tags هشت مورد.\n"
-			. "خروجی فقط JSON با کلیدهای: intro, highlights, faq, seo_title, seo_desc, focus_keyword, tags\n"
-			. "intro همان معرفی و بررسی محصول است. faq حداکثر ۴ مورد {q,a} از مشخصات واقعی.\n";
+			. "خروجی فقط JSON با کلیدهای: intro, highlights, pros, cons, verdict, seo_title, seo_desc, focus_keyword, tags\n"
+			. "intro معرفی و بررسی ۲ تا ۴ پاراگراف. highlights چهار تا شش نکته. pros مزایا از مشخصات واقعی. cons فقط اگر در جدول نشانه دارد. verdict نتیجه‌گیری کوتاه خرید.\n";
 
 		return $rules . "محصول: {$name}\nانگلیسی: {$name2}\nمنبع: {$source}\nمشخصات: {$specs}";
 	}
@@ -384,7 +384,7 @@ class Shoper_AI_Client {
 					'messages'    => array(
 						array(
 							'role'    => 'system',
-							'content' => 'You write a short Digikala-style Persian product introduction from the given source and specs only. Do not invent specs, prices, reviews, or audience claims. Valid JSON only.',
+							'content' => 'You write a Persian product review page from source and specs only. Subtle sales tone. Do not invent specs, prices, or fake reviews. Valid JSON only.',
 						),
 						array(
 							'role'    => 'user',
@@ -587,11 +587,32 @@ class Shoper_AI_Client {
 				$out['faq'] = array_slice( $faq, 0, 5 );
 			}
 		}
-		$intro = ! empty( $remote['intro'] ) ? Shoper_Copywriter::s( $remote['intro'] ) : '';
-		if ( strlen( $intro ) < 40 ) {
-			$intro = isset( $studio['title'] ) ? $studio['title'] : '';
-			if ( ! empty( $data['description'] ) ) {
-				$intro .= ' ' . Shoper_Copywriter::s( $data['description'] );
+		$intro = '';
+		if ( ! empty( $remote['intro'] ) ) {
+			$intro = Shoper_Copywriter::polish_source( $remote['intro'] );
+		}
+		if ( Shoper_Copywriter::len( $intro ) < 80 ) {
+			$intro = ! empty( $studio['analysis'] ) ? $studio['analysis'] : '';
+			if ( ! empty( $data['description'] ) && Shoper_Copywriter::len( $intro ) < 80 ) {
+				$intro = Shoper_Copywriter::polish_source( $data['description'] );
+			}
+		}
+		if ( $intro ) {
+			$out['intro'] = $intro;
+		}
+		foreach ( array( 'pros', 'cons' ) as $list_key ) {
+			if ( empty( $remote[ $list_key ] ) || ! is_array( $remote[ $list_key ] ) ) {
+				continue;
+			}
+			$items = array();
+			foreach ( $remote[ $list_key ] as $item ) {
+				$item = Shoper_Copywriter::s( $item );
+				if ( $item ) {
+					$items[] = $item;
+				}
+			}
+			if ( $items ) {
+				$out[ $list_key ] = array_slice( $items, 0, 6 );
 			}
 		}
 		$seo = Shoper_Copywriter::clamp_seo(
@@ -612,8 +633,10 @@ class Shoper_AI_Client {
 			$out['analysis'],
 			$out['review'],
 			$out['audience'],
-			$out['verdict'],
-			isset( $out['faq'] ) ? $out['faq'] : array()
+			isset( $out['verdict'] ) ? $out['verdict'] : '',
+			isset( $out['faq'] ) ? $out['faq'] : array(),
+			isset( $out['pros'] ) ? $out['pros'] : array(),
+			isset( $out['cons'] ) ? $out['cons'] : array()
 		);
 		$out['short_description'] = Shoper_Copywriter::short_html(
 			isset( $data['name1'] ) ? $data['name1'] : $studio['title'],
