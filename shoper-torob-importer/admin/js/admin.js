@@ -198,28 +198,41 @@
 			return relay + (relay.indexOf('?') >= 0 ? '&' : '?') + 'url=' + encodeURIComponent(url);
 		},
 
+		wrapGateway: function (gateway, url) {
+			if (!gateway) {
+				return '';
+			}
+			if (gateway.style === 'template' && gateway.template) {
+				return String(gateway.template).replace('{url}', encodeURIComponent(url));
+			}
+			var base = gateway.base ? String(gateway.base).replace(/\/+$/, '') : '';
+			if (!base) {
+				return '';
+			}
+			if (gateway.style === 'query') {
+				var param = gateway.param || 'url';
+				return base + (base.indexOf('?') >= 0 ? '&' : '?') + param + '=' + encodeURIComponent(url);
+			}
+			return base + '/' + url;
+		},
+
+		activeGateways: function () {
+			var list = this.cfg('gateways', []);
+			return Array.isArray(list) ? list : [];
+		},
+
 		/**
-		 * دریافت JSON از ترب از مرورگر کاربر (IP واقعی، مناسب هاست خارج).
-		 * در صورت CORS یا شبکه null برمی‌گردد تا مسیر سرور امتحان شود.
+		 * یک GET و خواندن JSON. در خطا null.
 		 */
-		browserFetch: function (url) {
-			var self = this;
-			var mode = this.fetchMode();
-			if (mode === 'server') {
-				return $.Deferred().resolve(null).promise();
-			}
-			if (!window.fetch) {
-				return $.Deferred().resolve(null).promise();
-			}
-			var target = url;
-			if (mode === 'relay' || this.cfg('relayUrl', '')) {
-				target = this.wrapRelay(url);
-			}
+		fetchOne: function (target, timeoutMs) {
 			var dfd = $.Deferred();
+			if (!window.fetch || !target) {
+				return dfd.resolve(null).promise();
+			}
 			var ctrl = window.AbortController ? new AbortController() : null;
 			var timer = setTimeout(function () {
 				if (ctrl) { ctrl.abort(); }
-			}, 12000);
+			}, timeoutMs || 4000);
 			fetch(target, {
 				method: 'GET',
 				mode: 'cors',
@@ -234,15 +247,68 @@
 				}
 				return res.json();
 			}).then(function (json) {
-				if (json && typeof json === 'object' && !json.error) {
+				if (dfd.state() !== 'pending') {
+					return;
+				}
+				if (json && typeof json === 'object' && !json.error && !json.corsfix_error) {
 					dfd.resolve(json);
 				} else {
 					dfd.resolve(null);
 				}
 			}).catch(function () {
 				clearTimeout(timer);
-				dfd.resolve(null);
+				if (dfd.state() === 'pending') {
+					dfd.resolve(null);
+				}
 			});
+			return dfd.promise();
+		},
+
+		/**
+		 * دریافت JSON از مرورگر: مستقیم، رله، بعد درگاه‌های تست‌شده.
+		 */
+		browserFetch: function (url) {
+			var self = this;
+			var mode = this.fetchMode();
+			if (mode === 'server') {
+				return $.Deferred().resolve(null).promise();
+			}
+			if (!window.fetch) {
+				return $.Deferred().resolve(null).promise();
+			}
+
+			var targets = [];
+			if (mode === 'relay' || this.cfg('relayUrl', '')) {
+				targets.push(this.wrapRelay(url));
+			}
+			if (mode !== 'relay') {
+				targets.push(url);
+				this.activeGateways().forEach(function (g) {
+					var wrapped = self.wrapGateway(g, url);
+					if (wrapped && targets.indexOf(wrapped) < 0) {
+						targets.push(wrapped);
+					}
+				});
+			}
+
+			var dfd = $.Deferred();
+			var i = 0;
+			var next = function () {
+				if (i >= targets.length) {
+					dfd.resolve(null);
+					return;
+				}
+				var target = targets[i++];
+				var wait = (i === 1) ? 2500 : 5000;
+				self.fetchOne(target, wait).done(function (json) {
+					if (json && (json.results || json.random_key || json.name1)) {
+						dfd.resolve(json);
+					} else {
+						next();
+					}
+				});
+			};
+			next();
 			return dfd.promise();
 		},
 
@@ -344,6 +410,12 @@
 					term: term
 				}).done(function (resp) {
 					var list = (resp && resp.success && resp.data && resp.data.suggestions) ? resp.data.suggestions : [];
+					if (!list.length && resp && resp.data && resp.data.error && self.$suggest) {
+						var msg = resp.data.message || 'اتصال به ترب برقرار نشد.';
+						self.$suggest.html('<div class="shoper-suggest-empty">' + self.esc(msg) + '</div>').show();
+						self.sugOpen = true;
+						return;
+					}
 					self.applySuggestList(term, list);
 				}).fail(function (xhr, status) {
 					if (status !== 'abort') {
@@ -722,7 +794,7 @@
 			var searchFail = function (info) {
 				var msg = (info && info.message) ? info.message : 'جستجو ناموفق بود.';
 				if (info && (info.code === 'blocked' || info.status === 490 || info.status === 403)) {
-					msg += ' سرور مسدود است. اگر از مرورگر هم نتیجه نیامد، در تنظیمات رله ایران را ذخیره کنید.';
+					msg += ' مسیر مستقیم مسدود است. درگاه پیش‌فرض باید لیست را بیاورد؛ اگر نیامد اتصال هاست به درگاه را در عیب‌یابی ببینید.';
 				}
 				self.status(msg, 'error');
 			};
@@ -1330,7 +1402,7 @@
 				results_count: ok ? raw.results.length : 0,
 				note: ok
 					? 'مرورگر شما به ترب دسترسی دارد. جستجو را از کادر بالا انجام دهید؛ نیازی به سبز شدن تست سرور نیست.'
-					: 'مرورگر هم نتوانست JSON ترب را بخواند (معمولاً CORS). فایل رله را روی هاست ایران بگذارید.'
+					: 'مرورگر مستقیم JSON ترب را نخواند (معمولاً CORS). اگر درگاه پیش‌فرض در عیب‌یابی سرور موفق باشد، جستجو باید کار کند.'
 			};
 			d.checks.unshift(check);
 			d.summary = d.summary || {};
@@ -1339,7 +1411,7 @@
 				d.summary.message = 'سرور مسدود است اما مرورگر شما به ترب وصل شد. افزونه باید کار کند — در کادر جستجو نام محصول را بنویسید.';
 			} else if (d.summary.verdict === 'blocked' || d.summary.verdict === 'fail') {
 				d.summary.verdict = 'fail';
-				d.summary.message = 'هم سرور و هم مرورگر به ترب نرسیدند. رله ایران لازم است.';
+				d.summary.message = 'مرورگر مستقیم به ترب نرسید. اگر درگاه پیش‌فرض در همین گزارش موفق است، در کادر بالا جستجو کنید.';
 			}
 			if (d.text) {
 				var line = '[ ' + (ok ? 'OK' : 'FAIL') + ' ] مرورگر مدیر — ' + check.note + '\n';

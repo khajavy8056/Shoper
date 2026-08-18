@@ -19,6 +19,8 @@ if ( isset( $_POST['shoper_save_settings'] ) && check_admin_referer( 'shoper_set
 		'shoper_proxy_url'      => isset( $_POST['proxy_url'] ) ? esc_url_raw( wp_unslash( $_POST['proxy_url'] ) ) : '',
 		'shoper_relay_url'      => isset( $_POST['relay_url'] ) ? esc_url_raw( wp_unslash( $_POST['relay_url'] ) ) : '',
 		'shoper_fetch_mode'     => isset( $_POST['fetch_mode'] ) ? sanitize_text_field( wp_unslash( $_POST['fetch_mode'] ) ) : 'auto',
+		'shoper_use_default_gateways' => isset( $_POST['use_default_gateways'] ) ? 'yes' : 'no',
+		'shoper_extra_gateways' => isset( $_POST['extra_gateways'] ) ? sanitize_textarea_field( wp_unslash( $_POST['extra_gateways'] ) ) : '',
 		'shoper_debug'         => isset( $_POST['debug'] ) ? '1' : '',
 	);
 	foreach ( $options as $k => $v ) {
@@ -34,6 +36,8 @@ $price_behavior = get_option( 'shoper_price_behavior', 'cheapest' );
 $proxy_url = get_option( 'shoper_proxy_url', '' );
 $relay_url = get_option( 'shoper_relay_url', '' );
 $fetch_mode = get_option( 'shoper_fetch_mode', 'auto' );
+$use_default_gateways = get_option( 'shoper_use_default_gateways', 'yes' );
+$extra_gateways = get_option( 'shoper_extra_gateways', '' );
 $shoper_debug = get_option( 'shoper_debug', '' );
 ?>
 <div class="wrap shoper-wrap" dir="rtl">
@@ -48,7 +52,7 @@ $shoper_debug = get_option( 'shoper_debug', '' );
 					نام محصول را بنویسید تا از ترب پیدا کنیم. می‌توانید لینک مستقیم محصول ترب را هم بچسبانید.
 				</p>
 				<div class="notice notice-info inline" style="margin:10px 0 0;">
-					<p>اگر دکمهٔ «عیب‌یابی کامل» کد ۴۹۰ نشان داد، یعنی <strong>سرور</strong> مسدود است نه افزونه. همان‌جا در این کادر جستجو کنید — داده از مرورگر شما گرفته می‌شود.</p>
+					<p>در نسخه ۱.۲ لیست از <strong>همان مسیر سرور</strong> می‌آمد؛ کلیک به‌خاطر نرفتن لینک جزئیات خالی می‌ماند. اگر امروز مسیر مستقیم کد ۴۹۰ بدهد، افزونه خودکار از <strong>درگاه تست‌شده</strong> همان لیست را می‌آورد — نام را همین‌جا بنویسید.</p>
 				</div>
 
 				<div class="shoper-field shoper-mode-toggle">
@@ -119,7 +123,23 @@ $shoper_debug = get_option( 'shoper_debug', '' );
 								<p class="description">اگر عیب‌یابی سرور کد ۴۹۰ داد نگران نباشید؛ آن فقط IP هاست را می‌سنجد. جستجو را از کادر بالا امتحان کنید.</p>
 							</td>
 						</tr>
-						<tr><th>پروکسی خروجی</th><td><input type="url" class="regular-text" name="proxy_url" value="<?php echo esc_attr( $proxy_url ); ?>" placeholder="http://user:pass@proxy.example:8080"><p class="description">اختیاری.</p></td></tr>
+						<tr>
+							<th>درگاه پیش‌فرض</th>
+							<td>
+								<label><input type="checkbox" name="use_default_gateways" value="yes" <?php checked( $use_default_gateways, 'yes' ); ?>>
+									استفاده از درگاه تست‌شده (CORS.SH) وقتی ترب IP هاست را مسدود کند
+								</label>
+								<p class="description">فقط درگاهی که در تست زنده JSON ترب برگرداند به‌صورت پیش‌فرض فعال است. پروکسی‌های باز تصادفی اضافه نشدند چون قابل اعتماد و امن نبودند.</p>
+							</td>
+						</tr>
+						<tr>
+							<th>درگاه سفارشی</th>
+							<td>
+								<textarea class="large-text" rows="3" name="extra_gateways" placeholder="https://your-gateway.example/&#10;https://other.example/?url={url}"><?php echo esc_textarea( $extra_gateways ); ?></textarea>
+								<p class="description">اختیاری؛ هر خط یک پیشوند یا الگو با <code>{url}</code>.</p>
+							</td>
+						</tr>
+						<tr><th>پروکسی خروجی</th><td><input type="url" class="regular-text" name="proxy_url" value="<?php echo esc_attr( $proxy_url ); ?>" placeholder="http://user:pass@proxy.example:8080"><p class="description">پروکسی HTTP CONNECT اختیاری. فقط اگر خودتان پروکسی معتبر دارید پر کنید.</p></td></tr>
 						<tr><th>آدرس رله ایران</th><td><input type="url" class="regular-text" name="relay_url" id="shoper-relay-url" value="<?php echo esc_attr( $relay_url ); ?>" placeholder="https://your-iran-host.com/shoper-relay.php?token=..."><p class="description">اگر جستجو از مرورگر هم کار نکرد، فایل <code>tools/shoper-relay.php</code> را روی یک هاست ایران بگذارید و آدرسش را اینجا ذخیره کنید.</p>
 							<p><button type="button" class="button" id="shoper-download-relay">دانلود فایل رله</button></p></td></tr>
 						<tr>
@@ -173,7 +193,7 @@ $shoper_debug = get_option( 'shoper_debug', '' );
 			<div class="shoper-card shoper-help">
 				<h3>راهنما</h3>
 				<ul>
-					<li>اگر هاست خارج از ایران است یا ترب کد ۴۹۰ می‌دهد، افزونه اول از <strong>مرورگر شما</strong> داده را می‌گیرد و محصول را بدون تماس دوباره با ترب می‌سازد.</li>
+					<li>اگر ترب IP هاست را مسدود کند، افزونه از درگاه پیش‌فرض تست‌شده و بعد از مرورگر شما داده را می‌گیرد؛ کلیک روی پیشنهاد دیگر جزئیات را خالی نمی‌گذارد.</li>
 					<li>تصاویر ابتدا در <strong>کتابخانه‌ی رسانه‌ی</strong> وردپرس ذخیره و سپس به محصول وصل می‌شوند.</li>
 					<li>هر مشخصه‌ی فنی مانند «پردازنده»، «وزن» و «نوع شنا» به‌صورت <strong>یک ویژگی مجزا</strong> در تب ویژگی‌ها ثبت می‌شود.</li>
 					<li>برای جلوگیری از تکرار، SKU محصول برابر با <code>TRB-{random_key}</code> قرار می‌گیرد.</li>

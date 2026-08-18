@@ -23,7 +23,7 @@ const fixtureDir = path.join(__dirname, '../preview/fixtures');
 const searchRaw = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'search-samsung.json'), 'utf8'));
 const detailsRaw = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'details-9bcf3364.json'), 'utf8'));
 
-console.log('\nShoper 1.3 node tests\n');
+console.log('\nShoper 1.3.2 node tests\n');
 
 const search = logic.normalizeSearch(searchRaw);
 check('جستجوی fixture نرمال می‌شود', search.results && search.results.length > 0, search.results.length + ' نتیجه');
@@ -66,8 +66,17 @@ function wrapRelay(relay, url) {
 const wrapped = wrapRelay('https://relay.example/shoper-relay.php?token=abc', 'https://api.torob.com/v4/base-product/search/?q=s25');
 check('رله توکن را نگه می‌دارد', wrapped.includes('token=abc') && wrapped.includes('url='));
 
+function wrapGateway(g, url) {
+	if (g.style === 'template') return String(g.template).replace('{url}', encodeURIComponent(url));
+	const base = String(g.base || '').replace(/\/+$/, '');
+	if (g.style === 'query') return base + (base.includes('?') ? '&' : '?') + (g.param || 'url') + '=' + encodeURIComponent(url);
+	return base + '/' + url;
+}
+const gw = wrapGateway({ style: 'prefix', base: 'https://proxy.cors.sh/' }, 'https://api.torob.com/v4/base-product/search/?q=s25');
+check('درگاه پیشوندی CORS.SH درست ساخته می‌شود', gw === 'https://proxy.cors.sh/https://api.torob.com/v4/base-product/search/?q=s25');
+
 const pluginJs = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/admin/js/admin.js'), 'utf8');
-check('admin.js مسیر مرورگر دارد', pluginJs.includes('browserFetch') && pluginJs.includes('product_json'));
+check('admin.js مسیر مرورگر و درگاه دارد', pluginJs.includes('browserFetch') && pluginJs.includes('wrapGateway') && pluginJs.includes('product_json'));
 check('chooseSuggest لینک more_info را می‌فرستد', /preview\(it\.random_key[\s\S]{0,80}more_info_url/.test(pluginJs));
 check('fill هم product_json می‌فرستد', /shoper_fill[\s\S]{0,400}product_json/.test(pluginJs));
 
@@ -80,7 +89,7 @@ check('اکشن ingest ثبت شده', ajax.includes("wp_ajax_shoper_ingest") &&
 
 const client = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/includes/class-shoper-torob-client.php'), 'utf8');
 check('ingest_search در کلاینت هست', client.includes('function ingest_search'));
-check('request از رله استفاده می‌کند', client.includes('wrap_relay_url( $url )'));
+check('request از رله و درگاه استفاده می‌کند', client.includes('wrap_relay_url') && client.includes('build_request_candidates') && client.includes('proxy.cors.sh'));
 
 const relay = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/tools/shoper-relay.php'), 'utf8');
 check('رله فقط دامنه ترب را قبول می‌کند', relay.includes('torob\\.(com|ir)') || relay.includes('torob\\.(com|ir)$'));

@@ -139,6 +139,168 @@ class Shoper_Torob_Client {
 		return $relay . $sep . 'url=' . rawurlencode( $url );
 	}
 
+	/**
+	 * درگاه‌های پیش‌فرض تست‌شده (نه پروکسی باز تصادفی).
+	 *
+	 * فقط درگاه‌هایی اینجا هستند که در تست زنده JSON معتبر ترب برگرداندند.
+	 * پروکسی‌های CONNECT عمومی به‌خاطر ناامنی و عدم تأیید اضافه نمی‌شوند.
+	 *
+	 * @return array
+	 */
+	public static function default_gateways() {
+		return array(
+			array(
+				'id'    => 'cors_sh',
+				'label' => 'CORS.SH',
+				'style' => 'prefix',
+				'base'  => 'https://proxy.cors.sh/',
+			),
+		);
+	}
+
+	/**
+	 * پیچیدن آدرس ترب داخل یک درگاه.
+	 *
+	 * @param array  $gateway درگاه.
+	 * @param string $url     آدرس ترب.
+	 * @return string
+	 */
+	public static function wrap_gateway( $gateway, $url ) {
+		if ( ! is_array( $gateway ) ) {
+			return '';
+		}
+		$style = isset( $gateway['style'] ) ? $gateway['style'] : 'prefix';
+		if ( 'template' === $style && ! empty( $gateway['template'] ) ) {
+			return str_replace( '{url}', rawurlencode( $url ), (string) $gateway['template'] );
+		}
+		if ( empty( $gateway['base'] ) ) {
+			return '';
+		}
+		$base = rtrim( (string) $gateway['base'], '/' );
+		if ( 'query' === $style ) {
+			$param = ! empty( $gateway['param'] ) ? $gateway['param'] : 'url';
+			$sep   = ( false === strpos( $base, '?' ) ) ? '?' : '&';
+			return $base . $sep . $param . '=' . rawurlencode( $url );
+		}
+		return $base . '/' . $url;
+	}
+
+	/**
+	 * درگاه‌های فعال (پیش‌فرض + سفارشی کاربر).
+	 *
+	 * @return array
+	 */
+	public static function active_gateways() {
+		$list = array();
+		if ( 'no' !== get_option( 'shoper_use_default_gateways', 'yes' ) ) {
+			$list = self::default_gateways();
+		}
+
+		$extra = trim( (string) get_option( 'shoper_extra_gateways', '' ) );
+		if ( '' !== $extra ) {
+			$lines = preg_split( '/\r\n|\r|\n/', $extra );
+			$i     = 0;
+			foreach ( $lines as $line ) {
+				$line = trim( $line );
+				if ( '' === $line || '#' === $line[0] ) {
+					continue;
+				}
+				++$i;
+				if ( false !== strpos( $line, '{url}' ) ) {
+					$list[] = array(
+						'id'       => 'custom_' . $i,
+						'label'    => 'سفارشی ' . $i,
+						'style'    => 'template',
+						'template' => $line,
+					);
+					continue;
+				}
+				$list[] = array(
+					'id'    => 'custom_' . $i,
+					'label' => 'سفارشی ' . $i,
+					'style' => 'prefix',
+					'base'  => $line,
+				);
+			}
+		}
+
+		return $list;
+	}
+
+	/**
+	 * فهرست آدرس‌های کاندید برای یک درخواست ترب.
+	 *
+	 * @param string $url آدرس اصلی ترب.
+	 * @return array
+	 */
+	public function build_request_candidates( $url ) {
+		$out = array();
+
+		if ( $this->relay ) {
+			$wrapped = $this->wrap_relay_url( $url );
+			if ( $wrapped ) {
+				$out[] = array(
+					'url'  => $wrapped,
+					'kind' => 'relay',
+				);
+			}
+		}
+
+		$gateways  = self::active_gateways();
+		$cached_id = function_exists( 'get_transient' ) ? get_transient( 'shoper_good_gateway' ) : '';
+		$cached_gw = null;
+		if ( $cached_id ) {
+			foreach ( $gateways as $g ) {
+				if ( isset( $g['id'] ) && $g['id'] === $cached_id ) {
+					$cached_gw = $g;
+					break;
+				}
+			}
+		}
+		if ( $cached_gw ) {
+			$wrapped = self::wrap_gateway( $cached_gw, $url );
+			if ( $wrapped ) {
+				$out[] = array(
+					'url'        => $wrapped,
+					'kind'       => 'gateway',
+					'gateway_id' => $cached_gw['id'],
+				);
+			}
+		}
+
+		$direct_blocked = function_exists( 'get_transient' ) ? get_transient( 'shoper_direct_blocked' ) : false;
+		if ( ! $direct_blocked ) {
+			$out[] = array(
+				'url'  => $url,
+				'kind' => 'direct',
+			);
+		}
+
+		foreach ( $gateways as $g ) {
+			if ( $cached_gw && isset( $g['id'] ) && $g['id'] === $cached_gw['id'] ) {
+				continue;
+			}
+			$wrapped = self::wrap_gateway( $g, $url );
+			if ( ! $wrapped ) {
+				continue;
+			}
+			$out[] = array(
+				'url'        => $wrapped,
+				'kind'       => 'gateway',
+				'gateway_id' => isset( $g['id'] ) ? $g['id'] : '',
+			);
+		}
+
+		if ( $direct_blocked ) {
+			$out[] = array(
+				'url'  => $url,
+				'kind' => 'direct',
+			);
+		}
+
+		return $out;
+	}
+
 	/* --------------------------------------------------------------------- */
 	/* جستجو و پیشنهاد نام                                                     */
 	/* --------------------------------------------------------------------- */
@@ -492,44 +654,56 @@ class Shoper_Torob_Client {
 	 * @return array|WP_Error
 	 */
 	private function request( $url, $context = '' ) {
-		if ( $this->relay ) {
-			$wrapped = $this->wrap_relay_url( $url );
-			if ( $wrapped ) {
-				$url = $wrapped;
-			}
-		}
-
-		$transports = array();
-		if ( $this->curl_available() ) {
-			$transports[] = 'curl';
-		}
-		$transports[] = 'wp';
-
+		$candidates = $this->build_request_candidates( $url );
 		$last_error = null;
-		foreach ( $transports as $transport ) {
-			$result = $this->request_once( $url, $transport, $context );
 
-			if ( ! is_wp_error( $result ) ) {
-				return $result;
+		foreach ( $candidates as $candidate ) {
+			$target = isset( $candidate['url'] ) ? $candidate['url'] : '';
+			if ( '' === $target ) {
+				continue;
 			}
 
-			$last_error = $result;
-
-			// اگر خطا از خود انتقال (cURL) نباشد، یعنی سرور پاسخ قطعی داده
-			// (403/490/404 و ...)؛ روش دوم همان پاسخ را می‌دهد، پس متوقف می‌شویم.
-			if ( 'curl' === $transport && ! $this->is_transport_error( $result ) ) {
-				break;
+			$transports = array();
+			if ( $this->curl_available() ) {
+				$transports[] = 'curl';
 			}
+			$transports[] = 'wp';
 
-			if ( 'curl' === $transport ) {
-				Shoper_Debug::log(
-					'fallback',
-					array(
-						'context' => $context,
-						'reason'  => 'cURL failed, trying WordPress HTTP API',
-						'error'   => $result->get_error_code(),
-					)
-				);
+			foreach ( $transports as $transport ) {
+				$result = $this->request_once( $target, $transport, $context );
+
+				if ( ! is_wp_error( $result ) ) {
+					if ( ! empty( $candidate['gateway_id'] ) && function_exists( 'set_transient' ) ) {
+						set_transient( 'shoper_good_gateway', $candidate['gateway_id'], 30 * MINUTE_IN_SECONDS );
+					}
+					if ( 'direct' === $candidate['kind'] && function_exists( 'delete_transient' ) ) {
+						delete_transient( 'shoper_direct_blocked' );
+					}
+					return $result;
+				}
+
+				$last_error = $result;
+
+				if ( 'direct' === $candidate['kind'] && 'blocked' === $result->get_error_code() && function_exists( 'set_transient' ) ) {
+					set_transient( 'shoper_direct_blocked', 1, 15 * MINUTE_IN_SECONDS );
+				}
+
+				// پاسخ قطعی سرور (۴۹۰ و مشابه) را با روش انتقال دوم تکرار نکن؛ کاندید بعدی را برو.
+				if ( 'curl' === $transport && ! $this->is_transport_error( $result ) ) {
+					break;
+				}
+
+				if ( 'curl' === $transport ) {
+					Shoper_Debug::log(
+						'fallback',
+						array(
+							'context' => $context,
+							'reason'  => 'cURL failed, trying WordPress HTTP API',
+							'error'   => $result->get_error_code(),
+							'kind'    => isset( $candidate['kind'] ) ? $candidate['kind'] : '',
+						)
+					);
+				}
 			}
 		}
 

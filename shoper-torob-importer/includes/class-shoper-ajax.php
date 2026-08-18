@@ -173,8 +173,6 @@ class Shoper_Ajax {
 		$result  = $builder->suggest( $term );
 
 		if ( is_wp_error( $result ) ) {
-			// پیشنهاد یک قابلیت کمکی است؛ خطایش نباید مزاحم تایپ کاربر شود.
-			// اما علت واقعی در لاگ اشکال‌زدایی ثبت می‌شود.
 			Shoper_Debug::log(
 				'suggest_error',
 				array(
@@ -182,9 +180,14 @@ class Shoper_Ajax {
 					'message' => $result->get_error_message(),
 				)
 			);
-			$payload = array( 'suggestions' => array() );
-			if ( Shoper_Debug::enabled() ) {
-				$payload['debug'] = $result->get_error_code();
+			$payload = array(
+				'suggestions' => array(),
+				'error'       => $result->get_error_code(),
+				'message'     => $result->get_error_message(),
+			);
+			$err_data = $result->get_error_data();
+			if ( is_array( $err_data ) && isset( $err_data['status'] ) ) {
+				$payload['status'] = (int) $err_data['status'];
 			}
 			wp_send_json_success( $payload );
 		}

@@ -109,6 +109,7 @@ class Shoper_Admin {
 				'detailsPath'=> Shoper_Torob_Client::DETAIL_URL,
 				'fetchMode'  => get_option( 'shoper_fetch_mode', 'auto' ),
 				'relayUrl'   => (string) get_option( 'shoper_relay_url', '' ),
+				'gateways'   => Shoper_Torob_Client::active_gateways(),
 				'i18n'    => array(
 					'searching'    => 'در حال جستجو در ترب…',
 					'loading'      => 'در حال دریافت اطلاعات محصول…',

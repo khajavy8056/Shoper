@@ -50,6 +50,9 @@ class Shoper_Diagnostics {
 		$checks[] = self::http_check( 'curl_ua_mobile', 'cURL با User-Agent موبایل', 'curl', $search_url, array( 'encoding' => 'gzip, deflate', 'ua' => self::ua( 1 ) ) );
 		$checks[] = self::proxy_check( $search_url );
 		$checks[] = self::relay_check();
+		foreach ( self::gateway_checks( $search_url ) as $gw_check ) {
+			$checks[] = $gw_check;
+		}
 
 		$summary = self::summarize( $checks );
 
@@ -89,6 +92,7 @@ class Shoper_Diagnostics {
 			'relay'             => self::mask_proxy( get_option( 'shoper_relay_url', '' ) ),
 			'relay_configured'  => ( '' !== trim( (string) get_option( 'shoper_relay_url', '' ) ) ),
 			'fetch_mode'        => get_option( 'shoper_fetch_mode', 'auto' ),
+			'default_gateways'  => ( 'no' !== get_option( 'shoper_use_default_gateways', 'yes' ) ),
 			'debug_enabled'     => Shoper_Debug::enabled(),
 			'home_url'          => function_exists( 'home_url' ) ? wp_parse_url( home_url(), PHP_URL_HOST ) : '—',
 		);
@@ -217,6 +221,51 @@ class Shoper_Diagnostics {
 		}
 		$result = self::curl_request( $url, array( 'encoding' => 'gzip, deflate', 'ua' => self::ua( 0 ), 'proxy' => $proxy ) );
 		return self::analyze( 'proxy', 'cURL از طریق پروکسی (' . self::mask_proxy( $proxy ) . ')', 'proxy', $result );
+	}
+
+	/**
+	 * بررسی درگاه‌های پیش‌فرض تست‌شده.
+	 *
+	 * @param string $url آدرس تست.
+	 * @return array
+	 */
+	private static function gateway_checks( $url ) {
+		if ( 'no' === get_option( 'shoper_use_default_gateways', 'yes' ) ) {
+			return array(
+				array(
+					'id'     => 'gateway',
+					'label'  => 'درگاه پیش‌فرض',
+					'method' => 'gateway',
+					'status' => 'skip',
+					'note'   => 'درگاه‌های پیش‌فرض در تنظیمات خاموش شده‌اند.',
+				),
+			);
+		}
+
+		$out = array();
+		foreach ( Shoper_Torob_Client::default_gateways() as $g ) {
+			$target = Shoper_Torob_Client::wrap_gateway( $g, $url );
+			$result = self::curl_request(
+				$target,
+				array(
+					'encoding' => 'gzip, deflate',
+					'ua'       => self::ua( 0 ),
+				)
+			);
+			$item = self::analyze(
+				'gateway_' . $g['id'],
+				'درگاه پیش‌فرض ' . $g['label'],
+				'gateway',
+				$result
+			);
+			if ( 'ok' === $item['status'] ) {
+				$item['note'] = 'این درگاه JSON معتبر ترب برگرداند. افزونه باید بدون رله ایران کار کند.';
+			} elseif ( 'fail' === $item['status'] && empty( $item['note'] ) ) {
+				$item['note'] = 'این درگاه از این هاست به ترب نرسید.';
+			}
+			$out[] = $item;
+		}
+		return $out;
 	}
 
 	/**
@@ -497,7 +546,7 @@ class Shoper_Diagnostics {
 			$message = 'حداقل یک روش سرور به ترب متصل شد (' . ( $success ? $success['label'] : '' ) . ').';
 		} elseif ( $blocked > 0 && $blocked === $fail ) {
 			$verdict = 'blocked';
-			$message = 'سرور این سایت توسط ترب مسدود است (کد 490). این طبیعی است و به معنی خراب بودن افزونه نیست. نام محصول را در کادر جستجو بنویسید تا از مرورگر شما گرفته شود. اگر آنجا هم نتیجه نیامد، رله ایران را تنظیم کنید.';
+			$message = 'مسیر مستقیم سرور مسدود است (کد 490). اگر درگاه پیش‌فرض در همین گزارش موفق باشد افزونه کار می‌کند؛ وگرنه نام را در کادر جستجو بنویسید.';
 		} elseif ( $fail > 0 && $warn === 0 ) {
 			$verdict = 'fail';
 			$message = 'هیچ روش سروری به ترب متصل نشد. جزئیات هر روش در گزارش آمده است.';
@@ -575,6 +624,7 @@ class Shoper_Diagnostics {
 		$lines[] = '  پروکسی: ' . ( $env['proxy_configured'] ? $env['proxy'] : 'تنظیم نشده' );
 		$lines[] = '  رله ایران: ' . ( ! empty( $env['relay_configured'] ) ? $env['relay'] : 'تنظیم نشده' );
 		$lines[] = '  روش دریافت: ' . ( isset( $env['fetch_mode'] ) ? $env['fetch_mode'] : 'auto' );
+		$lines[] = '  درگاه پیش‌فرض: ' . ( ! empty( $env['default_gateways'] ) ? 'فعال' : 'خاموش' );
 		$lines[] = '  لاگ اشکال‌زدایی: ' . ( $env['debug_enabled'] ? 'فعال' : 'غیرفعال' );
 		$lines[] = '  دامنه سایت: ' . $env['home_url'];
 		$lines[] = '';
