@@ -1127,7 +1127,7 @@
 			html += '<div class="shoper-ai-pane" data-pane="verdict" style="display:none;"><textarea id="shoper-p-verdict" rows="6"></textarea></div>';
 			html += '<div class="shoper-ai-pane" data-pane="review" style="display:none;"><textarea id="shoper-p-review" rows="8"></textarea></div>';
 			html += '<textarea id="shoper-p-audience" style="display:none;"></textarea>';
-			html += '<p class="description">چیدمان از گروه‌های مشخصات همین کالا ساخته می‌شود. ظاهر ثابت است؛ متن و جدول‌ها مال همین محصول‌اند. مشخصه تازه ساخته نمی‌شود.</p>';
+			html += '<p class="description">مدل اول دادهٔ منبع را می‌گیرد، برای هر عنوان نمونه حدود ده خط می‌نویسد، بعد خودش راستی‌آزمایی می‌کند. اگر ادعای تازه باشد آن بخش کنار می‌رود. مدل از فروشگاه به اینترنت دسترسی ندارد.</p>';
 			html += '<p><button type="button" class="button" id="shoper-ai-rerun">ساخت دوباره معرفی</button></p>';
 				html += '</div>';
 
@@ -1736,29 +1736,57 @@
 			if (enh.tags && enh.tags.length) { $('#shoper-p-tags').val(enh.tags.join('، ')); }
 			var label = enh.provider_label || 'استودیوی نویسندگی خواجوی';
 			var extra = enh.fallback_reason ? ' — ' + enh.fallback_reason : '';
-			this.setAiStatus('آمادهٔ نظارت: ' + label + extra, 'is-ok');
+			if (enh.verify_note) { extra += ' — ' + enh.verify_note; }
+			this.setAiStatus('آمادهٔ نظارت: ' + label + extra, extra ? 'is-warn' : 'is-ok');
 		},
 
 		buildAiPrompt: function (data, compact) {
 			data = data || {};
-			var specs = [];
-			var bag = Object.assign({}, data.key_specs || {}, data.specs || {});
-			var n = 0;
-			var max = compact ? 12 : 24;
-			for (var k in bag) {
-				if (!bag.hasOwnProperty(k)) continue;
-				specs.push(k + ': ' + bag[k]);
-				if (++n >= max) break;
+			var lines = [];
+			lines.push('نام: ' + (data.name1 || ''));
+			lines.push('انگلیسی: ' + (data.name2 || ''));
+			var groups = data.spec_groups || [];
+			var maxG = compact ? 4 : 8;
+			var gi = 0;
+			groups.forEach(function (g) {
+				if (gi >= maxG || !g || !g.specs) return;
+				var bits = [];
+				var n = 0;
+				var maxN = compact ? 3 : 6;
+				for (var k in g.specs) {
+					if (!g.specs.hasOwnProperty(k) || n >= maxN) continue;
+					bits.push(k + ' ' + g.specs[k]);
+					n += 1;
+				}
+				if (bits.length) {
+					lines.push('گروه «' + (g.header || 'مشخصات') + '»: ' + bits.join('؛ '));
+					gi += 1;
+				}
+			});
+			if (!groups.length) {
+				var bag = Object.assign({}, data.key_specs || {}, data.specs || {});
+				var specs = [];
+				var i = 0;
+				var max = compact ? 12 : 24;
+				for (var key in bag) {
+					if (!bag.hasOwnProperty(key) || i >= max) continue;
+					specs.push(key + ': ' + bag[key]);
+					i += 1;
+				}
+				if (specs.length) lines.push('مشخصات: ' + specs.join('؛ '));
 			}
-			var source = String(data.description || '').replace(/\s+/g, ' ').slice(0, compact ? 360 : 1400);
-			return 'نقش: نویسنده صفحه محصول فروشگاهی.\n'
-				+ 'کار: متن را فقط از منبع و مشخصات همین کالا بنویس. چیدمان را از گروه‌های همین کالا بساز؛ قالب گوشی را روی کالای دیگر کپی نکن.\n'
-				+ 'کالا ساده را کوتاه، موبایل و لپ‌تاپ را کامل‌تر بنویس.\n'
-				+ 'لحن متقاعدکننده اما نامحسوس. نظر مشتری و مشخصه تازه نساز.\n'
-				+ 'سئو اجباری: seo_title بین ۵۰ تا ۶۰ نویسه و با کلمه خرید؛ seo_desc بین ۱۴۰ تا ۱۵۵ نویسه با ۲ مشخصه واقعی؛ focus_keyword دو تا چهار کلمه؛ tags هشت مورد.\n'
-				+ 'خروجی فقط JSON با کلیدهای: intro, highlights, pros, cons, verdict, seo_title, seo_desc, focus_keyword, tags\n'
-				+ 'intro معرفی همین کالا. highlights از مشخصات واقعی. cons فقط اگر در جدول نشانه دارد. verdict نتیجه‌گیری خرید.\n'
-				+ 'محصول: ' + (data.name1 || '') + '\nانگلیسی: ' + (data.name2 || '') + '\nمنبع: ' + source + '\nمشخصات: ' + specs.join('؛ ');
+			var source = String(data.description || '').replace(/\s+/g, ' ').slice(0, compact ? 280 : 900);
+			if (source) lines.push('متن منبع: ' + source);
+			var size = compact ? '۶ تا ۱۰ خط' : '۸ تا ۱۲ خط';
+			return 'نقش: نویسنده صفحه نقد و بررسی همین کالا.\n'
+				+ 'مرحله ۱: فقط دادهٔ منبع زیر را بخوان. اینترنت نداری؛ چیزی از بیرون اضافه نکن.\n'
+				+ 'مرحله ۲: برای هر عنوان نمونه، متن مخصوص همین کالا بنویس. نه خیلی بلند نه خیلی کوتاه؛ معرفی و تحلیل حدود ' + size + '. کالا ساده کوتاه‌تر.\n'
+				+ 'عنوان‌ها: intro=معرفی و بررسی محصول؛ highlights=ویژگی‌های برجسته؛ analysis=تحلیل و آنالیز فنی؛ verdict=نتیجه‌گیری و پیشنهاد خرید.\n'
+				+ 'لحن متقاعدکننده اما نامحسوس. شعار نزن. نظر مشتری نساز. مشخصه تازه اختراع نکن.\n'
+				+ 'مرحله ۳: خودت راستی‌آزمایی کن. اگر عدد یا ادعایی در منبع نیست حذفش کن. اگر مطمئن نیستی checked را false بگذار.\n'
+				+ 'سئو: seo_title بین ۵۰ تا ۶۰ نویسه و با خرید؛ seo_desc بین ۱۴۰ تا ۱۵۵ با ۲ مشخصه واقعی؛ focus_keyword دو تا چهار کلمه؛ tags هشت مورد.\n'
+				+ 'خروجی فقط JSON با کلیدهای: intro, highlights, analysis, pros, cons, verdict, seo_title, seo_desc, focus_keyword, tags, checked\n'
+				+ 'دادهٔ منبع همین کالا:\n' + lines.join('\n');
 		},
 
 		parseAiJson: function (text) {
@@ -1822,7 +1850,7 @@
 			opts.body = JSON.stringify({
 				model: provider.model || 'openai-fast',
 				messages: [
-					{ role: 'system', content: 'You write a Persian product review page from source and specs only. Subtle sales tone. Do not invent specs or fake reviews.' },
+					{ role: 'system', content: 'Three steps: read supplied source, write each sample heading for this product only, self-check. No internet. Do not invent specs or fake reviews. JSON only.' },
 					{ role: 'user', content: prompt }
 				],
 				temperature: 0.25,

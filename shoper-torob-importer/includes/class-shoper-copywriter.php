@@ -185,6 +185,192 @@ class Shoper_Copywriter {
 	}
 
 	/**
+	 * رقم‌های فارسی را لاتین می‌کند.
+	 *
+	 * @param string $value متن.
+	 * @return string
+	 */
+	public static function digits( $value ) {
+		$fa = array( '۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹' );
+		$en = array( '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' );
+		return str_replace( $fa, $en, (string) $value );
+	}
+
+	/**
+	 * بریف منبع برای مدل: فقط دادهٔ همین کالا.
+	 *
+	 * @param array $data    محصول.
+	 * @param bool  $compact فشرده.
+	 * @return string
+	 */
+	public static function briefing( $data, $compact = false ) {
+		$data   = is_array( $data ) ? $data : array();
+		$name   = self::s( isset( $data['name1'] ) ? $data['name1'] : '' );
+		$name2  = self::s( isset( $data['name2'] ) ? $data['name2'] : '' );
+		$source = self::polish_source( isset( $data['description'] ) ? $data['description'] : '' );
+		$limit  = $compact ? 280 : 900;
+		if ( self::len( $source ) > $limit ) {
+			$source = function_exists( 'mb_substr' ) ? mb_substr( $source, 0, $limit, 'UTF-8' ) . '…' : ( substr( $source, 0, $limit ) . '…' );
+		}
+		$groups = self::spec_groups( $data );
+		$lines  = array(
+			'نام: ' . $name,
+			'انگلیسی: ' . $name2,
+		);
+		$max_g  = $compact ? 4 : 8;
+		$g      = 0;
+		foreach ( $groups as $group ) {
+			$bits = array();
+			$n    = 0;
+			foreach ( (array) $group['specs'] as $k => $v ) {
+				$bits[] = self::s( $k ) . ' ' . self::s( $v );
+				if ( ++$n >= ( $compact ? 3 : 6 ) ) {
+					break;
+				}
+			}
+			if ( $bits ) {
+				$lines[] = 'گروه «' . self::s( $group['header'] ) . '»: ' . implode( '؛ ', $bits );
+			}
+			if ( ++$g >= $max_g ) {
+				break;
+			}
+		}
+		if ( $source ) {
+			$lines[] = 'متن منبع: ' . $source;
+		}
+		return implode( "\n", $lines );
+	}
+
+	/**
+	 * عددهای مجاز از منبع همین کالا.
+	 *
+	 * @param array $data محصول.
+	 * @return array
+	 */
+	public static function source_numbers( $data ) {
+		$blob = self::digits( self::briefing( $data, false ) );
+		if ( ! empty( $data['name1'] ) ) {
+			$blob .= ' ' . self::digits( $data['name1'] );
+		}
+		if ( ! empty( $data['name2'] ) ) {
+			$blob .= ' ' . self::digits( $data['name2'] );
+		}
+		preg_match_all( '/\d+(?:[.,]\d+)?/u', $blob, $m );
+		$out = array();
+		foreach ( (array) $m[0] as $n ) {
+			$out[ str_replace( ',', '.', $n ) ] = true;
+		}
+		return $out;
+	}
+
+	/**
+	 * راستی‌آزمایی متن مدل با دادهٔ منبع.
+	 *
+	 * جملهٔ دارای عدد غریبه یا عبارت ممنوع حذف می‌شود.
+	 *
+	 * @param string $text متن مدل.
+	 * @param array  $data محصول.
+	 * @return string
+	 */
+	public static function fact_check( $text, $data ) {
+		$text = self::polish_source( $text );
+		if ( '' === $text ) {
+			return '';
+		}
+		$banned = array( 'تحلیل کارشناسی', 'سال ۲۰۲۶', 'سال 2026', 'نظر مشتری', 'خریداران می‌گویند', 'نظرات کاربران', 'امتیاز ۴.', 'امتیاز 4.' );
+		$allow  = self::source_numbers( $data );
+		$parts  = preg_split( '/(?<=[.؟!])\s+/u', $text );
+		$keep   = array();
+		foreach ( (array) $parts as $sent ) {
+			$sent = trim( $sent );
+			if ( '' === $sent ) {
+				continue;
+			}
+			$bad = false;
+			foreach ( $banned as $b ) {
+				if ( self::has( $sent, $b ) ) {
+					$bad = true;
+					break;
+				}
+			}
+			if ( $bad ) {
+				continue;
+			}
+			$norm = self::digits( $sent );
+			preg_match_all( '/\d+(?:[.,]\d+)?/u', $norm, $found );
+			foreach ( (array) $found[0] as $n ) {
+				$key = str_replace( ',', '.', $n );
+				$num = (float) $key;
+				if ( $num < 13 ) {
+					continue;
+				}
+				if ( ! isset( $allow[ $key ] ) && ! isset( $allow[ (string) (int) $num ] ) ) {
+					$bad = true;
+					break;
+				}
+			}
+			if ( ! $bad ) {
+				$keep[] = $sent;
+			}
+		}
+		return trim( implode( ' ', $keep ) );
+	}
+
+	/**
+	 * آیا این نکته به مشخصات همین کالا وصل است؟
+	 *
+	 * @param string $item نکته.
+	 * @param array  $data محصول.
+	 * @return bool
+	 */
+	public static function claim_grounded( $item, $data ) {
+		$item = self::s( $item );
+		if ( '' === $item ) {
+			return false;
+		}
+		$bag = array();
+		if ( ! empty( $data['key_specs'] ) && is_array( $data['key_specs'] ) ) {
+			$bag = array_merge( $bag, $data['key_specs'] );
+		}
+		if ( ! empty( $data['specs'] ) && is_array( $data['specs'] ) ) {
+			$bag = array_merge( $bag, $data['specs'] );
+		}
+		foreach ( $bag as $k => $v ) {
+			$k = self::s( $k );
+			$v = self::s( $v );
+			if ( $v && self::len( $v ) >= 2 && self::has( $item, $v ) ) {
+				return true;
+			}
+			if ( $k && self::len( $k ) >= 3 && self::has( $item, $k ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * پالایش فهرست مدل.
+	 *
+	 * @param array $items نکات.
+	 * @param array $data  محصول.
+	 * @return array
+	 */
+	public static function filter_claims( $items, $data ) {
+		$out = array();
+		foreach ( (array) $items as $item ) {
+			$item = self::s( $item );
+			if ( '' === $item || ! self::claim_grounded( $item, $data ) ) {
+				continue;
+			}
+			$checked = self::fact_check( $item, $data );
+			if ( $checked ) {
+				$out[] = $checked;
+			}
+		}
+		return array_slice( array_values( array_unique( $out ) ), 0, 6 );
+	}
+
+	/**
 	 * تشخیص دسته.
 	 *
 	 * @param string $hay   متن.

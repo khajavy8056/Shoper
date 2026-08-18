@@ -370,11 +370,28 @@ const handlers = {
 				try {
 					const remote = JSON.parse(remoteRaw);
 					if (remote && typeof remote === 'object') {
-					['analysis', 'review', 'audience', 'verdict', 'seo_title', 'seo_desc', 'focus_keyword'].forEach((k) => {
-						if (remote[k] && String(remote[k]).length > 18) enh[k] = String(remote[k]);
-					});
-					if (remote.intro && String(remote.intro).length > 40) {
-						enh.analysis = logic.polishSource(remote.intro);
+					const rejected = (remote.checked === false || remote.checked === 'false' || remote.checked === 0);
+					if (!rejected) {
+						['review', 'audience', 'verdict', 'seo_title', 'seo_desc', 'focus_keyword'].forEach((k) => {
+							if (remote[k] && String(remote[k]).length > 18) {
+								const cleaned = logic.factCheck(String(remote[k]), data);
+								if (cleaned) enh[k] = cleaned;
+							}
+						});
+						if (remote.intro && String(remote.intro).length > 40) {
+							const intro = logic.factCheck(remote.intro, data);
+							if (intro.length >= 40) enh.analysis = intro;
+						}
+						if (Array.isArray(remote.highlights)) {
+							const hs = logic.filterClaims(remote.highlights, data);
+							if (hs.length) enh.highlights = hs;
+						}
+						if (remote.analysis) {
+							const tech = logic.factCheck(remote.analysis, data);
+							if (tech.length >= 40) enh.tech_analysis = tech;
+						}
+					} else {
+						enh.verify_note = 'مدل خودش مطمئن نبود؛ متن استودیو از مشخصات منبع ماند.';
 					}
 					if (Array.isArray(remote.tags) && remote.tags.length) enh.tags = remote.tags.slice(0, 12);
 					if (Array.isArray(remote.faq) && remote.faq.length) enh.faq = remote.faq.slice(0, 5);
@@ -732,13 +749,13 @@ const server = http.createServer(async (req, res) => {
 	}
 
 	// --- دانلود آخرین نسخه‌ی افزونه (ZIP) ---
-	if (pathname === '/download/latest' || pathname === '/download/shoper-torob-importer-1.5.6.zip') {
-		const zip = path.join(ROOT, 'dist', 'shoper-torob-importer-1.5.6.zip');
+	if (pathname === '/download/latest' || pathname === '/download/shoper-torob-importer-1.5.7.zip') {
+		const zip = path.join(ROOT, 'dist', 'shoper-torob-importer-1.5.7.zip');
 		try {
 			const data = await fsp.readFile(zip);
 			res.writeHead(200, {
 				'Content-Type': 'application/zip',
-				'Content-Disposition': 'attachment; filename="shoper-torob-importer-1.5.6.zip"',
+				'Content-Disposition': 'attachment; filename="shoper-torob-importer-1.5.7.zip"',
 				'Content-Length': data.length,
 				'Cache-Control': 'no-store',
 			});

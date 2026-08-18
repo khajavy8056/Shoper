@@ -707,6 +707,65 @@ function specGroupsOf(data) {
 	return [];
 }
 
+function digitsFa(value) {
+	const fa = '۰۱۲۳۴۵۶۷۸۹';
+	return String(value || '').replace(/[۰-۹]/g, (ch) => String(fa.indexOf(ch)));
+}
+
+function briefingOf(data, compact) {
+	const lines = ['نام: ' + String((data && data.name1) || ''), 'انگلیسی: ' + String((data && data.name2) || '')];
+	const groups = specGroupsOf(data || {});
+	groups.slice(0, compact ? 4 : 8).forEach((g) => {
+		const bits = Object.keys(g.specs || {}).slice(0, compact ? 3 : 6).map((k) => k + ' ' + g.specs[k]);
+		if (bits.length) lines.push('گروه «' + (g.header || 'مشخصات') + '»: ' + bits.join('؛ '));
+	});
+	let source = polishSource((data && data.description) || '');
+	if (source.length > (compact ? 280 : 900)) source = source.slice(0, compact ? 280 : 900) + '…';
+	if (source) lines.push('متن منبع: ' + source);
+	return lines.join('\n');
+}
+
+function sourceNumbers(data) {
+	const blob = digitsFa(briefingOf(data, false) + ' ' + String((data && data.name1) || '') + ' ' + String((data && data.name2) || ''));
+	const out = {};
+	(blob.match(/\d+(?:[.,]\d+)?/g) || []).forEach((n) => { out[n.replace(',', '.')] = true; });
+	return out;
+}
+
+function factCheck(text, data) {
+	text = polishSource(text);
+	if (!text) return '';
+	const banned = ['تحلیل کارشناسی', 'سال ۲۰۲۶', 'سال 2026', 'نظر مشتری', 'خریداران می‌گویند', 'نظرات کاربران'];
+	const allow = sourceNumbers(data);
+	return text.split(/(?<=[.؟!])\s+/).filter((sent) => {
+		sent = sent.trim();
+		if (!sent) return false;
+		if (banned.some((b) => sent.indexOf(b) >= 0)) return false;
+		const nums = digitsFa(sent).match(/\d+(?:[.,]\d+)?/g) || [];
+		return !nums.some((n) => {
+			const key = n.replace(',', '.');
+			const num = parseFloat(key);
+			if (num < 13) return false;
+			return !allow[key] && !allow[String(parseInt(num, 10))];
+		});
+	}).join(' ').trim();
+}
+
+function claimGrounded(item, data) {
+	item = String(item || '').trim();
+	if (!item) return false;
+	const bag = Object.assign({}, (data && data.key_specs) || {}, (data && data.specs) || {});
+	return Object.keys(bag).some((k) => {
+		const v = String(bag[k] || '').trim();
+		if (v && v.length >= 2 && item.indexOf(v) >= 0) return true;
+		return k && k.length >= 3 && item.indexOf(k) >= 0;
+	});
+}
+
+function filterClaims(items, data) {
+	return (items || []).map((x) => factCheck(String(x || ''), data)).filter((x) => x && claimGrounded(x, data)).slice(0, 6);
+}
+
 function groupSentence(header, specs) {
 	const bits = [];
 	Object.keys(specs || {}).forEach((k) => {
@@ -1187,4 +1246,10 @@ module.exports = {
 	composeArticle,
 	draftArticle,
 	assembleProductHtml,
+	specGroupsOf,
+	contentDepth,
+	briefingOf,
+	factCheck,
+	filterClaims,
+	claimGrounded,
 };

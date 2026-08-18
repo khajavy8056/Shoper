@@ -210,7 +210,7 @@ $hf_token = get_option( 'shoper_hf_token', '' );
 								<label style="display:block;margin-top:8px;"><input type="checkbox" name="ai_auto" value="yes" <?php checked( $ai_auto, 'yes' ); ?>>
 									بعد از دریافت محصول، معرفی و بررسی شروع شود
 								</label>
-								<p class="description" style="margin-top:8px;">مدل از متن منبع و مشخصات واقعی یک معرفی مقاله‌ای کوتاه می‌سازد تا صفحه خالی نماند. مشخصات فنی جداگانه در جدول می‌ماند. اگر سرویس ابری قطع باشد، <strong>استودیوی خواجوی</strong> همان قالب را پر می‌کند.</p>
+								<p class="description" style="margin-top:8px;">مدل اول دادهٔ منبع همین کالا را می‌گیرد، برای هر عنوان نمونه حدود ده خط می‌نویسد، بعد راستی‌آزمایی می‌کند. مدل از فروشگاه به اینترنت دسترسی ندارد. اگر قطع باشد یا ادعای تازه بسازد، <strong>استودیوی خواجوی</strong> همان قالب را از مشخصات منبع پر می‌کند.</p>
 								<p style="margin-top:8px;"><label>توکن اختیاری Hugging Face<br>
 									<input type="password" class="regular-text" name="hf_token" value="<?php echo esc_attr( $hf_token ); ?>" autocomplete="off" placeholder="hf_… فقط اگر خودتان دارید">
 								</label></p>

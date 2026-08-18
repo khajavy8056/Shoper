@@ -23,7 +23,7 @@ const fixtureDir = path.join(__dirname, '../preview/fixtures');
 const searchRaw = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'search-samsung.json'), 'utf8'));
 const detailsRaw = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'details-9bcf3364.json'), 'utf8'));
 
-console.log('\nShoper 1.5.6 node tests\n');
+console.log('\nShoper 1.5.7 node tests\n');
 
 const search = logic.normalizeSearch(searchRaw);
 check('جستجوی fixture نرمال می‌شود', search.results && search.results.length > 0, search.results.length + ' نتیجه');
@@ -81,7 +81,7 @@ check('chooseSuggest لینک more_info را می‌فرستد', /preview\(it\.r
 check('fill هم product_json می‌فرستد', /shoper_fill[\s\S]{0,900}product_json/.test(pluginJs));
 
 const mainPhp = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/shoper-torob-importer.php'), 'utf8');
-check('plugin version 1.5.6', mainPhp.includes("define( 'SHOPER_VERSION', '1.5.6' )"));
+check('plugin version 1.5.7', mainPhp.includes("define( 'SHOPER_VERSION', '1.5.7' )"));
 check('کلاس تجمیع فروشنده بارگذاری می‌شود', mainPhp.includes('class-shoper-seller-aggregator.php'));
 
 check('digikala client required', mainPhp.includes('class-shoper-digikala-client.php') && mainPhp.includes('class-shoper-catalog.php'));
@@ -167,7 +167,7 @@ check('ajax enhance action', ajax.includes('shoper_enhance'));
 const aiPhp = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/includes/class-shoper-ai-client.php'), 'utf8');
 check('AI uses 3 independent free families', aiPhp.includes('openai-fast') && aiPhp.includes('gpt-oss:20b') && aiPhp.includes('oai.endpoints.kepler.ai.cloud.ovh.net') && aiPhp.includes('Qwen3.6-27B'));
 check('old dead llm7 models removed', aiPhp.indexOf("'gpt-4o-mini-2024-07-18'") < 0 && aiPhp.indexOf("'gemma-2-9b-it'") < 0);
-check('merge keeps product data', aiPhp.includes('merge( $studio, $parsed, $data )'));
+check('merge keeps product data', aiPhp.includes('merge( $studio, $parsed, $data )') && aiPhp.includes('fact_check') && aiPhp.includes('remote_rejected'));
 check('prompt writes review template', aiPhp.includes('نقد و بررسی') && aiPhp.includes('verdict') && aiPhp.includes('pros') && aiPhp.includes('گروه‌'));
 check('copywriter builds layout from spec groups', copyPhp.includes('function spec_groups') && copyPhp.includes('product-spec-group') && copyPhp.includes('function group_analysis_paragraph'));
 check('studio mode and max 3 tries', aiPhp.includes("'studio'") && aiPhp.includes('MAX_TRIES') && aiPhp.includes('clamp_seo'));
@@ -182,6 +182,15 @@ check('request از رله و درگاه استفاده می‌کند', client.i
 
 const relay = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/tools/shoper-relay.php'), 'utf8');
 check('رله فقط دامنه ترب را قبول می‌کند', relay.includes('torob\\.(com|ir)') || relay.includes('torob\\.(com|ir)$'));
+check('prompt is three-step with self-check', aiPhp.includes('مرحله ۱') && aiPhp.includes('مرحله ۳') && aiPhp.includes('checked') && aiPhp.includes('اینترنت نداری'));
+check('copywriter has fact_check and briefing', copyPhp.includes('function fact_check') && copyPhp.includes('function briefing') && copyPhp.includes('function filter_claims'));
+const gloveFacts = { name1: 'دستکش ایمنی چرمی', specs: { رنگ: 'مشکی', جنس: 'چرم طبیعی' }, key_specs: { جنس: 'چرم طبیعی' } };
+const checked = logic.factCheck('جنس چرم طبیعی است. پردازنده ۹۹۹ گیگاهرتز دارد.', gloveFacts);
+check('fact_check drops invented numbers', checked.indexOf('999') < 0 && checked.indexOf('چرم طبیعی') >= 0);
+check('fact_check drops fake review phrases', logic.factCheck('نظر مشتری این است که عالی است. رنگ مشکی ثبت شده است.', gloveFacts).indexOf('نظر مشتری') < 0);
+const kept = logic.filterClaims(['جنس: چرم طبیعی', 'باتری ۵۰۰۰ میلی‌آمپر'], gloveFacts).join(' ');
+check('filter_claims keeps grounded highlight', kept.indexOf('چرم طبیعی') >= 0 && kept.indexOf('۵۰۰۰') < 0 && kept.indexOf('5000') < 0);
+check('admin.js three-step prompt', pluginJs.includes('مرحله ۱') && pluginJs.includes('checked') && pluginJs.includes('اینترنت نداری'));
 
 console.log('\nنتیجه:', pass, 'موفق،', fail, 'ناموفق\n');
 process.exit(fail > 0 ? 1 : 0);

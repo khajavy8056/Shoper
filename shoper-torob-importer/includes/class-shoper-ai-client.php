@@ -220,41 +220,19 @@ class Shoper_AI_Client {
 	 * @return string
 	 */
 	public function build_prompt( $data, $compact = false ) {
-		$name   = isset( $data['name1'] ) ? Shoper_Copywriter::s( $data['name1'] ) : '';
-		$name2  = isset( $data['name2'] ) ? Shoper_Copywriter::s( $data['name2'] ) : '';
-		$source = isset( $data['description'] ) ? Shoper_Copywriter::s( $data['description'] ) : '';
-		$limit  = $compact ? 360 : 1400;
-		if ( function_exists( 'mb_strlen' ) && mb_strlen( $source, 'UTF-8' ) > $limit ) {
-			$source = mb_substr( $source, 0, $limit, 'UTF-8' );
-		} elseif ( strlen( $source ) > ( $compact ? 420 : 1600 ) ) {
-			$source = substr( $source, 0, $compact ? 420 : 1600 );
-		}
-		$spec_bits = array();
-		$bag       = array();
-		if ( ! empty( $data['key_specs'] ) && is_array( $data['key_specs'] ) ) {
-			$bag = $data['key_specs'];
-		}
-		if ( ! empty( $data['specs'] ) && is_array( $data['specs'] ) ) {
-			$bag = array_merge( $bag, $data['specs'] );
-		}
-		$i     = 0;
-		$max_s = $compact ? 12 : 24;
-		foreach ( $bag as $k => $v ) {
-			$spec_bits[] = $k . ': ' . Shoper_Copywriter::s( $v );
-			if ( ++$i >= $max_s ) {
-				break;
-			}
-		}
-		$specs = implode( '؛ ', $spec_bits );
-
+		$brief = Shoper_Copywriter::briefing( $data, $compact );
+		$lines = $compact ? '۶ تا ۱۰ خط' : '۸ تا ۱۲ خط';
 		$rules = "نقش: نویسنده صفحه نقد و بررسی همین کالا.\n"
-			. "کار: متن را فقط از منبع و مشخصات همین کالا بنویس. چیدمان را از گروه‌های همین کالا بساز؛ قالب گوشی را روی کالای دیگر کپی نکن. کالا ساده را کوتاه، موبایل و لپ‌تاپ را کامل‌تر بنویس.\n"
-			. "لحن: متقاعدکننده اما نامحسوس. شعار نزن. نظر مشتری نساز. مشخصه تازه اختراع نکن.\n"
-			. "سئو اجباری: seo_title بین ۵۰ تا ۶۰ نویسه و با کلمه خرید؛ seo_desc بین ۱۴۰ تا ۱۵۵ نویسه با ۲ مشخصه واقعی؛ focus_keyword دو تا چهار کلمه؛ tags هشت مورد.\n"
-			. "خروجی فقط JSON با کلیدهای: intro, highlights, pros, cons, verdict, seo_title, seo_desc, focus_keyword, tags\n"
-			. "intro معرفی و بررسی ۲ تا ۴ پاراگراف. highlights چهار تا شش نکته. pros مزایا از مشخصات واقعی. cons فقط اگر در جدول نشانه دارد. verdict نتیجه‌گیری کوتاه خرید.\n";
+			. "مرحله ۱: فقط دادهٔ منبع زیر را بخوان. اینترنت نداری؛ چیزی از بیرون اضافه نکن.\n"
+			. "مرحله ۲: برای هر عنوان نمونه، متن مخصوص همین کالا بنویس. نه خیلی بلند نه خیلی کوتاه؛ معرفی و تحلیل حدود {$lines}. کالا ساده کوتاه‌تر.\n"
+			. "عنوان‌ها: intro=معرفی و بررسی محصول؛ highlights=ویژگی‌های برجسته؛ analysis=تحلیل و آنالیز فنی؛ verdict=نتیجه‌گیری و پیشنهاد خرید.\n"
+			. "لحن متقاعدکننده اما نامحسوس. شعار نزن. نظر مشتری نساز. مشخصه تازه اختراع نکن. چیدمان را از گروه‌های همین کالا بساز؛ قالب گوشی را روی کالای دیگر کپی نکن.\n"
+			. "مرحله ۳: خودت راستی‌آزمایی کن. اگر هر عدد یا ادعایی در منبع نیست حذفش کن. اگر مطمئن نیستی checked را false بگذار.\n"
+			. "سئو: seo_title بین ۵۰ تا ۶۰ نویسه و با خرید؛ seo_desc بین ۱۴۰ تا ۱۵۵ با ۲ مشخصه واقعی؛ focus_keyword دو تا چهار کلمه؛ tags هشت مورد.\n"
+			. "خروجی فقط JSON با کلیدهای: intro, highlights, analysis, pros, cons, verdict, seo_title, seo_desc, focus_keyword, tags, checked\n"
+			. "highlights چهار تا شش نکته از مشخصات واقعی. pros از همان مشخصات. cons فقط اگر در جدول نشانه دارد.\n";
 
-		return $rules . "محصول: {$name}\nانگلیسی: {$name2}\nمنبع: {$source}\nمشخصات: {$specs}";
+		return $rules . "دادهٔ منبع همین کالا:\n" . $brief;
 	}
 
 	/**
@@ -384,7 +362,7 @@ class Shoper_AI_Client {
 					'messages'    => array(
 						array(
 							'role'    => 'system',
-							'content' => 'You write a Persian product review page from source and specs only. Subtle sales tone. Do not invent specs, prices, or fake reviews. Valid JSON only.',
+							'content' => 'Three steps: read supplied source, write each sample heading for this product only, self-check. No internet. Do not invent specs or fake reviews. JSON only.',
 						),
 						array(
 							'role'    => 'user',
@@ -428,7 +406,7 @@ class Shoper_AI_Client {
 	 * @return string|WP_Error
 	 */
 	private function http( $method, $url, $headers, $body ) {
-		$ua = 'ShoperStudio/1.5.6 (Khajavy; +https://github.com/khajavy8056/Shoper)';
+		$ua = 'ShoperStudio/1.5.7 (Khajavy; +https://github.com/khajavy8056/Shoper)';
 		if ( function_exists( 'curl_init' ) ) {
 			$ch  = curl_init( $url );
 			$opt = array(
@@ -516,12 +494,32 @@ class Shoper_AI_Client {
 		if ( ! is_array( $data ) ) {
 			return null;
 		}
-		foreach ( array( 'intro', 'analysis', 'seo_title', 'seo_desc', 'review' ) as $k ) {
+		foreach ( array( 'intro', 'analysis', 'seo_title', 'seo_desc', 'review', 'verdict' ) as $k ) {
 			if ( ! empty( $data[ $k ] ) ) {
 				return $data;
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * آیا مدل خودش رد کرده است؟
+	 *
+	 * @param array $remote پاسخ.
+	 * @return bool
+	 */
+	public static function remote_rejected( $remote ) {
+		if ( ! is_array( $remote ) || ! array_key_exists( 'checked', $remote ) ) {
+			return false;
+		}
+		$v = $remote['checked'];
+		if ( false === $v || 0 === $v || '0' === $v ) {
+			return true;
+		}
+		if ( is_string( $v ) && in_array( strtolower( trim( $v ) ), array( 'false', 'no', 'off' ), true ) ) {
+			return true;
+		}
+		return false;
 	}
 
 	/**
@@ -533,35 +531,43 @@ class Shoper_AI_Client {
 	 * @return array
 	 */
 	public function merge( $studio, $remote, $data = array() ) {
-		$out = $studio;
-		foreach ( array( 'analysis', 'review', 'audience', 'verdict', 'seo_title', 'seo_desc', 'focus_keyword' ) as $k ) {
-			if ( empty( $remote[ $k ] ) || ! is_string( $remote[ $k ] ) ) {
-				continue;
-			}
-			$clean = Shoper_Copywriter::s( $remote[ $k ] );
-			$min   = in_array( $k, array( 'analysis', 'review' ), true ) ? 70 : 18;
-			if ( strlen( $clean ) > $min ) {
-				$out[ $k ] = $clean;
-			}
-		}
-		if ( ! empty( $remote['highlights'] ) && is_array( $remote['highlights'] ) ) {
-			$hs = array();
-			foreach ( $remote['highlights'] as $h ) {
-				$h = Shoper_Copywriter::s( $h );
-				if ( $h ) {
-					$hs[] = $h;
+		$out     = $studio;
+		$trusted = ! self::remote_rejected( $remote );
+
+		if ( $trusted ) {
+			foreach ( array( 'review', 'audience', 'verdict', 'seo_title', 'seo_desc', 'focus_keyword' ) as $k ) {
+				if ( empty( $remote[ $k ] ) || ! is_string( $remote[ $k ] ) ) {
+					continue;
+				}
+				$clean = Shoper_Copywriter::fact_check( $remote[ $k ], $data );
+				$min   = ( 'review' === $k ) ? 40 : 18;
+				if ( Shoper_Copywriter::len( $clean ) > $min ) {
+					$out[ $k ] = $clean;
 				}
 			}
-			if ( $hs ) {
-				$out['highlights'] = array_slice( $hs, 0, 8 );
+			if ( ! empty( $remote['highlights'] ) && is_array( $remote['highlights'] ) ) {
+				$hs = Shoper_Copywriter::filter_claims( $remote['highlights'], $data );
+				if ( $hs ) {
+					$out['highlights'] = $hs;
+				}
+			}
+			foreach ( array( 'pros', 'cons' ) as $list_key ) {
+				if ( empty( $remote[ $list_key ] ) || ! is_array( $remote[ $list_key ] ) ) {
+					continue;
+				}
+				$items = Shoper_Copywriter::filter_claims( $remote[ $list_key ], $data );
+				if ( $items ) {
+					$out[ $list_key ] = $items;
+				}
 			}
 		}
+
 		if ( ! empty( $remote['tags'] ) && is_array( $remote['tags'] ) ) {
 			$tags = array();
-			foreach ( $remote['tags'] as $t ) {
-				$t = Shoper_Copywriter::s( $t );
-				if ( $t ) {
-					$tags[] = $t;
+			foreach ( $remote['tags'] as $tag ) {
+				$tag = Shoper_Copywriter::s( $tag );
+				if ( $tag ) {
+					$tags[] = $tag;
 				}
 			}
 			if ( $tags ) {
@@ -575,7 +581,7 @@ class Shoper_AI_Client {
 					continue;
 				}
 				$q = Shoper_Copywriter::s( isset( $item['q'] ) ? $item['q'] : '' );
-				$a = Shoper_Copywriter::s( isset( $item['a'] ) ? $item['a'] : '' );
+				$a = Shoper_Copywriter::fact_check( isset( $item['a'] ) ? $item['a'] : '', $data );
 				if ( $q && $a ) {
 					$faq[] = array(
 						'q' => $q,
@@ -587,9 +593,10 @@ class Shoper_AI_Client {
 				$out['faq'] = array_slice( $faq, 0, 5 );
 			}
 		}
+
 		$intro = '';
-		if ( ! empty( $remote['intro'] ) ) {
-			$intro = Shoper_Copywriter::polish_source( $remote['intro'] );
+		if ( $trusted && ! empty( $remote['intro'] ) ) {
+			$intro = Shoper_Copywriter::fact_check( $remote['intro'], $data );
 		}
 		if ( Shoper_Copywriter::len( $intro ) < 80 ) {
 			$intro = ! empty( $studio['analysis'] ) ? $studio['analysis'] : '';
@@ -598,23 +605,22 @@ class Shoper_AI_Client {
 			}
 		}
 		if ( $intro ) {
-			$out['intro'] = $intro;
+			$out['intro']    = $intro;
+			$out['analysis'] = $intro;
 		}
-		foreach ( array( 'pros', 'cons' ) as $list_key ) {
-			if ( empty( $remote[ $list_key ] ) || ! is_array( $remote[ $list_key ] ) ) {
-				continue;
-			}
-			$items = array();
-			foreach ( $remote[ $list_key ] as $item ) {
-				$item = Shoper_Copywriter::s( $item );
-				if ( $item ) {
-					$items[] = $item;
-				}
-			}
-			if ( $items ) {
-				$out[ $list_key ] = array_slice( $items, 0, 6 );
-			}
+
+		$tech = '';
+		if ( $trusted && ! empty( $remote['analysis'] ) && is_string( $remote['analysis'] ) ) {
+			$tech = Shoper_Copywriter::fact_check( $remote['analysis'], $data );
 		}
+		if ( Shoper_Copywriter::len( $tech ) < 40 && ! empty( $studio['tech_analysis'] ) ) {
+			$tech = $studio['tech_analysis'];
+		}
+		$out['tech_analysis'] = $tech;
+		if ( ! $trusted ) {
+			$out['verify_note'] = 'مدل خودش مطمئن نبود؛ متن استودیو از مشخصات منبع ماند.';
+		}
+
 		$seo = Shoper_Copywriter::clamp_seo(
 			isset( $out['seo_title'] ) ? $out['seo_title'] : '',
 			isset( $out['seo_desc'] ) ? $out['seo_desc'] : '',
@@ -625,17 +631,6 @@ class Shoper_AI_Client {
 		$out['seo_title']     = $seo['title'];
 		$out['seo_desc']      = $seo['description'];
 		$out['focus_keyword'] = $seo['keyword'];
-
-		$tech = '';
-		if ( ! empty( $remote['analysis'] ) && is_string( $remote['analysis'] ) && Shoper_Copywriter::len( $remote['analysis'] ) > 70 ) {
-			$tech = Shoper_Copywriter::s( $remote['analysis'] );
-		} elseif ( ! empty( $studio['tech_analysis'] ) ) {
-			$tech = $studio['tech_analysis'];
-		}
-		$out['tech_analysis'] = $tech;
-		if ( $intro ) {
-			$out['analysis'] = $intro;
-		}
 
 		$out['description_html'] = Shoper_Copywriter::assemble_html(
 			$data,
