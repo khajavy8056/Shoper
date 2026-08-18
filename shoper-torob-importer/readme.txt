@@ -6,7 +6,7 @@ Tested up to: 6.6
 Requires PHP: 7.4
 WC requires at least: 5.0
 WC tested up to: 9.3
-Stable tag: 1.5.1
+Stable tag: 1.5.2
 License: GPLv2 or later
 
 از نام محصول تا صفحه فروش: مشخصات دانه‌دانه، گالری، توضیحات کارشناسی، بررسی و سئو — با نظارت فروشنده.

@@ -29,6 +29,12 @@ if ( isset( $_POST['shoper_save_settings'] ) && check_admin_referer( 'shoper_set
 	foreach ( $options as $k => $v ) {
 		update_option( $k, $v );
 	}
+	if ( isset( $_POST['hf_token'] ) ) {
+		$hf_in = sanitize_text_field( wp_unslash( $_POST['hf_token'] ) );
+		if ( '' !== $hf_in ) {
+			update_option( 'shoper_hf_token', $hf_in );
+		}
+	}
 	echo '<div class="notice notice-success is-dismissible"><p>تنظیمات ذخیره شد.</p></div>';
 }
 
@@ -198,12 +204,16 @@ $ai_auto = get_option( 'shoper_ai_auto', 'yes' );
 							<th>بازنویسی هوشمند</th>
 							<td>
 								<label><input type="checkbox" name="ai_enabled" value="yes" <?php checked( $ai_enabled, 'yes' ); ?>>
-									فعال — Pollinations ناشناس + LLM7 به‌روز + استودیوی خواجوی
+									فعال — سه مدل رایگان آماده: Pollinations + LLM7 + OVH
 								</label>
 								<label style="display:block;margin-top:8px;"><input type="checkbox" name="ai_auto" value="yes" <?php checked( $ai_auto, 'yes' ); ?>>
 									بعد از دریافت محصول، بازنویسی خودکار شروع شود
 								</label>
-								<p class="description">Hugging Face بدون توکن عمومی کار نمی‌کند؛ لازم نیست تهیه کنید. اگر سرویس ابری قطع باشد متن کامل از استودیو نوشته می‌شود.</p>
+								<p class="description" style="margin-top:8px;">این سه سرویس بدون کلید پولی در افزونه هستند و به‌نوبت عوض می‌شوند تا سقف رایگان یکی کار را نخواباند. کلید پولی داخل مخزن عمومی گذاشته نمی‌شود چون فوراً دزدیده می‌شود. اگر همه قطع باشند، <strong>متن کامل از استودیوی خواجوی</strong> نوشته می‌شود و محصول بدون توضیح نمی‌ماند.</p>
+								<p style="margin-top:8px;"><label>توکن اختیاری Hugging Face<br>
+									<input type="password" class="regular-text" name="hf_token" value="<?php echo esc_attr( $hf_token ); ?>" autocomplete="off" placeholder="hf_… فقط اگر خودتان دارید">
+								</label></p>
+								<p class="description">Hugging Face در ۲۰۲۶ بدون توکن Hub کار نمی‌کند. اگر حساب رایگان دارید توکن را اینجا بگذارید؛ لازم نیست.</p>
 							</td>
 						</tr>
 					</table>

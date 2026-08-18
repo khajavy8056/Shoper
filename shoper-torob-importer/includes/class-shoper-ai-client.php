@@ -1,13 +1,15 @@
 <?php
 /**
- * لایه هوش مصنوعی با چرخش سرویس‌های رایگانِ واقعاً تست‌شده.
+ * لایه هوش مصنوعی با حداقل سه مدل رایگانِ بدون کلید پولی.
  *
  * یافتهٔ زنده (اوت ۲۰۲۶):
  * - Pollinations GET مدل openai-fast برای درخواست ناشناس کار می‌کند.
- * - Hugging Face Router بدون توکن ۴۰۱ می‌دهد؛ فقط اگر کاربر توکن رایگان بگذارد استفاده می‌شود.
- * - مدل‌های قدیمی LLM7 از کاتالوگ فعلی حذف شده‌اند.
+ * - کاتالوگ LLM7 زنده است؛ مدل‌های usage_based_only=false شامل gpt-oss:20b و DeepSeek-V4-Flash-0731.
+ * - کاتالوگ OVH AI Endpoints زنده است و دسترسی ناشناس رسمی دارد (gpt-oss-20b، Qwen3.6-27B).
+ * - Hugging Face Router بدون توکن ۴۰۱ می‌دهد؛ فقط اگر کاربر توکن رایگان خودش را بگذارد.
  *
- * اگر همه قطع شوند استودیوی خواجوی متن کامل را می‌نویسد.
+ * کلید پولی داخل افزونه جاسازی نمی‌شود (در مخزن عمومی فوراً دزدیده می‌شود).
+ * اگر همه قطع شوند استودیوی خواجوی متن کامل را می‌نویسد؛ محصول بدون توضیح نمی‌ماند.
  *
  * @package Shoper
  */
@@ -22,54 +24,96 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Shoper_AI_Client {
 
 	const STATE_OPTION = 'shoper_ai_rotation';
-	const DAILY_CAP    = 36;
-	const COOLDOWN     = 600;
+	const DAILY_CAP    = 40;
+	const COOLDOWN     = 180;
+	const MAX_TRIES    = 3;
+	const TIMEOUT      = 16;
 
 	/**
-	 * فهرست ارائه‌دهنده‌ها.
+	 * فهرست ارائه‌دهنده‌ها — سه خانواده مستقل + مدل‌های ذخیره.
 	 *
 	 * @return array
 	 */
 	public static function default_providers() {
 		$providers = array(
 			array(
-				'id'    => 'pollinations_get',
-				'label' => 'Pollinations (ناشناس)',
-				'type'  => 'pollinations_get',
-				'url'   => 'https://text.pollinations.ai/',
-				'model' => 'openai-fast',
+				'id'      => 'pollinations_get',
+				'label'   => 'Pollinations GPT-OSS',
+				'type'    => 'pollinations_get',
+				'url'     => 'https://text.pollinations.ai/',
+				'model'   => 'openai-fast',
+				'family'  => 'pollinations',
+				'browser' => true,
 			),
 			array(
-				'id'    => 'pollinations_openai',
-				'label' => 'Pollinations Chat',
-				'type'  => 'openai',
-				'url'   => 'https://text.pollinations.ai/openai',
-				'model' => 'openai-fast',
-				'key'   => '',
+				'id'      => 'llm7_gptoss',
+				'label'   => 'LLM7 GPT-OSS 20B',
+				'type'    => 'openai',
+				'url'     => 'https://api.llm7.io/v1/chat/completions',
+				'model'   => 'gpt-oss:20b',
+				'key'     => 'unused',
+				'family'  => 'llm7',
+				'browser' => true,
 			),
 			array(
-				'id'    => 'llm7_gptoss',
-				'label' => 'LLM7 GPT-OSS',
-				'type'  => 'openai',
-				'url'   => 'https://api.llm7.io/v1/chat/completions',
-				'model' => 'gpt-oss:20b',
-				'key'   => 'unused',
+				'id'      => 'ovh_gptoss',
+				'label'   => 'OVH GPT-OSS 20B',
+				'type'    => 'openai',
+				'url'     => 'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/chat/completions',
+				'model'   => 'gpt-oss-20b',
+				'key'     => '',
+				'family'  => 'ovh',
+				'browser' => true,
 			),
 			array(
-				'id'    => 'llm7_flash',
-				'label' => 'LLM7 DeepSeek Flash',
-				'type'  => 'openai',
-				'url'   => 'https://api.llm7.io/v1/chat/completions',
-				'model' => 'DeepSeek-V4-Flash-0731',
-				'key'   => 'unused',
+				'id'      => 'pollinations_openai',
+				'label'   => 'Pollinations Chat',
+				'type'    => 'openai',
+				'url'     => 'https://text.pollinations.ai/openai',
+				'model'   => 'openai-fast',
+				'key'     => '',
+				'family'  => 'pollinations',
+				'browser' => false,
 			),
 			array(
-				'id'    => 'llm7_gemini',
-				'label' => 'LLM7 Gemini Lite',
-				'type'  => 'openai',
-				'url'   => 'https://api.llm7.io/v1/chat/completions',
-				'model' => 'gemini-3.1-flash-lite',
-				'key'   => 'unused',
+				'id'      => 'llm7_flash',
+				'label'   => 'LLM7 DeepSeek Flash',
+				'type'    => 'openai',
+				'url'     => 'https://api.llm7.io/v1/chat/completions',
+				'model'   => 'DeepSeek-V4-Flash-0731',
+				'key'     => 'unused',
+				'family'  => 'llm7',
+				'browser' => false,
+			),
+			array(
+				'id'      => 'ovh_qwen',
+				'label'   => 'OVH Qwen 3.6',
+				'type'    => 'openai',
+				'url'     => 'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/chat/completions',
+				'model'   => 'Qwen3.6-27B',
+				'key'     => '',
+				'family'  => 'ovh',
+				'browser' => true,
+			),
+			array(
+				'id'      => 'llm7_gemini',
+				'label'   => 'LLM7 Gemini Lite',
+				'type'    => 'openai',
+				'url'     => 'https://api.llm7.io/v1/chat/completions',
+				'model'   => 'gemini-3.1-flash-lite',
+				'key'     => 'unused',
+				'family'  => 'llm7',
+				'browser' => false,
+			),
+			array(
+				'id'      => 'ovh_mistral',
+				'label'   => 'OVH Mistral Nemo',
+				'type'    => 'openai',
+				'url'     => 'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/chat/completions',
+				'model'   => 'Mistral-Nemo-Instruct-2407',
+				'key'     => '',
+				'family'  => 'ovh',
+				'browser' => false,
 			),
 		);
 
@@ -78,12 +122,14 @@ class Shoper_AI_Client {
 			array_unshift(
 				$providers,
 				array(
-					'id'    => 'huggingface',
-					'label' => 'Hugging Face Router',
-					'type'  => 'openai',
-					'url'   => 'https://router.huggingface.co/v1/chat/completions',
-					'model' => 'HuggingFaceTB/SmolLM3-3B',
-					'key'   => $hf,
+					'id'      => 'huggingface',
+					'label'   => 'Hugging Face Router',
+					'type'    => 'openai',
+					'url'     => 'https://router.huggingface.co/v1/chat/completions',
+					'model'   => 'HuggingFaceTB/SmolLM3-3B',
+					'key'     => $hf,
+					'family'  => 'huggingface',
+					'browser' => false,
 				)
 			);
 		}
@@ -92,24 +138,59 @@ class Shoper_AI_Client {
 	}
 
 	/**
-	 * بهبود محصول.
+	 * مدل‌هایی که مرورگر مدیر می‌تواند مستقیم صدا بزند.
 	 *
-	 * @param array $data داده.
 	 * @return array
 	 */
-	public function enhance( $data ) {
+	public static function browser_providers() {
+		$out = array();
+		foreach ( self::default_providers() as $p ) {
+			if ( empty( $p['browser'] ) ) {
+				continue;
+			}
+			$out[] = array(
+				'id'    => $p['id'],
+				'label' => $p['label'],
+				'type'  => $p['type'],
+				'url'   => $p['url'],
+				'model' => $p['model'],
+				'key'   => isset( $p['key'] ) ? $p['key'] : '',
+			);
+		}
+		return $out;
+	}
+
+	/**
+	 * بهبود محصول.
+	 *
+	 * @param array  $data داده.
+	 * @param string $mode auto|studio|remote.
+	 * @return array
+	 */
+	public function enhance( $data, $mode = 'auto' ) {
 		$studio = Shoper_Copywriter::enhance( $data );
-		if ( 'no' === get_option( 'shoper_ai_enabled', 'yes' ) ) {
+		if ( 'studio' === $mode || 'no' === get_option( 'shoper_ai_enabled', 'yes' ) ) {
 			return $studio;
 		}
 
-		$prompt    = $this->build_prompt( $data );
 		$providers = $this->ordered_providers();
+		$tried     = array();
+		$attempts  = 0;
 		foreach ( $providers as $provider ) {
+			$family = isset( $provider['family'] ) ? $provider['family'] : $provider['id'];
+			if ( isset( $tried[ $family ] ) ) {
+				continue;
+			}
 			if ( $this->is_cooling( $provider['id'] ) || $this->over_daily( $provider['id'] ) ) {
 				continue;
 			}
-			$text = $this->call_provider( $provider, $prompt );
+			$tried[ $family ] = true;
+			if ( ++$attempts > self::MAX_TRIES ) {
+				break;
+			}
+			$compact = ( 'pollinations_get' === $provider['type'] );
+			$prompt  = $this->build_prompt( $data, $compact );
+			$text    = $this->call_provider( $provider, $prompt );
 			if ( is_wp_error( $text ) || ! is_string( $text ) || '' === trim( $text ) ) {
 				$this->mark_fail( $provider['id'] );
 				continue;
@@ -132,19 +213,21 @@ class Shoper_AI_Client {
 	}
 
 	/**
-	 * پرامپت فشرده و دقیق سئو — مناسب GET و POST.
+	 * پرامپت سئو و بازنویسی.
 	 *
-	 * @param array $data داده.
+	 * @param array $data    داده.
+	 * @param bool  $compact فشرده برای GET.
 	 * @return string
 	 */
-	public function build_prompt( $data ) {
+	public function build_prompt( $data, $compact = false ) {
 		$name   = isset( $data['name1'] ) ? Shoper_Copywriter::s( $data['name1'] ) : '';
 		$name2  = isset( $data['name2'] ) ? Shoper_Copywriter::s( $data['name2'] ) : '';
 		$source = isset( $data['description'] ) ? Shoper_Copywriter::s( $data['description'] ) : '';
-		if ( function_exists( 'mb_strlen' ) && mb_strlen( $source, 'UTF-8' ) > 420 ) {
-			$source = mb_substr( $source, 0, 420, 'UTF-8' );
-		} elseif ( strlen( $source ) > 520 ) {
-			$source = substr( $source, 0, 520 );
+		$limit  = $compact ? 360 : 1400;
+		if ( function_exists( 'mb_strlen' ) && mb_strlen( $source, 'UTF-8' ) > $limit ) {
+			$source = mb_substr( $source, 0, $limit, 'UTF-8' );
+		} elseif ( strlen( $source ) > ( $compact ? 420 : 1600 ) ) {
+			$source = substr( $source, 0, $compact ? 420 : 1600 );
 		}
 		$spec_bits = array();
 		$bag       = array();
@@ -154,22 +237,25 @@ class Shoper_AI_Client {
 		if ( ! empty( $data['specs'] ) && is_array( $data['specs'] ) ) {
 			$bag = array_merge( $bag, $data['specs'] );
 		}
-		$i = 0;
+		$i     = 0;
+		$max_s = $compact ? 12 : 24;
 		foreach ( $bag as $k => $v ) {
 			$spec_bits[] = $k . ': ' . Shoper_Copywriter::s( $v );
-			if ( ++$i >= 14 ) {
+			if ( ++$i >= $max_s ) {
 				break;
 			}
 		}
-		$specs = implode('؛ ', $spec_bits);
+		$specs = implode( '؛ ', $spec_bits );
 
-		return "نقش: نویسنده ارشد فروشگاه ایرانی در سال ۲۰۲۶. فقط فارسی رسمی.\n"
-			. "کار: توضیح منبع را کامل و به‌روز کن؛ تحلیل و بررسی و سئو را دقیق پر کن.\n"
-			. "ممنوع: اختراع مشخصه، قیمت، امتیاز مشتری، گارانتی ساختگی.\n"
-			. "سئو اجباری: seo_title بین ۵۰ تا ۶۰ نویسه و با کلمه خرید؛ seo_desc بین ۱۴۰ تا ۱۵۵ نویسه شامل ۲ مشخصه واقعی و دعوت به مشاهده؛ focus_keyword دو تا چهار کلمه؛ tags هشت مورد.\n"
+		$rules = "نقش: نویسنده ارشد فروشگاه ایرانی در سال ۲۰۲۶. فقط فارسی رسمی و دقیق.\n"
+			. "کار: توضیح منبع را کامل، جزئی و به‌روز بازنویسی کن؛ تحلیل کارشناسی و بررسی و سئو را دقیق پر کن.\n"
+			. "ممنوع: اختراع مشخصه، قیمت، امتیاز مشتری، گارانتی ساختگی، نسل یا قابلیت خارج از جدول.\n"
+			. "سئو اجباری: seo_title بین ۵۰ تا ۶۰ نویسه و با کلمه خرید شروع شود؛ seo_desc بین ۱۴۰ تا ۱۵۵ نویسه شامل ۲ مشخصه واقعی و دعوت به مشاهده؛ focus_keyword دو تا چهار کلمه؛ tags هشت مورد.\n"
+			. "intro باید کلمه کلیدی را در جمله اول بیاورد. analysis حداقل سه بند از مشخصات واقعی. review نقاط قوت و نکات قابل توجه بدون نظر جعلی.\n"
 			. "خروجی فقط JSON با کلیدهای: intro, analysis, review, audience, verdict, highlights, faq, seo_title, seo_desc, focus_keyword, tags\n"
-			. "faq آرایه حداکثر ۴ مورد {q,a} از مشخصات واقعی.\n"
-			. "محصول: {$name}\nانگلیسی: {$name2}\nمنبع: {$source}\nمشخصات: {$specs}";
+			. "faq آرایه حداکثر ۴ مورد {q,a} از مشخصات واقعی.\n";
+
+		return $rules . "محصول: {$name}\nانگلیسی: {$name2}\nمنبع: {$source}\nمشخصات: {$specs}";
 	}
 
 	/**
@@ -290,7 +376,7 @@ class Shoper_AI_Client {
 				),
 				$url
 			);
-			return $this->http( 'GET', $url, array(), '' );
+			return $this->http( 'GET', $url, array( 'Accept: application/json, text/plain, */*' ), '' );
 		}
 		if ( 'openai' === $type ) {
 			$payload = wp_json_encode(
@@ -299,15 +385,15 @@ class Shoper_AI_Client {
 					'messages'    => array(
 						array(
 							'role'    => 'system',
-							'content' => 'You write commercial Persian product copy and valid JSON only. Never invent specs.',
+							'content' => 'You write commercial Persian product copy and valid JSON only. Never invent specs. Follow SEO length rules exactly.',
 						),
 						array(
 							'role'    => 'user',
 							'content' => $prompt,
 						),
 					),
-					'temperature' => 0.3,
-					'max_tokens'  => 2200,
+					'temperature' => 0.25,
+					'max_tokens'  => 2600,
 				)
 			);
 			$headers = array(
@@ -343,15 +429,15 @@ class Shoper_AI_Client {
 	 * @return string|WP_Error
 	 */
 	private function http( $method, $url, $headers, $body ) {
-		$ua = 'ShoperStudio/1.5.1 (Khajavy; +https://github.com/khajavy8056/Shoper)';
+		$ua = 'ShoperStudio/1.5.2 (Khajavy; +https://github.com/khajavy8056/Shoper)';
 		if ( function_exists( 'curl_init' ) ) {
-			$ch = curl_init( $url );
+			$ch  = curl_init( $url );
 			$opt = array(
 				CURLOPT_RETURNTRANSFER => true,
 				CURLOPT_FOLLOWLOCATION => true,
 				CURLOPT_MAXREDIRS      => 2,
-				CURLOPT_TIMEOUT        => 35,
-				CURLOPT_CONNECTTIMEOUT => 10,
+				CURLOPT_TIMEOUT        => self::TIMEOUT,
+				CURLOPT_CONNECTTIMEOUT => 8,
 				CURLOPT_USERAGENT      => $ua,
 				CURLOPT_SSL_VERIFYPEER => true,
 				CURLOPT_SSL_VERIFYHOST => 2,
@@ -389,12 +475,12 @@ class Shoper_AI_Client {
 		$res = wp_remote_request(
 			$url,
 			array(
-				'method'    => $method,
-				'timeout'   => 35,
-				'headers'   => $wp_headers,
-				'body'      => $body,
-				'sslverify' => true,
-				'user-agent'=> $ua,
+				'method'     => $method,
+				'timeout'    => self::TIMEOUT,
+				'headers'    => $wp_headers,
+				'body'       => $body,
+				'sslverify'  => true,
+				'user-agent' => $ua,
 			)
 		);
 		if ( is_wp_error( $res ) ) {
@@ -440,7 +526,7 @@ class Shoper_AI_Client {
 	}
 
 	/**
-	 * ادغام با حفظ جداول مشخصات.
+	 * ادغام با حفظ جداول مشخصات و اعمال سئو.
 	 *
 	 * @param array $studio استودیو.
 	 * @param array $remote مدل.
@@ -450,11 +536,13 @@ class Shoper_AI_Client {
 	public function merge( $studio, $remote, $data = array() ) {
 		$out = $studio;
 		foreach ( array( 'analysis', 'review', 'audience', 'verdict', 'seo_title', 'seo_desc', 'focus_keyword' ) as $k ) {
-			if ( ! empty( $remote[ $k ] ) && is_string( $remote[ $k ] ) ) {
-				$clean = Shoper_Copywriter::s( $remote[ $k ] );
-				if ( strlen( $clean ) > 18 ) {
-					$out[ $k ] = $clean;
-				}
+			if ( empty( $remote[ $k ] ) || ! is_string( $remote[ $k ] ) ) {
+				continue;
+			}
+			$clean = Shoper_Copywriter::s( $remote[ $k ] );
+			$min   = in_array( $k, array( 'analysis', 'review' ), true ) ? 70 : 18;
+			if ( strlen( $clean ) > $min ) {
+				$out[ $k ] = $clean;
 			}
 		}
 		if ( ! empty( $remote['highlights'] ) && is_array( $remote['highlights'] ) ) {
@@ -507,6 +595,17 @@ class Shoper_AI_Client {
 				$intro .= ' ' . Shoper_Copywriter::s( $data['description'] );
 			}
 		}
+		$seo = Shoper_Copywriter::clamp_seo(
+			isset( $out['seo_title'] ) ? $out['seo_title'] : '',
+			isset( $out['seo_desc'] ) ? $out['seo_desc'] : '',
+			isset( $out['focus_keyword'] ) ? $out['focus_keyword'] : '',
+			isset( $data['name1'] ) ? $data['name1'] : ( isset( $studio['title'] ) ? $studio['title'] : '' ),
+			isset( $data['key_specs'] ) ? $data['key_specs'] : array()
+		);
+		$out['seo_title']     = $seo['title'];
+		$out['seo_desc']      = $seo['description'];
+		$out['focus_keyword'] = $seo['keyword'];
+
 		$out['description_html'] = Shoper_Copywriter::assemble_html(
 			$data,
 			$intro,
@@ -533,8 +632,14 @@ class Shoper_AI_Client {
 	 */
 	public function probe() {
 		$rows = array();
+		$seen = array();
 		foreach ( self::default_providers() as $p ) {
-			$row = array(
+			$family = isset( $p['family'] ) ? $p['family'] : $p['id'];
+			if ( isset( $seen[ $family ] ) ) {
+				continue;
+			}
+			$seen[ $family ] = true;
+			$row             = array(
 				'id'     => $p['id'],
 				'label'  => $p['label'],
 				'ok'     => false,
@@ -549,6 +654,12 @@ class Shoper_AI_Client {
 					$row['ok']     = strlen( trim( (string) $body ) ) > 0;
 					$row['detail'] = $row['ok'] ? 'پاسخ متنی دریافت شد' : 'پاسخ خالی';
 				}
+			} elseif ( 'llm7' === $family ) {
+				$body = $this->http( 'GET', 'https://api.llm7.io/v1/models', array( 'Accept: application/json' ), '' );
+				$row  = $this->probe_catalog( $row, $body, 'gpt-oss' );
+			} elseif ( 'ovh' === $family ) {
+				$body = $this->http( 'GET', 'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/models', array( 'Accept: application/json' ), '' );
+				$row  = $this->probe_catalog( $row, $body, 'gpt-oss-20b' );
 			} else {
 				$row['detail'] = 'در چرخش ساخت محصول امتحان می‌شود';
 			}
@@ -562,8 +673,27 @@ class Shoper_AI_Client {
 		);
 		return array(
 			'providers' => $rows,
-			'note'      => 'Hugging Face بدون توکن رایگان قابل استفاده نیست. Pollinations برای درخواست ناشناس تست شد.',
+			'note'      => 'سه سرویس رایگان بدون کلید پولی در افزونه است: Pollinations، LLM7، OVH. Hugging Face بدون توکن Hub کار نمی‌کند.',
 		);
+	}
+
+	/**
+	 * پروب کاتالوگ مدل.
+	 *
+	 * @param array             $row  ردیف.
+	 * @param string|WP_Error   $body پاسخ.
+	 * @param string            $need مدل لازم.
+	 * @return array
+	 */
+	private function probe_catalog( $row, $body, $need ) {
+		if ( is_wp_error( $body ) ) {
+			$row['detail'] = $body->get_error_message();
+			return $row;
+		}
+		$ok = false !== stripos( (string) $body, $need );
+		$row['ok']     = $ok;
+		$row['detail'] = $ok ? ( 'کاتالوگ زنده است و مدل ' . $need . ' دیده شد' ) : 'کاتالوگ خوانده شد اما مدل موردنظر نبود';
+		return $row;
 	}
 
 	/**

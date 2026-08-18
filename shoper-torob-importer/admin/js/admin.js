@@ -1255,17 +1255,20 @@
 		 * @return {Object}
 		 */
 		buildSeo: function (d) {
-			var title = d.name1 || '';
+			var title = 'خرید ' + (d.name1 || '');
+			if (title.length > 60) { title = title.slice(0, 57) + '…'; }
+			if (title.length < 50) { title = (title + ' | مشخصات کامل').slice(0, 60); }
 			var parts = [];
 			if (d.name2) { parts.push(d.name2); }
 			var ks = d.key_specs || {};
 			var i = 0;
 			for (var k in ks) {
 				if (!ks.hasOwnProperty(k)) continue;
-				if (i++ >= 5) break;
-				parts.push(k + ': ' + ks[k]);
+				if (i++ >= 2) break;
+				parts.push(k + ' ' + ks[k]);
 			}
-			var desc = parts.join(' | ');
+			var desc = 'خرید ' + (d.name1 || '') + ' با مشخصات کامل، بررسی کارشناسی و تصاویر واقعی. ' + parts.join(' | ');
+			if (desc.length < 140) { desc += ' همین حالا مشخصات را ببینید و مقایسه کنید.'; }
 			if (desc.length > 155) { desc = desc.slice(0, 152) + '…'; }
 
 			var tags = [];
@@ -1734,22 +1737,25 @@
 			this.setAiStatus('آمادهٔ نظارت: ' + label + extra, 'is-ok');
 		},
 
-		buildAiPrompt: function (data) {
+		buildAiPrompt: function (data, compact) {
 			data = data || {};
 			var specs = [];
 			var bag = Object.assign({}, data.key_specs || {}, data.specs || {});
 			var n = 0;
+			var max = compact ? 12 : 24;
 			for (var k in bag) {
 				if (!bag.hasOwnProperty(k)) continue;
 				specs.push(k + ': ' + bag[k]);
-				if (++n >= 14) break;
+				if (++n >= max) break;
 			}
-			var source = String(data.description || '').replace(/\s+/g, ' ').slice(0, 420);
-			return 'نقش: نویسنده ارشد فروشگاه ایرانی در سال ۲۰۲۶. فقط فارسی رسمی.\n'
-				+ 'کار: توضیح منبع را کامل کن؛ تحلیل و بررسی و سئو را دقیق پر کن.\n'
-				+ 'ممنوع: اختراع مشخصه، قیمت، امتیاز مشتری.\n'
-				+ 'سئو اجباری: seo_title ۵۰ تا ۶۰ نویسه با کلمه خرید؛ seo_desc ۱۴۰ تا ۱۵۵ نویسه با ۲ مشخصه واقعی؛ focus_keyword دو تا چهار کلمه؛ tags هشت مورد.\n'
+			var source = String(data.description || '').replace(/\s+/g, ' ').slice(0, compact ? 360 : 1400);
+			return 'نقش: نویسنده ارشد فروشگاه ایرانی در سال ۲۰۲۶. فقط فارسی رسمی و دقیق.\n'
+				+ 'کار: توضیح منبع را کامل، جزئی و به‌روز بازنویسی کن؛ تحلیل کارشناسی و بررسی و سئو را دقیق پر کن.\n'
+				+ 'ممنوع: اختراع مشخصه، قیمت، امتیاز مشتری، گارانتی ساختگی.\n'
+				+ 'سئو اجباری: seo_title بین ۵۰ تا ۶۰ نویسه و با کلمه خرید شروع شود؛ seo_desc بین ۱۴۰ تا ۱۵۵ نویسه شامل ۲ مشخصه واقعی و دعوت به مشاهده؛ focus_keyword دو تا چهار کلمه؛ tags هشت مورد.\n'
+				+ 'intro باید کلمه کلیدی را در جمله اول بیاورد. analysis حداقل سه بند از مشخصات واقعی.\n'
 				+ 'خروجی فقط JSON با کلیدهای: intro, analysis, review, audience, verdict, highlights, faq, seo_title, seo_desc, focus_keyword, tags\n'
+				+ 'faq آرایه حداکثر ۴ مورد {q,a} از مشخصات واقعی.\n'
 				+ 'محصول: ' + (data.name1 || '') + '\nانگلیسی: ' + (data.name2 || '') + '\nمنبع: ' + source + '\nمشخصات: ' + specs.join('؛ ');
 		},
 
@@ -1768,29 +1774,101 @@
 			return null;
 		},
 
-		browserEnhance: function (data) {
+		aiProviderList: function () {
+			var list = this.cfg('aiProviders', []);
+			if (Array.isArray(list) && list.length) {
+				return list;
+			}
+			return [
+				{ id: 'pollinations_get', label: 'Pollinations GPT-OSS', type: 'pollinations_get', url: 'https://text.pollinations.ai/', model: 'openai-fast' },
+				{ id: 'llm7_gptoss', label: 'LLM7 GPT-OSS 20B', type: 'openai', url: 'https://api.llm7.io/v1/chat/completions', model: 'gpt-oss:20b', key: 'unused' },
+				{ id: 'ovh_gptoss', label: 'OVH GPT-OSS 20B', type: 'openai', url: 'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/chat/completions', model: 'gpt-oss-20b' }
+			];
+		},
+
+		callAiProvider: function (provider, prompt) {
 			var dfd = $.Deferred();
-			if (!window.fetch) return dfd.resolve(null).promise();
-			var prompt = this.buildAiPrompt(data);
-			var url = 'https://text.pollinations.ai/' + encodeURIComponent(prompt) + '?model=openai-fast';
+			if (!window.fetch || !provider) return dfd.resolve(null).promise();
 			var ctrl = window.AbortController ? new AbortController() : null;
-			var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 22000);
-			fetch(url, {
-				method: 'GET',
+			var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 16000);
+			var opts = {
 				mode: 'cors',
 				credentials: 'omit',
-				headers: { 'Accept': 'application/json, text/plain, */*' },
 				signal: ctrl ? ctrl.signal : undefined
-			}).then(function (res) {
+			};
+			if (provider.type === 'pollinations_get') {
+				opts.method = 'GET';
+				opts.headers = { 'Accept': 'application/json, text/plain, */*' };
+				var url = String(provider.url || 'https://text.pollinations.ai/').replace(/\/+$/, '') + '/' + encodeURIComponent(prompt) + '?model=' + encodeURIComponent(provider.model || 'openai-fast');
+				fetch(url, opts).then(function (res) {
+					clearTimeout(timer);
+					if (!res.ok) return null;
+					return res.text();
+				}).then(function (text) {
+					dfd.resolve(text || null);
+				}).catch(function () {
+					clearTimeout(timer);
+					dfd.resolve(null);
+				});
+				return dfd.promise();
+			}
+			opts.method = 'POST';
+			opts.headers = { 'Accept': 'application/json', 'Content-Type': 'application/json' };
+			if (provider.key) {
+				opts.headers.Authorization = 'Bearer ' + provider.key;
+			}
+			opts.body = JSON.stringify({
+				model: provider.model || 'openai-fast',
+				messages: [
+					{ role: 'system', content: 'You write commercial Persian product copy and valid JSON only. Never invent specs.' },
+					{ role: 'user', content: prompt }
+				],
+				temperature: 0.25,
+				max_tokens: 2600
+			});
+			fetch(provider.url, opts).then(function (res) {
 				clearTimeout(timer);
 				if (!res.ok) return null;
 				return res.text();
 			}).then(function (text) {
-				dfd.resolve(text || null);
+				if (!text) { dfd.resolve(null); return; }
+				try {
+					var json = JSON.parse(text);
+					if (json && json.choices && json.choices[0] && json.choices[0].message) {
+						dfd.resolve(json.choices[0].message.content || null);
+						return;
+					}
+				} catch (e) { /* raw text */ }
+				dfd.resolve(text);
 			}).catch(function () {
 				clearTimeout(timer);
 				dfd.resolve(null);
 			});
+			return dfd.promise();
+		},
+
+		browserEnhance: function (data) {
+			var self = this;
+			var dfd = $.Deferred();
+			var list = this.aiProviderList();
+			var i = 0;
+			var next = function () {
+				if (i >= list.length) {
+					dfd.resolve(null, '');
+					return;
+				}
+				var provider = list[i++];
+				var compact = provider.type === 'pollinations_get';
+				self.callAiProvider(provider, self.buildAiPrompt(data, compact)).done(function (text) {
+					var parsed = self.parseAiJson(text);
+					if (parsed && (parsed.analysis || parsed.seo_title || parsed.intro)) {
+						dfd.resolve(parsed, provider);
+						return;
+					}
+					next();
+				});
+			};
+			next();
 			return dfd.promise();
 		},
 
@@ -1800,33 +1878,53 @@
 			if (this._enhancing && !force) { return; }
 			this._enhancing = true;
 			this.setAiStatus((typeof ShoperData !== 'undefined' && ShoperData.i18n && ShoperData.i18n.enhancing) ? ShoperData.i18n.enhancing : 'در حال بازنویسی…', 'is-loading');
-			var runServer = function () {
-				self.ajax('shoper_enhance', {
-					product_json: JSON.stringify(data || self.currentData || {})
-				}, function (resp) {
-					self._enhancing = false;
-					self.applyEnhance(resp);
-				}, function (info) {
-					self._enhancing = false;
-					self.setAiStatus((info && info.message) ? info.message : 'بازنویسی ناموفق بود؛ متن منبع باقی ماند.', 'is-warn');
+			var payload = data || this.currentData || {};
+			var finish = function (resp) {
+				self._enhancing = false;
+				self.applyEnhance(resp);
+			};
+			var keepStudio = function (msg) {
+				self._enhancing = false;
+				if (self.lastEnhance) {
+					self.setAiStatus(msg || 'مدل ابری قطع بود؛ متن کامل استودیو باقی ماند.', 'is-warn');
+				} else {
+					self.setAiStatus(msg || 'بازنویسی ناموفق بود؛ متن منبع باقی ماند.', 'is-warn');
+				}
+			};
+			var tryCloud = function () {
+				self.browserEnhance(payload).done(function (parsed, provider) {
+					if (parsed) {
+						self.ajax('shoper_enhance', {
+							product_json: JSON.stringify(payload),
+							remote_json: JSON.stringify(parsed),
+							remote_provider: provider && provider.label ? provider.label : 'browser'
+						}, finish, function () {
+							self.ajax('shoper_enhance', {
+								product_json: JSON.stringify(payload),
+								mode: 'remote'
+							}, finish, function (info) {
+								keepStudio(info && info.message);
+							});
+						});
+						return;
+					}
+					self.ajax('shoper_enhance', {
+						product_json: JSON.stringify(payload),
+						mode: 'remote'
+					}, finish, function (info) {
+						keepStudio(info && info.message);
+					});
 				});
 			};
-			this.browserEnhance(data || this.currentData || {}).done(function (text) {
-				var parsed = self.parseAiJson(text);
-				if (parsed && (parsed.analysis || parsed.seo_title)) {
-					self.ajax('shoper_enhance', {
-						product_json: JSON.stringify(data || self.currentData || {}),
-						remote_json: JSON.stringify(parsed)
-					}, function (resp) {
-						self._enhancing = false;
-						if (resp && !resp.provider_label) {
-							resp.provider_label = 'Pollinations از مرورگر + استودیو خواجوی';
-						}
-						self.applyEnhance(resp);
-					}, function () { runServer(); });
-					return;
-				}
-				runServer();
+			this.ajax('shoper_enhance', {
+				product_json: JSON.stringify(payload),
+				mode: 'studio'
+			}, function (resp) {
+				self.applyEnhance(resp);
+				self.setAiStatus('متن کامل آماده شد؛ در حال تقویت با مدل ابری رایگان…', 'is-loading');
+				tryCloud();
+			}, function () {
+				tryCloud();
 			});
 		},
 

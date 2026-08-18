@@ -365,6 +365,22 @@ const handlers = {
 		}
 		try {
 			const enh = logic.enhanceProduct(data);
+			const remoteRaw = params.get('remote_json') || '';
+			if (remoteRaw) {
+				try {
+					const remote = JSON.parse(remoteRaw);
+					if (remote && typeof remote === 'object') {
+						['analysis', 'review', 'audience', 'verdict', 'seo_title', 'seo_desc', 'focus_keyword'].forEach((k) => {
+							if (remote[k] && String(remote[k]).length > 18) enh[k] = String(remote[k]);
+						});
+						if (Array.isArray(remote.tags) && remote.tags.length) enh.tags = remote.tags.slice(0, 12);
+						if (Array.isArray(remote.faq) && remote.faq.length) enh.faq = remote.faq.slice(0, 5);
+						enh.provider = params.get('remote_provider') || 'browser';
+						enh.provider_label = (enh.provider) + ' + استودیو خواجوی';
+						enh.remote = true;
+					}
+				} catch (e) { /* keep studio */ }
+			}
 			return ok(res, enh);
 		} catch (err) {
 			return fail(res, err.message);
@@ -707,13 +723,13 @@ const server = http.createServer(async (req, res) => {
 	}
 
 	// --- دانلود آخرین نسخه‌ی افزونه (ZIP) ---
-	if (pathname === '/download/latest' || pathname === '/download/shoper-torob-importer-1.5.1.zip') {
-		const zip = path.join(ROOT, 'dist', 'shoper-torob-importer-1.5.1.zip');
+	if (pathname === '/download/latest' || pathname === '/download/shoper-torob-importer-1.5.2.zip') {
+		const zip = path.join(ROOT, 'dist', 'shoper-torob-importer-1.5.2.zip');
 		try {
 			const data = await fsp.readFile(zip);
 			res.writeHead(200, {
 				'Content-Type': 'application/zip',
-				'Content-Disposition': 'attachment; filename="shoper-torob-importer-1.5.0.zip"',
+				'Content-Disposition': 'attachment; filename="shoper-torob-importer-1.5.2.zip"',
 				'Content-Length': data.length,
 				'Cache-Control': 'no-store',
 			});

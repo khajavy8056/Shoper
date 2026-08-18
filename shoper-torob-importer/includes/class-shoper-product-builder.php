@@ -758,11 +758,11 @@ class Shoper_Product_Builder {
 		if ( 'no' === get_option( 'shoper_ai_enabled', 'yes' ) ) {
 			return array();
 		}
-		if ( ! class_exists( 'Shoper_AI_Client' ) ) {
-			return array();
+		if ( class_exists( 'Shoper_Copywriter' ) ) {
+			// ساخت محصول نباید منتظر API ابری بماند؛ متن کامل همین‌جا آماده است.
+			return Shoper_Copywriter::enhance( $data );
 		}
-		$client = new Shoper_AI_Client();
-		return $client->enhance( $data );
+		return array();
 	}
 
 	/**

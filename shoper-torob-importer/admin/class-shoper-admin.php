@@ -114,6 +114,7 @@ class Shoper_Admin {
 				'gateways'   => Shoper_Torob_Client::active_gateways(),
 				'aiEnabled'  => get_option( 'shoper_ai_enabled', 'yes' ),
 				'aiAuto'     => get_option( 'shoper_ai_auto', 'yes' ),
+				'aiProviders'=> class_exists( 'Shoper_AI_Client' ) ? Shoper_AI_Client::browser_providers() : array(),
 				'author'     => defined( 'SHOPER_AUTHOR' ) ? SHOPER_AUTHOR : 'خواجوی',
 				'i18n'    => array(
 					'searching'    => 'در حال جستجو در کاتالوگ…',

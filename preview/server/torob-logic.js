@@ -723,6 +723,7 @@ function enhanceProduct(data) {
 	if (bat) bits.push('باتری «' + bat + '» یکی از معیارهای دوام روزانه است.');
 	if (bits.length) analysis += '\n\n' + bits.join(' ');
 	if (source) analysis += '\n\nتوضیح کارشناسی منبع در معرفی حفظ شده است.';
+	analysis += '\n\nبرای تصمیم خرید در سال ۲۰۲۶ همین جدول را با نیاز واقعی بسنجید؛ قابلیت خارج از مشخصات ثبت‌شده اضافه نشده است.';
 
 	const pros = [];
 	const cons = [];
@@ -788,9 +789,12 @@ function enhanceProduct(data) {
 	descriptionHtml += '<p class="shoper-source">متن فروش توسط <strong>Shoper Studio</strong> — خواجوی آماده شده است.</p></div>';
 
 	const seo = buildSeo(data);
-	const seoTitle = ('خرید ' + name).slice(0, 60);
+	let seoTitle = 'خرید ' + name;
+	if (seoTitle.length < 50) seoTitle += ' | مشخصات کامل';
+	if (seoTitle.length > 60) seoTitle = seoTitle.slice(0, 57) + '…';
 	let seoDesc = 'خرید ' + name + ' با مشخصات کامل، بررسی کارشناسی و تصاویر واقعی.';
 	if (name2) seoDesc += ' ' + name2;
+	if (seoDesc.length < 140) seoDesc += ' همین حالا مشخصات را ببینید و مقایسه کنید.';
 	if (seoDesc.length > 155) seoDesc = seoDesc.slice(0, 152) + '…';
 	const tags = seo.tags.slice();
 	if (brand && tags.indexOf(brand) < 0) tags.unshift(brand);

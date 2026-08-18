@@ -281,13 +281,13 @@
       <div class="shoper-card shoper-download-card">
         <h3>⬇️ دانلود آخرین نسخه‌ی افزونه</h3>
         <p class="description" style="margin:0 0 10px;">
-          نسخه‌ی نهایی تست‌شده (v1.5.1) به‌صورت ZIP آماده‌ی نصب است.
+          نسخه‌ی نهایی تست‌شده (v1.5.2) به‌صورت ZIP آماده‌ی نصب است.
           بعد از دانلود، پوشه‌ی <code>shoper-torob-importer</code> را در
           <code>wp-content/plugins/</code> بریزید و فعالش کنید.
         </p>
         <a id="shoper-download-btn" class="button button-primary button-hero" style="display:inline-block;text-align:center;width:100%;"
            href="/download/latest">
-          دانلود shoper-torob-importer-1.5.1.zip
+          دانلود shoper-torob-importer-1.5.2.zip
         </a>
         <p class="description" id="download-meta" style="margin-top:8px;font-size:11.5px;"></p>
       </div>
@@ -337,6 +337,11 @@ window.ShoperData = {
   gateways: [],
   aiEnabled: 'yes',
   aiAuto: 'yes',
+  aiProviders: [
+    { id: 'pollinations_get', label: 'Pollinations GPT-OSS', type: 'pollinations_get', url: 'https://text.pollinations.ai/', model: 'openai-fast' },
+    { id: 'llm7_gptoss', label: 'LLM7 GPT-OSS 20B', type: 'openai', url: 'https://api.llm7.io/v1/chat/completions', model: 'gpt-oss:20b', key: 'unused' },
+    { id: 'ovh_gptoss', label: 'OVH GPT-OSS 20B', type: 'openai', url: 'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/chat/completions', model: 'gpt-oss-20b' }
+  ],
   author: 'خواجوی',
   i18n: {
     searching: 'در حال جستجو در ترب…',

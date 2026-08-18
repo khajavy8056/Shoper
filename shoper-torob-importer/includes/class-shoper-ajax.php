@@ -278,6 +278,7 @@ class Shoper_Ajax {
 		}
 
 		$client = new Shoper_AI_Client();
+		$mode   = isset( $_POST['mode'] ) ? sanitize_key( wp_unslash( $_POST['mode'] ) ) : 'auto';
 		$remote = null;
 		if ( ! empty( $_POST['remote_json'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
 			$raw_remote = json_decode( wp_unslash( $_POST['remote_json'] ), true ); // phpcs:ignore
@@ -288,11 +289,12 @@ class Shoper_Ajax {
 		if ( $remote ) {
 			$studio = Shoper_Copywriter::enhance( $payload );
 			$result = $client->merge( $studio, $remote, $payload );
-			$result['provider']       = 'pollinations_browser';
-			$result['provider_label'] = 'Pollinations از مرورگر + استودیو خواجوی';
+			$from   = isset( $_POST['remote_provider'] ) ? sanitize_text_field( wp_unslash( $_POST['remote_provider'] ) ) : 'browser';
+			$result['provider']       = $from ? $from : 'browser';
+			$result['provider_label'] = ( $from ? $from : 'مدل مرورگر' ) . ' + استودیو خواجوی';
 			$result['remote']         = true;
 		} else {
-			$result = $client->enhance( $payload );
+			$result = $client->enhance( $payload, $mode );
 		}
 		$result['rotation'] = $client->status_snapshot();
 		wp_send_json_success( $result );

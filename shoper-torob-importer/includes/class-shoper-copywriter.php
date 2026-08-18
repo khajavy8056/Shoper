@@ -153,11 +153,11 @@ class Shoper_Copywriter {
 	public static function intro( $cat, $name, $name2, $brand, $source, $specs ) {
 		$label = self::category_label( $cat );
 		$parts = array();
-		$lead  = $name . ' یک ' . $label . ' است';
+		$lead  = 'خرید ' . $name . ' یعنی انتخاب یک ' . $label;
 		if ( $brand ) {
 			$lead .= ' از برند ' . $brand;
 		}
-		$lead .= ' که برای خریدار ایرانی با مشخصات دقیق و قابل استناد آماده شده است.';
+		$lead .= ' با مشخصات ثبت‌شده و قابل استناد برای خریدار ایرانی در سال ۲۰۲۶.';
 		$parts[] = $lead;
 		if ( $name2 ) {
 			$parts[] = 'شناسهٔ بین‌المللی محصول: ' . $name2 . '.';
@@ -190,10 +190,10 @@ class Shoper_Copywriter {
 	 */
 	public static function polish_source( $source ) {
 		$source = self::s( $source );
-		if ( function_exists( 'mb_strlen' ) && mb_strlen( $source, 'UTF-8' ) > 1600 ) {
-			$source = mb_substr( $source, 0, 1580, 'UTF-8' ) . '…';
-		} elseif ( strlen( $source ) > 2000 ) {
-			$source = substr( $source, 0, 1980 ) . '…';
+		if ( function_exists( 'mb_strlen' ) && mb_strlen( $source, 'UTF-8' ) > 1800 ) {
+			$source = mb_substr( $source, 0, 1780, 'UTF-8' ) . '…';
+		} elseif ( strlen( $source ) > 2200 ) {
+			$source = substr( $source, 0, 2180 ) . '…';
 		}
 		return $source;
 	}
@@ -285,6 +285,22 @@ class Shoper_Copywriter {
 		if ( $source ) {
 			$paras[] = 'توضیح کارشناسی منبع نیز در معرفی محصول حفظ شده تا لحن فروشگاهی جای دادهٔ فنی را نگیرد.';
 		}
+		$extra = array();
+		$i     = 0;
+		foreach ( array_merge( (array) $keys, (array) $specs ) as $k => $v ) {
+			$line = self::s( $k ) . ' «' . self::s( $v ) . '»';
+			if ( '' === $line || in_array( $line, $extra, true ) ) {
+				continue;
+			}
+			$extra[] = $line;
+			if ( ++$i >= 8 ) {
+				break;
+			}
+		}
+		if ( $extra ) {
+			$paras[] = 'جزئیات دقیق همین مدل برای مقایسهٔ به‌روز: ' . implode( '؛ ', $extra ) . '. هر عدد فقط از کاتالوگ همین کالا آمده است.';
+		}
+		$paras[] = 'برای تصمیم خرید در سال ۲۰۲۶ همین جدول را با نیاز واقعی بسنجید؛ نسل جدید، امتیاز مشتری یا قابلیت خارج از مشخصات ثبت‌شده به متن اضافه نشده است.';
 		return implode( "\n\n", array_filter( $paras ) );
 	}
 
@@ -593,11 +609,78 @@ class Shoper_Copywriter {
 		if ( function_exists( 'mb_strlen' ) && mb_strlen( $keyword, 'UTF-8' ) > 40 ) {
 			$keyword = mb_substr( $keyword, 0, 40, 'UTF-8' );
 		}
+		$clamped = self::clamp_seo( $title, $desc, $keyword, $name, $keys );
+		return array(
+			'title'       => $clamped['title'],
+			'description' => $clamped['description'],
+			'keyword'     => $clamped['keyword'],
+			'tags'        => array_slice( $tags, 0, 12 ),
+		);
+	}
+
+	/**
+	 * طول سئو را سخت اعمال می‌کند.
+	 *
+	 * @param string $title   عنوان.
+	 * @param string $desc    توضیح.
+	 * @param string $keyword کلمه.
+	 * @param string $name    نام محصول.
+	 * @param array  $keys    مشخصات کلیدی.
+	 * @return array
+	 */
+	public static function clamp_seo( $title, $desc, $keyword, $name, $keys = array() ) {
+		$title   = self::s( $title );
+		$desc    = self::s( $desc );
+		$keyword = self::s( $keyword );
+		$name    = self::s( $name );
+		if ( 0 !== strpos( $title, 'خرید' ) ) {
+			$title = 'خرید ' . ( $title ? $title : $name );
+		}
+		$tlen = function_exists( 'mb_strlen' ) ? mb_strlen( $title, 'UTF-8' ) : strlen( $title );
+		if ( $tlen < 50 ) {
+			$title .= ' | مشخصات کامل';
+			$tlen    = function_exists( 'mb_strlen' ) ? mb_strlen( $title, 'UTF-8' ) : strlen( $title );
+		}
+		if ( $tlen > 60 ) {
+			$title = function_exists( 'mb_substr' ) ? mb_substr( $title, 0, 57, 'UTF-8' ) . '…' : ( substr( $title, 0, 57 ) . '…' );
+		}
+		$bits = array();
+		$i    = 0;
+		foreach ( (array) $keys as $k => $v ) {
+			$bits[] = self::s( $k ) . ' ' . self::s( $v );
+			if ( ++$i >= 2 ) {
+				break;
+			}
+		}
+		if ( '' === $desc ) {
+			$desc = 'خرید ' . $name . ' با مشخصات کامل، بررسی کارشناسی و تصاویر واقعی. مشاهده جزئیات.';
+			if ( $bits ) {
+				$desc .= ' ' . implode( ' | ', $bits );
+			}
+		}
+		$dlen = function_exists( 'mb_strlen' ) ? mb_strlen( $desc, 'UTF-8' ) : strlen( $desc );
+		if ( $dlen < 140 ) {
+			$extra = $bits ? ( ' ' . implode( ' | ', $bits ) ) : '';
+			$desc .= $extra . ' همین حالا مشخصات را ببینید و مقایسه کنید.';
+			$dlen   = function_exists( 'mb_strlen' ) ? mb_strlen( $desc, 'UTF-8' ) : strlen( $desc );
+		}
+		if ( $dlen > 155 ) {
+			$desc = function_exists( 'mb_substr' ) ? mb_substr( $desc, 0, 152, 'UTF-8' ) . '…' : ( substr( $desc, 0, 152 ) . '…' );
+		}
+		if ( '' === $keyword ) {
+			$keyword = 'خرید ' . $name;
+		}
+		if ( 0 !== strpos( $keyword, 'خرید' ) ) {
+			$keyword = 'خرید ' . $keyword;
+		}
+		$klen = function_exists( 'mb_strlen' ) ? mb_strlen( $keyword, 'UTF-8' ) : strlen( $keyword );
+		if ( $klen > 40 ) {
+			$keyword = function_exists( 'mb_substr' ) ? mb_substr( $keyword, 0, 40, 'UTF-8' ) : substr( $keyword, 0, 40 );
+		}
 		return array(
 			'title'       => $title,
 			'description' => $desc,
 			'keyword'     => $keyword,
-			'tags'        => array_slice( $tags, 0, 12 ),
 		);
 	}
 
