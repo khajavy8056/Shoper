@@ -102,8 +102,13 @@ class Shoper_Admin {
 			'shoper-admin',
 			'ShoperData',
 			array(
-				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-				'nonce'   => wp_create_nonce( 'shoper_nonce' ),
+				'ajaxUrl'    => admin_url( 'admin-ajax.php' ),
+				'nonce'      => wp_create_nonce( 'shoper_nonce' ),
+				'apiBase'    => Shoper_Torob_Client::API_BASE,
+				'searchPath' => Shoper_Torob_Client::SEARCH_URL,
+				'detailsPath'=> Shoper_Torob_Client::DETAIL_URL,
+				'fetchMode'  => get_option( 'shoper_fetch_mode', 'auto' ),
+				'relayUrl'   => (string) get_option( 'shoper_relay_url', '' ),
 				'i18n'    => array(
 					'searching'    => 'در حال جستجو در ترب…',
 					'loading'      => 'در حال دریافت اطلاعات محصول…',

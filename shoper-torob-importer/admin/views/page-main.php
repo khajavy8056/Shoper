@@ -16,6 +16,10 @@ if ( isset( $_POST['shoper_save_settings'] ) && check_admin_referer( 'shoper_set
 		'shoper_product_status' => isset( $_POST['product_status'] ) ? sanitize_text_field( wp_unslash( $_POST['product_status'] ) ) : 'draft',
 		'shoper_import_gallery' => isset( $_POST['import_gallery'] ) ? 'yes' : 'no',
 		'shoper_price_behavior' => isset( $_POST['price_behavior'] ) ? sanitize_text_field( wp_unslash( $_POST['price_behavior'] ) ) : 'cheapest',
+		'shoper_proxy_url'      => isset( $_POST['proxy_url'] ) ? esc_url_raw( wp_unslash( $_POST['proxy_url'] ) ) : '',
+		'shoper_relay_url'      => isset( $_POST['relay_url'] ) ? esc_url_raw( wp_unslash( $_POST['relay_url'] ) ) : '',
+		'shoper_fetch_mode'     => isset( $_POST['fetch_mode'] ) ? sanitize_text_field( wp_unslash( $_POST['fetch_mode'] ) ) : 'auto',
+		'shoper_debug'         => isset( $_POST['debug'] ) ? '1' : '',
 	);
 	foreach ( $options as $k => $v ) {
 		update_option( $k, $v );
@@ -27,6 +31,10 @@ $data_source    = get_option( 'shoper_data_source', 'direct' );
 $product_status = get_option( 'shoper_product_status', 'draft' );
 $import_gallery = get_option( 'shoper_import_gallery', 'yes' );
 $price_behavior = get_option( 'shoper_price_behavior', 'cheapest' );
+$proxy_url = get_option( 'shoper_proxy_url', '' );
+$relay_url = get_option( 'shoper_relay_url', '' );
+$fetch_mode = get_option( 'shoper_fetch_mode', 'auto' );
+$shoper_debug = get_option( 'shoper_debug', '' );
 ?>
 <div class="wrap shoper-wrap" dir="rtl">
 	<h1 class="wp-heading-inline">🛒 Shoper — درون‌ریز محصول از ترب</h1>
@@ -96,6 +104,16 @@ $price_behavior = get_option( 'shoper_price_behavior', 'cheapest' );
 								</select>
 							</td>
 						</tr>
+						<tr><th>پروکسی ترب</th><td><input type="url" class="regular-text" name="proxy_url" value="<?php echo esc_attr( $proxy_url ); ?>" placeholder="http://user:pass@proxy.example:8080"><p class="description">اختیاری؛ برای خطای 490 از پروکسی خروجی مناسب استفاده کنید.</p></td></tr>
+						<tr>
+							<th>لاگ اشکال‌زدایی</th>
+							<td>
+								<label><input type="checkbox" name="debug" value="1" <?php checked( $shoper_debug, '1' ); ?>>
+									ثبت جزئیات درخواست‌ها به ترب در لاگ سرور (فقط هنگام عیب‌یابی فعال کنید)
+								</label>
+								<p class="description">می‌توانید به‌جای این گزینه، ثابت <code>SHOPER_DEBUG</code> را در <code>wp-config.php</code> تعریف کنید. در حالت عادی هیچ اطلاعات حساسی ثبت نمی‌شود.</p>
+							</td>
+						</tr>
 						<tr>
 							<th>وضعیت پیش‌فرض</th>
 							<td>
@@ -128,14 +146,17 @@ $price_behavior = get_option( 'shoper_price_behavior', 'cheapest' );
 
 				<hr>
 
-				<h3>تست اتصال</h3>
-				<button type="button" class="button" id="shoper-test-conn">بررسی اتصال به ترب</button>
+				<h3>تست اتصال و عیب‌یابی</h3>
+				<button type="button" class="button" id="shoper-test-conn">بررسی سریع اتصال</button>
+				<button type="button" class="button" id="shoper-diagnostics-btn">🔍 عیب‌یابی کامل</button>
 				<div id="shoper-conn-result" style="margin-top:10px;"></div>
+				<div id="shoper-diagnostics" style="margin-top:12px;display:none;"></div>
 			</div>
 
 			<div class="shoper-card shoper-help">
 				<h3>راهنما</h3>
 				<ul>
+					<li>اگر هاست خارج از ایران است یا ترب کد ۴۹۰ می‌دهد، افزونه اول از <strong>مرورگر شما</strong> داده را می‌گیرد و محصول را بدون تماس دوباره با ترب می‌سازد.</li>
 					<li>تصاویر ابتدا در <strong>کتابخانه‌ی رسانه‌ی</strong> وردپرس ذخیره و سپس به محصول وصل می‌شوند.</li>
 					<li>هر مشخصه‌ی فنی مانند «پردازنده»، «وزن» و «نوع شنا» به‌صورت <strong>یک ویژگی مجزا</strong> در تب ویژگی‌ها ثبت می‌شود.</li>
 					<li>برای جلوگیری از تکرار، SKU محصول برابر با <code>TRB-{random_key}</code> قرار می‌گیرد.</li>

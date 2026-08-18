@@ -1,0 +1,130 @@
+{
+  "_comment": "پاسخ واقعی api.torob.com برای q=گوشی سام — گرفته‌شده در ۲۰۲۶-۰۸-۱۶",
+  "count": 1204,
+  "results": [
+    {
+      "random_key": "ce31f6e1-ce4e-4a9b-9827-aeab2c7eb3b2",
+      "name1": "گوشی سامسونگ A26 5G | حافظه 256 رم 8 گیگابایت",
+      "name2": "Samsung Galaxy A26 5G 256/8 GB",
+      "price": 65000000,
+      "price_text": "از ۶۵٫۰۰۰٫۰۰۰ تومان",
+      "shop_text": "در ۱۲۱ فروشگاه",
+      "image_url": "https://image.torob.com/base/images/ar/n7/arn7mAuFKpLFXDn_.jpg",
+      "image_count": 5,
+      "has_wiki": true,
+      "web_client_absolute_url": "/p/ce31f6e1-ce4e-4a9b-9827-aeab2c7eb3b2/",
+      "more_info_url": "https://api.torob.com/v4/base-product/details/?search_id=01a0075b09a672468a912bfc1d427061&prk=ce31f6e1-ce4e-4a9b-9827-aeab2c7eb3b2",
+      "media_urls": [
+        { "type": "image", "url": "https://image.torob.com/base/images/ar/n7/arn7mAuFKpLFXDn_.jpg" },
+        { "type": "image", "url": "https://image.torob.com/base/images/_M/MH/_MMHIpXsKL6MrcwM.jpg" },
+        { "type": "image", "url": "https://image.torob.com/base/images/eR/sm/eRsmSE6hLMvh7gAc.jpg" },
+        { "type": "image", "url": "https://image.torob.com/base/images/jJ/cs/jJcsFhRw9CFxF8gn.jpg" },
+        { "type": "image", "url": "https://image.torob.com/base/images/z0/OR/z0OR4rufkyYcaiXK.jpg" }
+      ]
+    },
+    {
+      "random_key": "153df520-3821-4053-ba6c-b55dbdd32f1a",
+      "name1": "گوشی سامسونگ (ویتنام) S25 FE 5G | حافظه 256 رم 8 گیگابایت",
+      "name2": "Samsung Galaxy S25 FE 5G (Vietnam) 256/8 GB",
+      "price": 142990000,
+      "price_text": "از ۱۴۲٫۹۹۰٫۰۰۰ تومان",
+      "shop_text": "در ۱۵۳ فروشگاه",
+      "image_url": "https://image.torob.com/base/images/Jg/MD/JgMDpX4-IbV1Igji.webp",
+      "image_count": 6,
+      "has_wiki": true,
+      "web_client_absolute_url": "/p/153df520-3821-4053-ba6c-b55dbdd32f1a/",
+      "more_info_url": "https://api.torob.com/v4/base-product/details/?search_id=01a0075b09a672468a912bfc1d427061&prk=153df520-3821-4053-ba6c-b55dbdd32f1a",
+      "media_urls": [
+        { "type": "image", "url": "https://image.torob.com/base/images/Jg/MD/JgMDpX4-IbV1Igji.webp" },
+        { "type": "image", "url": "https://image.torob.com/base/images/xF/UZ/xFUZ1PV10x0gDVG7.webp" },
+        { "type": "image", "url": "https://image.torob.com/base/images/g-/_8/g-_8wjmo3JUWurC-.webp" },
+        { "type": "image", "url": "https://image.torob.com/base/images/ag/-v/ag-vF7b9vwm7qMxC.webp" },
+        { "type": "image", "url": "https://image.torob.com/base/images/3i/Zo/3iZo3vjr--q8dpE4.webp" },
+        { "type": "image", "url": "https://image.torob.com/base/images/58/sK/58sK16oHARBxmzLc.webp" }
+      ]
+    },
+    {
+      "random_key": "9bcf3364-2387-42ab-b712-bfc6c429ab07",
+      "name1": "گوشی سامسونگ S26 Ultra 5G | حافظه 256 رم 12 گیگابایت",
+      "name2": "Samsung Galaxy S26 Ultra 5G 256/12 GB",
+      "price": 268500000,
+      "price_text": "از ۲۶۸٫۵۰۰٫۰۰۰ تومان",
+      "shop_text": "در ۹۶ فروشگاه",
+      "image_url": "https://image.torob.com/base/images/ig/uG/iguGCcfuIatx1Qeo.webp",
+      "image_count": 7,
+      "has_wiki": false,
+      "web_client_absolute_url": "/p/9bcf3364-2387-42ab-b712-bfc6c429ab07/",
+      "more_info_url": "https://api.torob.com/v4/base-product/details/?search_id=01a007206c2476dd839cf960182f2a91&prk=9bcf3364-2387-42ab-b712-bfc6c429ab07",
+      "media_urls": [
+        { "type": "image", "url": "https://image.torob.com/base/images/ig/uG/iguGCcfuIatx1Qeo.webp" },
+        { "type": "image", "url": "https://image.torob.com/base/images/o7/i8/o7i8s9kA3-B4LQct.webp" },
+        { "type": "image", "url": "https://image.torob.com/base/images/VH/zw/VHzw-f3QePrBkcnE.webp" },
+        { "type": "image", "url": "https://image.torob.com/base/images/n-/vE/n-vEtXBac-zevBAZ.webp" },
+        { "type": "image", "url": "https://image.torob.com/base/images/dK/C1/dKC1HTiXwzCKWc-M.webp" },
+        { "type": "image", "url": "https://image.torob.com/base/images/90/cC/90cCjDCo7oXa8uNp.webp" },
+        { "type": "image", "url": "https://image.torob.com/base/images/XD/6V/XD6VvfQNOh9xNHdL.webp" }
+      ]
+    },
+    {
+      "random_key": "231000ba-0843-425a-9818-b83dc9cb722d",
+      "name1": "گوشی سامسونگ A57 5G | حافظه 256 رم 8 گیگابایت",
+      "name2": "Samsung Galaxy A57 5G 256/8 GB",
+      "price": 107000000,
+      "price_text": "از ۱۰۷٫۰۰۰٫۰۰۰ تومان",
+      "shop_text": "در ۱۰۵ فروشگاه",
+      "image_url": "https://image.torob.com/base/images/7G/gG/7GgGzx2zuAc5C7eF.webp",
+      "image_count": 3,
+      "has_wiki": true,
+      "web_client_absolute_url": "/p/231000ba-0843-425a-9818-b83dc9cb722d/",
+      "more_info_url": "https://api.torob.com/v4/base-product/details/?search_id=01a0075b09a672468a912bfc1d427061&prk=231000ba-0843-425a-9818-b83dc9cb722d",
+      "media_urls": [
+        { "type": "image", "url": "https://image.torob.com/base/images/7G/gG/7GgGzx2zuAc5C7eF.webp" },
+        { "type": "image", "url": "https://image.torob.com/base/images/VL/_d/VL_dQ1oVFpIEChSE.webp" }
+      ]
+    },
+    {
+      "random_key": "e38591ea-bf06-48dc-ac11-1e4c6771854d",
+      "name1": "گوشی سامسونگ (ویتنام) S25 Ultra 5G | حافظه 512 رم 12 گیگابایت",
+      "name2": "Samsung Galaxy S25 Ultra 5G (Vietnam) 512/12 GB",
+      "price": 285964000,
+      "price_text": "از ۲۸۵٫۹۶۴٫۰۰۰ تومان",
+      "shop_text": "در ۲۹ فروشگاه",
+      "image_url": "https://image.torob.com/base/images/Nq/zZ/NqzZXJ3xnS2hsYEz.webp",
+      "image_count": 7,
+      "has_wiki": true,
+      "web_client_absolute_url": "/p/e38591ea-bf06-48dc-ac11-1e4c6771854d/",
+      "more_info_url": "https://api.torob.com/v4/base-product/details/?search_id=01a0071eaa8575f38f8e2ed25881cfdf&prk=e38591ea-bf06-48dc-ac11-1e4c6771854d",
+      "media_urls": [
+        { "type": "image", "url": "https://image.torob.com/base/images/Nq/zZ/NqzZXJ3xnS2hsYEz.webp" },
+        { "type": "image", "url": "https://image.torob.com/base/images/Sy/wi/SywivydP309SYvAV.webp" },
+        { "type": "image", "url": "https://image.torob.com/base/images/wm/wY/wmwY6cf6uVJBfxKJ.webp" },
+        { "type": "image", "url": "https://image.torob.com/base/images/Ni/cR/NicR4lrV-iuPegPZ.webp" },
+        { "type": "image", "url": "https://image.torob.com/base/images/3s/Y8/3sY8BqmVeo2YT7fB.webp" },
+        { "type": "image", "url": "https://image.torob.com/base/images/KC/YJ/KCYJM3ogydvszJvv.webp" },
+        { "type": "image", "url": "https://image.torob.com/base/images/In/Ga/InGaUsrWEZQ8FV6w.webp" }
+      ]
+    },
+    {
+      "random_key": "3f6b636a-cd3b-49ae-b2c0-b8def912b175",
+      "name1": "گوشی ایکس اینووا S25 Ultra Mini | حافظه 64 رم 4 گیگابایت",
+      "name2": "Xinova S25 Ultra Mini 64/4 GB",
+      "price": 10440000,
+      "price_text": "از ۱۰٫۴۴۰٫۰۰۰ تومان",
+      "shop_text": "در ۳ فروشگاه",
+      "image_url": "https://image.torob.com/base/images/Ff/eH/FfeHW2o2OSAqeJDS.jpg",
+      "image_count": 7,
+      "has_wiki": false,
+      "web_client_absolute_url": "/p/3f6b636a-cd3b-49ae-b2c0-b8def912b175/",
+      "more_info_url": "https://api.torob.com/v4/base-product/details/?search_id=01a0071eaa8575f38f8e2ed25881cfdf&prk=3f6b636a-cd3b-49ae-b2c0-b8def912b175",
+      "media_urls": [
+        { "type": "image", "url": "https://image.torob.com/base/images/Ff/eH/FfeHW2o2OSAqeJDS.jpg" },
+        { "type": "image", "url": "https://image.torob.com/base/images/x7/g5/x7g5m7ZGdCQviA4Q.jpg" },
+        { "type": "image", "url": "https://image.torob.com/base/images/IK/sE/IKsE4NSWOudQy4cu.jpg" },
+        { "type": "image", "url": "https://image.torob.com/base/images/qe/L8/qeL8dvygG1_BvGhz.jpg" },
+        { "type": "image", "url": "https://image.torob.com/base/images/Lc/VO/LcVOZUD_xOFkOFhv.webp" },
+        { "type": "image", "url": "https://image.torob.com/base/images/Ne/bc/NebcO6tzAOMvOr5U.jpg" },
+        { "type": "image", "url": "https://image.torob.com/base/images/lL/JN/lLJNg4R1lW1_9dbk.jpg" }
+      ]
+    }
+  ]
+}
