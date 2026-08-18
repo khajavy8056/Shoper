@@ -412,7 +412,8 @@ class Shoper_Diagnostics {
 			$item['note']       = 'پاسخ 2xx است اما JSON نیست؛ احتمالاً صفحه‌ی HTML خطا یا پاسخ فشرده‌ی بازنشده (Brotli).';
 		} elseif ( 403 === $code || 490 === $code ) {
 			$item['status'] = 'fail';
-			$item['note']   = 'ترب درخواست را مسدود کرده است (کد ' . $code . '). احتمالاً IP هاست یا هدرها؛ پروکسی خروجی مناسب یا هاست ایران.';
+			$item['blocked'] = true;
+			$item['note']   = 'ترب IP این هاست را مسدود کرده (کد ' . $code . '). این روی سرور انتظار می‌رود. افزونه باید از مرورگر مدیر یا رله ایران کار کند — این دکمه فقط مسیر سرور را می‌سنجد.';
 		} elseif ( 429 === $code ) {
 			$item['status'] = 'warn';
 			$item['note']   = 'ترب تعداد درخواست‌ها را محدود کرده (429)؛ کمی بعد دوباره تلاش کنید.';
@@ -484,12 +485,22 @@ class Shoper_Diagnostics {
 			}
 		}
 
+		$blocked = 0;
+		foreach ( $checks as $c ) {
+			if ( ! empty( $c['blocked'] ) || ( isset( $c['code'] ) && in_array( (int) $c['code'], array( 403, 490 ), true ) ) ) {
+				$blocked++;
+			}
+		}
+
 		if ( $ok > 0 ) {
 			$verdict = 'ok';
-			$message = 'حداقل یک روش به ترب متصل شد (' . ( $success ? $success['label'] : '' ) . '). اتصال از این سرور برقرار است.';
+			$message = 'حداقل یک روش سرور به ترب متصل شد (' . ( $success ? $success['label'] : '' ) . ').';
+		} elseif ( $blocked > 0 && $blocked === $fail ) {
+			$verdict = 'blocked';
+			$message = 'سرور این سایت توسط ترب مسدود است (کد 490). این طبیعی است و به معنی خراب بودن افزونه نیست. نام محصول را در کادر جستجو بنویسید تا از مرورگر شما گرفته شود. اگر آنجا هم نتیجه نیامد، رله ایران را تنظیم کنید.';
 		} elseif ( $fail > 0 && $warn === 0 ) {
 			$verdict = 'fail';
-			$message = 'هیچ روشی نتوانست به ترب متصل شود. جزئیات هر روش در گزارش آمده است.';
+			$message = 'هیچ روش سروری به ترب متصل نشد. جزئیات هر روش در گزارش آمده است.';
 		} elseif ( $warn > 0 ) {
 			$verdict = 'warn';
 			$message = 'پاسخ‌هایی دریافت شد اما معتبر نبود (JSON/ساختار/کد). جزئیات را در گزارش ببینید.';
@@ -562,6 +573,8 @@ class Shoper_Diagnostics {
 		$lines[] = '  منبع داده: ' . $env['data_source'];
 		$lines[] = '  timeout / connect-timeout: ' . $env['timeout'] . ' / ' . $env['connect_timeout'];
 		$lines[] = '  پروکسی: ' . ( $env['proxy_configured'] ? $env['proxy'] : 'تنظیم نشده' );
+		$lines[] = '  رله ایران: ' . ( ! empty( $env['relay_configured'] ) ? $env['relay'] : 'تنظیم نشده' );
+		$lines[] = '  روش دریافت: ' . ( isset( $env['fetch_mode'] ) ? $env['fetch_mode'] : 'auto' );
 		$lines[] = '  لاگ اشکال‌زدایی: ' . ( $env['debug_enabled'] ? 'فعال' : 'غیرفعال' );
 		$lines[] = '  دامنه سایت: ' . $env['home_url'];
 		$lines[] = '';

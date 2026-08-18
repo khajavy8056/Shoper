@@ -47,6 +47,9 @@ $shoper_debug = get_option( 'shoper_debug', '' );
 				<p class="description">
 					نام محصول را بنویسید تا از ترب پیدا کنیم. می‌توانید لینک مستقیم محصول ترب را هم بچسبانید.
 				</p>
+				<div class="notice notice-info inline" style="margin:10px 0 0;">
+					<p>اگر دکمهٔ «عیب‌یابی کامل» کد ۴۹۰ نشان داد، یعنی <strong>سرور</strong> مسدود است نه افزونه. همان‌جا در این کادر جستجو کنید — داده از مرورگر شما گرفته می‌شود.</p>
+				</div>
 
 				<div class="shoper-field shoper-mode-toggle">
 					<label><input type="radio" name="shoper_mode" value="query" checked> جستجو با نام</label>
@@ -104,7 +107,21 @@ $shoper_debug = get_option( 'shoper_debug', '' );
 								</select>
 							</td>
 						</tr>
-						<tr><th>پروکسی ترب</th><td><input type="url" class="regular-text" name="proxy_url" value="<?php echo esc_attr( $proxy_url ); ?>" placeholder="http://user:pass@proxy.example:8080"><p class="description">اختیاری؛ برای خطای 490 از پروکسی خروجی مناسب استفاده کنید.</p></td></tr>
+						<tr>
+							<th>روش دریافت از ترب</th>
+							<td>
+								<select name="fetch_mode">
+									<option value="auto" <?php selected( $fetch_mode, 'auto' ); ?>>خودکار (مرورگر، بعد سرور)</option>
+									<option value="browser" <?php selected( $fetch_mode, 'browser' ); ?>>فقط مرورگر (هاست مسدود / خارج)</option>
+									<option value="server" <?php selected( $fetch_mode, 'server' ); ?>>فقط سرور</option>
+									<option value="relay" <?php selected( $fetch_mode, 'relay' ); ?>>رله ایران</option>
+								</select>
+								<p class="description">اگر عیب‌یابی سرور کد ۴۹۰ داد نگران نباشید؛ آن فقط IP هاست را می‌سنجد. جستجو را از کادر بالا امتحان کنید.</p>
+							</td>
+						</tr>
+						<tr><th>پروکسی خروجی</th><td><input type="url" class="regular-text" name="proxy_url" value="<?php echo esc_attr( $proxy_url ); ?>" placeholder="http://user:pass@proxy.example:8080"><p class="description">اختیاری.</p></td></tr>
+						<tr><th>آدرس رله ایران</th><td><input type="url" class="regular-text" name="relay_url" id="shoper-relay-url" value="<?php echo esc_attr( $relay_url ); ?>" placeholder="https://your-iran-host.com/shoper-relay.php?token=..."><p class="description">اگر جستجو از مرورگر هم کار نکرد، فایل <code>tools/shoper-relay.php</code> را روی یک هاست ایران بگذارید و آدرسش را اینجا ذخیره کنید.</p>
+							<p><button type="button" class="button" id="shoper-download-relay">دانلود فایل رله</button></p></td></tr>
 						<tr>
 							<th>لاگ اشکال‌زدایی</th>
 							<td>

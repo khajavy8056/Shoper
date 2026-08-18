@@ -148,6 +148,11 @@
 				self.diagnostics();
 			});
 
+			$(document).on('click', '#shoper-download-relay', function (e) {
+				e.preventDefault();
+				self.downloadRelay();
+			});
+
 			// پر کردن محصول فعلی (در صفحه ویرایش).
 			$(document).on('click', '#shoper-fill-btn', function (e) {
 				e.preventDefault();
@@ -714,14 +719,21 @@
 				self.renderResults(self.lastResults);
 			};
 
+			var searchFail = function (info) {
+				var msg = (info && info.message) ? info.message : 'جستجو ناموفق بود.';
+				if (info && (info.code === 'blocked' || info.status === 490 || info.status === 403)) {
+					msg += ' سرور مسدود است. اگر از مرورگر هم نتیجه نیامد، در تنظیمات رله ایران را ذخیره کنید.';
+				}
+				self.status(msg, 'error');
+			};
 			this.browserFetch(this.torobSearchUrl(query, 10)).done(function (raw) {
 				if (raw && raw.results) {
 					self.ingest('search', raw, showSearch, function () {
-						self.ajax('shoper_search', { query: query }, showSearch);
+						self.ajax('shoper_search', { query: query }, showSearch, searchFail);
 					});
 					return;
 				}
-				self.ajax('shoper_search', { query: query }, showSearch);
+				self.ajax('shoper_search', { query: query }, showSearch, searchFail);
 			});
 		},
 
@@ -1261,11 +1273,18 @@
 
 		testConnection: function () {
 			var self = this;
-			this.$connResult.html('<span class="shoper-loading-inline"></span> در حال تست...');
-			this.ajax('shoper_test_connection', {}, function (data) {
-				self.$connResult.html('<span style="color:#00a32a;">✓ ' + self.esc(data.message) + '</span>');
-			}, function (info) {
-				self.$connResult.html('<span style="color:#d63638;">✗ ' + self.esc(info.message) + '</span>');
+			this.$connResult.html('<span class="shoper-loading-inline"></span> در حال تست مرورگر و سرور...');
+			this.browserFetch(this.torobSearchUrl('s25', 1)).done(function (raw) {
+				if (raw && raw.results) {
+					self.$connResult.html('<span style="color:#00a32a;">✓ اتصال از مرورگر شما برقرار است. همین حالا جستجو کنید.</span>');
+					return;
+				}
+				self.ajax('shoper_test_connection', {}, function (data) {
+					self.$connResult.html('<span style="color:#00a32a;">✓ ' + self.esc(data.message) + '</span>');
+				}, function (info) {
+					var msg = info.message || '';
+					self.$connResult.html('<span style="color:#dba617;">⚠ سرور مسدود است (' + self.esc(msg) + '). اگر جستجوی بالا هم نتیجه نداد، رله ایران را تنظیم کنید.</span>');
+				});
 			});
 		},
 
@@ -1283,8 +1302,11 @@
 			this.$diag.show().html('<div class="shoper-diag-loading"><span class="shoper-loading-inline"></span> در حال اجرای عیب‌یابی کامل… این کار چند ده ثانیه طول می‌کشد.</div>');
 
 			this.ajax('shoper_diagnostics', {}, function (data) {
-				self.$diagBtn.prop('disabled', false);
-				self.renderDiagnostics(data);
+				self.browserFetch(self.torobSearchUrl('s25', 2)).done(function (raw) {
+					self.$diagBtn.prop('disabled', false);
+					self.mergeBrowserDiag(data, raw);
+					self.renderDiagnostics(data);
+				});
 			}, function (info) {
 				self.$diagBtn.prop('disabled', false);
 				self.$diag.html('<div class="shoper-diag-error">خطا در اجرای عیب‌یابی: ' + self.esc(info.message) + '</div>');
@@ -1296,11 +1318,41 @@
 		 *
 		 * @param {Object} d گزارش.
 		 */
+		mergeBrowserDiag: function (d, raw) {
+			d.checks = d.checks || [];
+			var ok = !!(raw && raw.results && raw.results.length);
+			var check = {
+				id: 'browser',
+				label: 'مرورگر مدیر (مسیر اصلی افزونه ۱.۳)',
+				method: 'browser',
+				status: ok ? 'ok' : 'fail',
+				has_results: ok,
+				results_count: ok ? raw.results.length : 0,
+				note: ok
+					? 'مرورگر شما به ترب دسترسی دارد. جستجو را از کادر بالا انجام دهید؛ نیازی به سبز شدن تست سرور نیست.'
+					: 'مرورگر هم نتوانست JSON ترب را بخواند (معمولاً CORS). فایل رله را روی هاست ایران بگذارید.'
+			};
+			d.checks.unshift(check);
+			d.summary = d.summary || {};
+			if (ok) {
+				d.summary.verdict = 'ok';
+				d.summary.message = 'سرور مسدود است اما مرورگر شما به ترب وصل شد. افزونه باید کار کند — در کادر جستجو نام محصول را بنویسید.';
+			} else if (d.summary.verdict === 'blocked' || d.summary.verdict === 'fail') {
+				d.summary.verdict = 'fail';
+				d.summary.message = 'هم سرور و هم مرورگر به ترب نرسیدند. رله ایران لازم است.';
+			}
+			if (d.text) {
+				var line = '[ ' + (ok ? 'OK' : 'FAIL') + ' ] مرورگر مدیر — ' + check.note + '\n';
+				d.text = d.text.replace('[نتیجه‌ی کلی]', line + '\n[نتیجه‌ی کلی]');
+				d.text = d.text.replace(/\[نتیجه‌ی کلی\][^\n]*/, '[نتیجه‌ی کلی] ' + (d.summary.verdict || '').toUpperCase() + ' — ' + d.summary.message);
+			}
+		},
+
 		renderDiagnostics: function (d) {
 			var html = '';
 			var verdict = (d.summary && d.summary.verdict) || 'unknown';
-			var verdictLabel = { ok: 'اتصال برقرار است', warn: 'پاسخ غیرمعتبر', fail: 'اتصال برقرار نشد' }[verdict] || 'نامشخص';
-			var verdictColor = { ok: '#00a32a', warn: '#dba617', fail: '#d63638' }[verdict] || '#555';
+			var verdictLabel = { ok: 'افزونه می‌تواند کار کند', warn: 'پاسخ غیرمعتبر', fail: 'اتصال برقرار نشد', blocked: 'سرور مسدود است — از مرورگر استفاده کنید' }[verdict] || 'نامشخص';
+			var verdictColor = { ok: '#00a32a', warn: '#dba617', fail: '#d63638', blocked: '#dba617' }[verdict] || '#555';
 
 			html += '<div class="shoper-diag">';
 			html += '<div class="shoper-diag-summary" style="border:1px solid ' + verdictColor + ';color:' + verdictColor + ';">';
@@ -1395,6 +1447,49 @@
 		 */
 		diagRow: function (k, v) {
 			return '<tr><th>' + this.esc(k) + '</th><td>' + this.esc(v === undefined || v === null ? '—' : v) + '</td></tr>';
+		},
+
+		downloadRelay: function () {
+			var token = 'shoper-' + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6);
+			var php = [
+				'<?php',
+				'declare(strict_types=1);',
+				"header('X-Content-Type-Options: nosniff');",
+				"$TOKEN = '" + token + "';",
+				"$origin = isset($_SERVER['HTTP_ORIGIN']) ? (string) $_SERVER['HTTP_ORIGIN'] : '*';",
+				"header('Access-Control-Allow-Origin: ' . $origin);",
+				"header('Access-Control-Allow-Methods: GET, OPTIONS');",
+				"header('Access-Control-Allow-Headers: Accept, Content-Type');",
+				"header('Vary: Origin');",
+				"if ('OPTIONS' === strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'))) { http_response_code(204); exit; }",
+				"if ('GET' !== strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? ''))) { http_response_code(405); header('Content-Type: application/json; charset=utf-8'); echo '{\"error\":\"method\"}'; exit; }",
+				"$tok = isset($_GET['token']) ? (string) $_GET['token'] : '';",
+				"if ($TOKEN === '' || !hash_equals($TOKEN, $tok)) { http_response_code(403); echo '{\"error\":\"forbidden\"}'; exit; }",
+				"$target = isset($_GET['url']) ? (string) $_GET['url'] : '';",
+				"if ($target === '' || !preg_match('#^https://#i', $target)) { http_response_code(400); echo '{\"error\":\"url\"}'; exit; }",
+				"$host = parse_url($target, PHP_URL_HOST);",
+				"if (!is_string($host) || !preg_match('#(^|\\.)torob\\.(com|ir)$#i', $host)) { http_response_code(400); echo '{\"error\":\"host\"}'; exit; }",
+				"$ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';",
+				"$ch = curl_init($target);",
+				"curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER=>true,CURLOPT_FOLLOWLOCATION=>true,CURLOPT_MAXREDIRS=>3,CURLOPT_TIMEOUT=>25,CURLOPT_CONNECTTIMEOUT=>10,CURLOPT_USERAGENT=>$ua,CURLOPT_ENCODING=>'gzip, deflate',CURLOPT_SSL_VERIFYPEER=>true,CURLOPT_SSL_VERIFYHOST=>2,CURLOPT_HTTPHEADER=>['Accept: application/json','Referer: https://torob.com/','Origin: https://torob.com']]);",
+				"$body = curl_exec($ch); $code = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE); $ctype = (string) curl_getinfo($ch, CURLINFO_CONTENT_TYPE); curl_close($ch);",
+				"if ($body === false) { http_response_code(502); echo '{\"error\":\"upstream\"}'; exit; }",
+				"http_response_code($code > 0 ? $code : 200);",
+				"header('Content-Type: ' . ($ctype ?: 'application/json; charset=utf-8'));",
+				"echo $body;"
+			].join('\n');
+			var blob = new Blob([php], { type: 'application/x-httpd-php' });
+			var a = document.createElement('a');
+			a.href = URL.createObjectURL(blob);
+			a.download = 'shoper-relay.php';
+			a.click();
+			URL.revokeObjectURL(a.href);
+			var hint = 'https://YOUR-IRAN-HOST/shoper-relay.php?token=' + token;
+			var $field = $('#shoper-relay-url');
+			if ($field.length && !$field.val()) {
+				$field.val(hint);
+			}
+			alert('فایل رله دانلود شد. آن را روی هاست ایران آپلود کنید و در فیلد رله این آدرس را با دامنهٔ واقعی ذخیره کنید:\n' + hint);
 		},
 
 		esc: function (str) {
