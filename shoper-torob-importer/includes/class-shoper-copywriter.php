@@ -38,8 +38,9 @@ class Shoper_Copywriter {
 		$intro    = self::intro( $cat, $name, $name2, $brand, $source, $specs );
 		$audience = self::audience( $cat, $name, $specs );
 		$verdict  = self::verdict( $cat, $name, $highlights );
+		$faq      = self::faq( $cat, $name, $specs, $keys );
 		$short    = self::short_html( $name, $name2, $keys, $highlights );
-		$html     = self::assemble_html( $data, $intro, $highlights, $analysis, $review, $audience, $verdict );
+		$html     = self::assemble_html( $data, $intro, $highlights, $analysis, $review, $audience, $verdict, $faq );
 		$seo      = self::seo( $name, $name2, $brand, $cat, $keys, $specs );
 
 		return array(
@@ -51,6 +52,7 @@ class Shoper_Copywriter {
 			'highlights'         => $highlights,
 			'audience'           => $audience,
 			'verdict'            => $verdict,
+			'faq'                => $faq,
 			'seo_title'          => $seo['title'],
 			'seo_desc'           => $seo['description'],
 			'focus_keyword'      => $seo['keyword'],
@@ -188,10 +190,10 @@ class Shoper_Copywriter {
 	 */
 	public static function polish_source( $source ) {
 		$source = self::s( $source );
-		if ( function_exists( 'mb_strlen' ) && mb_strlen( $source, 'UTF-8' ) > 900 ) {
-			$source = mb_substr( $source, 0, 880, 'UTF-8' ) . '…';
-		} elseif ( strlen( $source ) > 1200 ) {
-			$source = substr( $source, 0, 1180 ) . '…';
+		if ( function_exists( 'mb_strlen' ) && mb_strlen( $source, 'UTF-8' ) > 1600 ) {
+			$source = mb_substr( $source, 0, 1580, 'UTF-8' ) . '…';
+		} elseif ( strlen( $source ) > 2000 ) {
+			$source = substr( $source, 0, 1980 ) . '…';
 		}
 		return $source;
 	}
@@ -540,7 +542,11 @@ class Shoper_Copywriter {
 		$label = self::category_label( $cat );
 		$title = 'خرید ' . $name;
 		if ( function_exists( 'mb_strlen' ) && mb_strlen( $title, 'UTF-8' ) > 60 ) {
-			$title = mb_substr( $name, 0, 57, 'UTF-8' ) . '…';
+			$short_name = $brand ? ( $brand . ' ' . $label ) : $name;
+			$title      = 'خرید ' . $short_name;
+			if ( mb_strlen( $title, 'UTF-8' ) > 60 ) {
+				$title = mb_substr( $title, 0, 57, 'UTF-8' ) . '…';
+			}
 		}
 		$bits = array();
 		if ( $name2 ) {
@@ -583,9 +589,9 @@ class Shoper_Copywriter {
 				$tags[]     = $t;
 			}
 		}
-		$keyword = $brand ? ( $brand . ' ' . $label ) : $name;
+		$keyword = $brand ? ( 'خرید ' . $brand . ' ' . $label ) : ( 'خرید ' . $label );
 		if ( function_exists( 'mb_strlen' ) && mb_strlen( $keyword, 'UTF-8' ) > 40 ) {
-			$keyword = mb_substr( $name, 0, 40, 'UTF-8' );
+			$keyword = mb_substr( $keyword, 0, 40, 'UTF-8' );
 		}
 		return array(
 			'title'       => $title,
@@ -607,7 +613,56 @@ class Shoper_Copywriter {
 	 * @param string $verdict    جمع‌بندی.
 	 * @return string
 	 */
-	public static function assemble_html( $data, $intro, $highlights, $analysis, $review, $audience, $verdict ) {
+	public static function faq( $cat, $name, $specs, $keys ) {
+		$out  = array();
+		$bag  = array_merge( (array) $keys, (array) $specs );
+		$pref = array(
+			'حافظه داخلی'      => 'حافظه داخلی این محصول چقدر است؟',
+			'مقدار رم'         => 'رم این محصول چقدر است؟',
+			'حافظه RAM'        => 'رم این محصول چقدر است؟',
+			'گنجایش باتری'     => 'ظرفیت باتری چقدر اعلام شده؟',
+			'ظرفیت باتری'      => 'ظرفیت باتری چقدر اعلام شده؟',
+			'دوربین اصلی'      => 'دوربین اصلی چه مشخصه‌ای دارد؟',
+			'اندازه صفحه نمایش'=> 'اندازه نمایشگر چقدر است؟',
+			'سیستم عامل'       => 'سیستم‌عامل چیست؟',
+			'پردازنده'         => 'پردازنده چه مدلی است؟',
+			'برند'             => 'برند سازنده چیست؟',
+		);
+		foreach ( $pref as $key => $q ) {
+			if ( empty( $bag[ $key ] ) ) {
+				continue;
+			}
+			$out[] = array(
+				'q' => $q,
+				'a' => self::s( $bag[ $key ] ) . ' — طبق مشخصات ثبت‌شده برای «' . $name . '».',
+			);
+			if ( count( $out ) >= 4 ) {
+				break;
+			}
+		}
+		if ( count( $out ) < 2 ) {
+			$out[] = array(
+				'q' => 'آیا مشخصات فنی کامل در صفحه آمده است؟',
+				'a' => 'بله. جدول مشخصات همین صفحه از کاتالوگ منبع پر شده و هر مورد به‌صورت ویژگی ووکامرس هم ثبت می‌شود.',
+			);
+		}
+		return $out;
+	}
+
+	/**
+	 * مونتاژ HTML نهایی توضیحات.
+	 *
+	 * @param array  $data       داده.
+	 * @param string $intro      معرفی.
+	 * @param array  $highlights نکات.
+	 * @param string $analysis   تحلیل.
+	 * @param string $review     بررسی.
+	 * @param string $audience   مخاطب.
+	 * @param string $verdict    جمع‌بندی.
+	 * @param array  $faq        پرسش‌ها.
+	 * @return string
+	 */
+	public static function assemble_html( $data, $intro, $highlights, $analysis, $review, $audience, $verdict, $faq = array() ) {
 		$html  = '<div class="shoper-studio-copy">';
 		$html .= '<h2>معرفی محصول</h2>';
 		$html .= wpautop( esc_html( $intro ) );
@@ -647,6 +702,17 @@ class Shoper_Copywriter {
 		} elseif ( ! empty( $data['specs'] ) && is_array( $data['specs'] ) ) {
 			$html .= '<h2>مشخصات فنی کامل</h2>';
 			$html .= self::table( $data['specs'] );
+		}
+
+		if ( $faq && is_array( $faq ) ) {
+			$html .= '<h2>پرسش‌های پرتکرار</h2>';
+			foreach ( $faq as $item ) {
+				if ( empty( $item['q'] ) || empty( $item['a'] ) ) {
+					continue;
+				}
+				$html .= '<h3>' . esc_html( $item['q'] ) . '</h3>';
+				$html .= '<p>' . esc_html( $item['a'] ) . '</p>';
+			}
 		}
 
 		$html .= '<h2>جمع‌بندی خرید</h2>';

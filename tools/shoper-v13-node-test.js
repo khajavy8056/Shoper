@@ -23,7 +23,7 @@ const fixtureDir = path.join(__dirname, '../preview/fixtures');
 const searchRaw = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'search-samsung.json'), 'utf8'));
 const detailsRaw = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'details-9bcf3364.json'), 'utf8'));
 
-console.log('\nShoper 1.5 node tests\n');
+console.log('\nShoper 1.5.1 node tests\n');
 
 const search = logic.normalizeSearch(searchRaw);
 check('جستجوی fixture نرمال می‌شود', search.results && search.results.length > 0, search.results.length + ' نتیجه');
@@ -81,7 +81,7 @@ check('chooseSuggest لینک more_info را می‌فرستد', /preview\(it\.r
 check('fill هم product_json می‌فرستد', /shoper_fill[\s\S]{0,900}product_json/.test(pluginJs));
 
 const mainPhp = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/shoper-torob-importer.php'), 'utf8');
-check('plugin version 1.5', mainPhp.includes("define( 'SHOPER_VERSION', '1.5.0' )"));
+check('plugin version 1.5.1', mainPhp.includes("define( 'SHOPER_VERSION', '1.5.1' )"));
 check('کلاس تجمیع فروشنده بارگذاری می‌شود', mainPhp.includes('class-shoper-seller-aggregator.php'));
 
 check('digikala client required', mainPhp.includes('class-shoper-digikala-client.php') && mainPhp.includes('class-shoper-catalog.php'));
@@ -103,9 +103,18 @@ const enh = logic.enhanceProduct(dkDetails);
 check('enhance analysis', !!(enh.analysis && enh.analysis.length > 40));
 check('enhance review', !!(enh.review && enh.review.indexOf('نقاط قوت') >= 0));
 check('enhance seo', !!(enh.seo_title && enh.seo_desc));
+check('enhance seo title خرید', String(enh.seo_title || '').indexOf('خرید') === 0);
+check('enhance faq', Array.isArray(enh.faq) && enh.faq.length >= 1);
 check('enhance keeps specs table', (enh.description_html || '').indexOf('مشخصات') >= 0);
-check('admin.js enhance + 4 steps', pluginJs.includes('queueEnhance') && pluginJs.includes('data-step=\"ai\"') && pluginJs.includes('data-step=\"review\"'));
+check('enhance has FAQ html', (enh.description_html || '').indexOf('پرسش') >= 0);
+check('admin.js enhance + 4 steps', pluginJs.includes('queueEnhance') && pluginJs.includes('data-step="ai"') && pluginJs.includes('data-step="review"'));
+check('admin.js browserEnhance', pluginJs.includes('browserEnhance') && pluginJs.includes('parseAiJson') && pluginJs.includes('text.pollinations.ai'));
 check('ajax enhance action', ajax.includes('shoper_enhance'));
+const aiPhp = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/includes/class-shoper-ai-client.php'), 'utf8');
+check('AI uses live pollinations + current llm7', aiPhp.includes('openai-fast') && aiPhp.includes('gpt-oss:20b') && aiPhp.includes('DeepSeek-V4-Flash-0731'));
+check('old dead llm7 models removed', aiPhp.indexOf("'gpt-4o-mini-2024-07-18'") < 0 && aiPhp.indexOf("'gemma-2-9b-it'") < 0);
+check('merge keeps product data', aiPhp.includes('merge( $studio, $parsed, $data )'));
+check('prompt has SEO rules', aiPhp.includes('seo_title بین'));
 
 check('اکشن ingest ثبت شده', ajax.includes("wp_ajax_shoper_ingest") && ajax.includes('preview_from_payload'));
 

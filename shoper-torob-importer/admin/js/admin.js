@@ -1734,20 +1734,99 @@
 			this.setAiStatus('آمادهٔ نظارت: ' + label + extra, 'is-ok');
 		},
 
+		buildAiPrompt: function (data) {
+			data = data || {};
+			var specs = [];
+			var bag = Object.assign({}, data.key_specs || {}, data.specs || {});
+			var n = 0;
+			for (var k in bag) {
+				if (!bag.hasOwnProperty(k)) continue;
+				specs.push(k + ': ' + bag[k]);
+				if (++n >= 14) break;
+			}
+			var source = String(data.description || '').replace(/\s+/g, ' ').slice(0, 420);
+			return 'نقش: نویسنده ارشد فروشگاه ایرانی در سال ۲۰۲۶. فقط فارسی رسمی.\n'
+				+ 'کار: توضیح منبع را کامل کن؛ تحلیل و بررسی و سئو را دقیق پر کن.\n'
+				+ 'ممنوع: اختراع مشخصه، قیمت، امتیاز مشتری.\n'
+				+ 'سئو اجباری: seo_title ۵۰ تا ۶۰ نویسه با کلمه خرید؛ seo_desc ۱۴۰ تا ۱۵۵ نویسه با ۲ مشخصه واقعی؛ focus_keyword دو تا چهار کلمه؛ tags هشت مورد.\n'
+				+ 'خروجی فقط JSON با کلیدهای: intro, analysis, review, audience, verdict, highlights, faq, seo_title, seo_desc, focus_keyword, tags\n'
+				+ 'محصول: ' + (data.name1 || '') + '\nانگلیسی: ' + (data.name2 || '') + '\nمنبع: ' + source + '\nمشخصات: ' + specs.join('؛ ');
+		},
+
+		parseAiJson: function (text) {
+			if (!text) return null;
+			text = String(text).trim();
+			var fence = text.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
+			if (fence) text = fence[1];
+			var a = text.indexOf('{');
+			var b = text.lastIndexOf('}');
+			if (a < 0 || b <= a) return null;
+			try {
+				var obj = JSON.parse(text.slice(a, b + 1));
+				if (obj && (obj.analysis || obj.review || obj.seo_title || obj.intro)) return obj;
+			} catch (e) { return null; }
+			return null;
+		},
+
+		browserEnhance: function (data) {
+			var dfd = $.Deferred();
+			if (!window.fetch) return dfd.resolve(null).promise();
+			var prompt = this.buildAiPrompt(data);
+			var url = 'https://text.pollinations.ai/' + encodeURIComponent(prompt) + '?model=openai-fast';
+			var ctrl = window.AbortController ? new AbortController() : null;
+			var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 22000);
+			fetch(url, {
+				method: 'GET',
+				mode: 'cors',
+				credentials: 'omit',
+				headers: { 'Accept': 'application/json, text/plain, */*' },
+				signal: ctrl ? ctrl.signal : undefined
+			}).then(function (res) {
+				clearTimeout(timer);
+				if (!res.ok) return null;
+				return res.text();
+			}).then(function (text) {
+				dfd.resolve(text || null);
+			}).catch(function () {
+				clearTimeout(timer);
+				dfd.resolve(null);
+			});
+			return dfd.promise();
+		},
+
 		queueEnhance: function (data, force) {
 			var self = this;
 			if (this.cfg('aiEnabled', 'yes') === 'no') { return; }
 			if (this._enhancing && !force) { return; }
 			this._enhancing = true;
 			this.setAiStatus((typeof ShoperData !== 'undefined' && ShoperData.i18n && ShoperData.i18n.enhancing) ? ShoperData.i18n.enhancing : 'در حال بازنویسی…', 'is-loading');
-			this.ajax('shoper_enhance', {
-				product_json: JSON.stringify(data || this.currentData || {})
-			}, function (resp) {
-				self._enhancing = false;
-				self.applyEnhance(resp);
-			}, function (info) {
-				self._enhancing = false;
-				self.setAiStatus((info && info.message) ? info.message : 'بازنویسی ناموفق بود؛ متن منبع باقی ماند.', 'is-warn');
+			var runServer = function () {
+				self.ajax('shoper_enhance', {
+					product_json: JSON.stringify(data || self.currentData || {})
+				}, function (resp) {
+					self._enhancing = false;
+					self.applyEnhance(resp);
+				}, function (info) {
+					self._enhancing = false;
+					self.setAiStatus((info && info.message) ? info.message : 'بازنویسی ناموفق بود؛ متن منبع باقی ماند.', 'is-warn');
+				});
+			};
+			this.browserEnhance(data || this.currentData || {}).done(function (text) {
+				var parsed = self.parseAiJson(text);
+				if (parsed && (parsed.analysis || parsed.seo_title)) {
+					self.ajax('shoper_enhance', {
+						product_json: JSON.stringify(data || self.currentData || {}),
+						remote_json: JSON.stringify(parsed)
+					}, function (resp) {
+						self._enhancing = false;
+						if (resp && !resp.provider_label) {
+							resp.provider_label = 'Pollinations از مرورگر + استودیو خواجوی';
+						}
+						self.applyEnhance(resp);
+					}, function () { runServer(); });
+					return;
+				}
+				runServer();
 			});
 		},
 

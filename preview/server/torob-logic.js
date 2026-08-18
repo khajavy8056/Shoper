@@ -773,11 +773,22 @@ function enhanceProduct(data) {
 	} else if (specs && Object.keys(specs).length) {
 		descriptionHtml += '<h2>مشخصات فنی کامل</h2>' + renderSpecTable(specs);
 	}
+	const faq = [];
+	const qmap = { 'حافظه داخلی': 'حافظه داخلی این محصول چقدر است؟', 'مقدار رم': 'رم این محصول چقدر است؟', 'گنجایش باتری': 'ظرفیت باتری چقدر اعلام شده؟', 'برند': 'برند سازنده چیست؟' };
+	Object.keys(qmap).forEach((k) => {
+		if (specs[k] || keys[k]) faq.push({ q: qmap[k], a: String(specs[k] || keys[k]) + ' — طبق مشخصات ثبت‌شده.' });
+	});
+	if (faq.length) {
+		descriptionHtml += '<h2>پرسش‌های پرتکرار</h2>';
+		faq.forEach((item) => {
+			descriptionHtml += '<h3>' + escHtml(item.q) + '</h3><p>' + escHtml(item.a) + '</p>';
+		});
+	}
 	descriptionHtml += '<h2>جمع‌بندی خرید</h2><p>' + escHtml(verdict) + '</p>';
 	descriptionHtml += '<p class="shoper-source">متن فروش توسط <strong>Shoper Studio</strong> — خواجوی آماده شده است.</p></div>';
 
 	const seo = buildSeo(data);
-	const seoTitle = ('خرید ' + name).slice(0, 70);
+	const seoTitle = ('خرید ' + name).slice(0, 60);
 	let seoDesc = 'خرید ' + name + ' با مشخصات کامل، بررسی کارشناسی و تصاویر واقعی.';
 	if (name2) seoDesc += ' ' + name2;
 	if (seoDesc.length > 155) seoDesc = seoDesc.slice(0, 152) + '…';
@@ -798,8 +809,9 @@ function enhanceProduct(data) {
 		verdict,
 		seo_title: seoTitle,
 		seo_desc: seoDesc,
-		focus_keyword: brand ? (brand + ' ' + name.split(' ')[0]) : name,
+		focus_keyword: brand ? ('خرید ' + brand) : ('خرید ' + name.split(' ')[0]),
 		tags: tags.slice(0, 12),
+		faq,
 		provider: 'studio',
 		provider_label: 'استودیوی نویسندگی خواجوی',
 		category: cat,

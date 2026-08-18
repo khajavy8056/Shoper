@@ -707,8 +707,8 @@ const server = http.createServer(async (req, res) => {
 	}
 
 	// --- دانلود آخرین نسخه‌ی افزونه (ZIP) ---
-	if (pathname === '/download/latest' || pathname === '/download/shoper-torob-importer-1.5.0.zip') {
-		const zip = path.join(ROOT, 'dist', 'shoper-torob-importer-1.5.0.zip');
+	if (pathname === '/download/latest' || pathname === '/download/shoper-torob-importer-1.5.1.zip') {
+		const zip = path.join(ROOT, 'dist', 'shoper-torob-importer-1.5.1.zip');
 		try {
 			const data = await fsp.readFile(zip);
 			res.writeHead(200, {

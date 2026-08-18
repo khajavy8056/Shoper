@@ -194,6 +194,18 @@ $ai_auto = get_option( 'shoper_ai_auto', 'yes' );
 								</label>
 							</td>
 						</tr>
+						<tr>
+							<th>بازنویسی هوشمند</th>
+							<td>
+								<label><input type="checkbox" name="ai_enabled" value="yes" <?php checked( $ai_enabled, 'yes' ); ?>>
+									فعال — Pollinations ناشناس + LLM7 به‌روز + استودیوی خواجوی
+								</label>
+								<label style="display:block;margin-top:8px;"><input type="checkbox" name="ai_auto" value="yes" <?php checked( $ai_auto, 'yes' ); ?>>
+									بعد از دریافت محصول، بازنویسی خودکار شروع شود
+								</label>
+								<p class="description">Hugging Face بدون توکن عمومی کار نمی‌کند؛ لازم نیست تهیه کنید. اگر سرویس ابری قطع باشد متن کامل از استودیو نوشته می‌شود.</p>
+							</td>
+						</tr>
 					</table>
 					<p><button type="submit" name="shoper_save_settings" class="button">ذخیره تنظیمات</button></p>
 				</form>

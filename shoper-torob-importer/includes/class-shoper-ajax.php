@@ -25,6 +25,7 @@ class Shoper_Ajax {
 		add_action( 'wp_ajax_shoper_create', array( $this, 'create' ) );
 		add_action( 'wp_ajax_shoper_fill', array( $this, 'fill' ) );
 		add_action( 'wp_ajax_shoper_enhance', array( $this, 'enhance' ) );
+		add_action( 'wp_ajax_shoper_ai_probe', array( $this, 'ai_probe' ) );
 		add_action( 'wp_ajax_shoper_test_connection', array( $this, 'test_connection' ) );
 		add_action( 'wp_ajax_shoper_diagnostics', array( $this, 'diagnostics' ) );
 	}
@@ -277,9 +278,38 @@ class Shoper_Ajax {
 		}
 
 		$client = new Shoper_AI_Client();
-		$result = $client->enhance( $payload );
+		$remote = null;
+		if ( ! empty( $_POST['remote_json'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+			$raw_remote = json_decode( wp_unslash( $_POST['remote_json'] ), true ); // phpcs:ignore
+			if ( is_array( $raw_remote ) ) {
+				$remote = $raw_remote;
+			}
+		}
+		if ( $remote ) {
+			$studio = Shoper_Copywriter::enhance( $payload );
+			$result = $client->merge( $studio, $remote, $payload );
+			$result['provider']       = 'pollinations_browser';
+			$result['provider_label'] = 'Pollinations از مرورگر + استودیو خواجوی';
+			$result['remote']         = true;
+		} else {
+			$result = $client->enhance( $payload );
+		}
 		$result['rotation'] = $client->status_snapshot();
 		wp_send_json_success( $result );
+	}
+
+	/**
+	 * پروب اتصال سرویس‌های نویسندگی.
+	 *
+	 * @return void
+	 */
+	public function ai_probe() {
+		$this->guard();
+		if ( ! class_exists( 'Shoper_AI_Client' ) ) {
+			wp_send_json_error( array( 'code' => 'ai_missing', 'message' => 'موتور نویسندگی در دسترس نیست.' ), 500 );
+		}
+		$client = new Shoper_AI_Client();
+		wp_send_json_success( $client->probe() );
 	}
 
 	/**
