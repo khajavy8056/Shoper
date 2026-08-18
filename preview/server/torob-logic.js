@@ -689,78 +689,78 @@ function specOf(specs, names) {
 	return '';
 }
 
+function polishSource(source) {
+	let text = String(source || '');
+	text = text.replace(/<\s*br\s*\/?>/gi, '\n').replace(/<\/p>/gi, '\n\n');
+	text = text.replace(/<[^>]+>/g, ' ');
+	text = text.replace(/\r\n|\r/g, '\n');
+	text = text.replace(/[ \t\u00a0]+/g, ' ');
+	text = text.replace(/ *\n */g, '\n');
+	text = text.replace(/\n{3,}/g, '\n\n');
+	text = text.replace(/\s+([،,.;:!?])/g, '$1');
+	text = text.replace(/([،,.;:!?])\1+/g, '$1');
+	text = text.replace(/([،,.;:!?])(\S)/g, '$1 $2');
+	return text.trim();
+}
+
 function enhanceProduct(data) {
 	const name = String((data && data.name1) || '');
 	const name2 = String((data && data.name2) || '');
 	const specs = (data && data.specs) || {};
 	const keys = (data && data.key_specs) || {};
-	const source = String((data && data.description) || '').replace(/\s+/g, ' ').trim();
 	const cat = detectCategory(name + ' ' + name2);
 	const brand = specOf(specs, ['برند', 'سازنده']);
+	let body = polishSource((data && data.description) || '');
+	if (!body) {
+		body = [name, name2, brand ? ('برند ' + brand) : ''].filter(Boolean).join('. ');
+		if (body && body.slice(-1) !== '.') body += '.';
+	}
+	const facts = [];
+	const pairs = {
+		'رم': specOf(specs, ['مقدار رم', 'حافظه RAM', 'رم', 'مقدار RAM']),
+		'حافظه داخلی': specOf(specs, ['حافظه داخلی', 'ظرفیت حافظه']),
+		'باتری': specOf(specs, ['گنجایش باتری', 'ظرفیت باتری']),
+		'دوربین اصلی': specOf(specs, ['دوربین اصلی', 'کیفیت دوربین اصلی']),
+		'صفحه نمایش': specOf(specs, ['اندازه صفحه نمایش']),
+		'پردازنده': specOf(specs, ['پردازنده', 'پردازنده مرکزی', 'تراشه']),
+	};
+	const hay = body.toLowerCase();
+	Object.keys(pairs).forEach((label) => {
+		const val = pairs[label];
+		if (!val) return;
+		if (hay.indexOf(String(val).toLowerCase()) >= 0) return;
+		facts.push(label + ' ' + val);
+	});
+	if (facts.length) {
+		body += '\n\nطبق مشخصات ثبت‌شده همین کالا: ' + facts.slice(0, 6).join('؛ ') + '.';
+	}
+
 	const highlights = [];
-	const prefer = ['برند', 'مدل', 'مقدار رم', 'حافظه RAM', 'حافظه داخلی', 'گنجایش باتری', 'ظرفیت باتری', 'دوربین اصلی', 'اندازه صفحه نمایش', 'پردازنده'];
+	const prefer = ['برند', 'مدل', 'مقدار رم', 'حافظه RAM', 'مقدار RAM', 'حافظه داخلی', 'گنجایش باتری', 'ظرفیت باتری', 'دوربین اصلی', 'اندازه صفحه نمایش', 'پردازنده'];
+	const bag = Object.assign({}, keys, specs);
 	for (const k of prefer) {
-		const bag = Object.assign({}, keys, specs);
 		if (bag[k]) highlights.push(k + ': ' + bag[k]);
 		if (highlights.length >= 6) break;
 	}
 	if (highlights.length < 4) {
-		for (const [k, v] of Object.entries(Object.assign({}, keys, specs))) {
+		for (const [k, v] of Object.entries(bag)) {
 			const line = k + ': ' + v;
 			if (!highlights.includes(line)) highlights.push(line);
 			if (highlights.length >= 6) break;
 		}
 	}
-	const ram = specOf(specs, ['مقدار رم', 'حافظه RAM', 'رم']);
-	const rom = specOf(specs, ['حافظه داخلی']);
-	const bat = specOf(specs, ['گنجایش باتری', 'ظرفیت باتری']);
-	const cam = specOf(specs, ['دوربین اصلی', 'کیفیت دوربین اصلی']);
-	let analysis = 'تحلیل زیر فقط از مشخصات اعلام‌شده برای «' + name + '» استخراج شده است؛ هیچ قابلیت خارج از داده اضافه نشده.';
-	const bits = [];
-	if (ram) bits.push('رم «' + ram + '» برای چندوظیفگی معیار عملی است.');
-	if (rom) bits.push('حافظه «' + rom + '» سقف نگهداری فایل را مشخص می‌کند.');
-	if (cam) bits.push('دوربین اصلی «' + cam + '» معیار عکاسی روزمره این مدل است.');
-	if (bat) bits.push('باتری «' + bat + '» یکی از معیارهای دوام روزانه است.');
-	if (bits.length) analysis += '\n\n' + bits.join(' ');
-	if (source) analysis += '\n\nتوضیح کارشناسی منبع در معرفی حفظ شده است.';
-	analysis += '\n\nبرای تصمیم خرید در سال ۲۰۲۶ همین جدول را با نیاز واقعی بسنجید؛ قابلیت خارج از مشخصات ثبت‌شده اضافه نشده است.';
 
-	const pros = [];
-	const cons = [];
-	if (brand) pros.push('برند مشخص: ' + brand);
-	if (ram && /(\d+)/.test(ram) && parseInt(RegExp.$1, 10) >= 8) pros.push('رم نسبتاً بالا (' + ram + ')');
-	if (bat) pros.push('ظرفیت باتری اعلام‌شده: ' + bat);
-	if (!pros.length) {
-		highlights.slice(0, 3).forEach((h) => pros.push(h));
-	}
-	if (!specOf(specs, ['گواهی ضدآب'])) cons.push('مقاومت رسمی در برابر آب در مشخصات دیده نشد.');
-	cons.push('قیمت نهایی را فروشگاه تعیین می‌کند؛ این بررسی روی مشخصات است.');
-	let review = 'بررسی کارشناسی «' + name + '» — نه نظر ساختگی مشتری.\n\nنقاط قوت:\n';
-	pros.slice(0, 5).forEach((p) => { review += '• ' + p + '\n'; });
-	review += '\nنکات قابل توجه:\n';
-	cons.slice(0, 4).forEach((c) => { review += '• ' + c + '\n'; });
-	review += '\nجمع‌بندی بررسی: اگر مشخصات با نیاز خریدار هم‌خوان است، مدل برای انتشار در فروشگاه شفاف است.';
-
-	const audience = cat === 'phone'
-		? 'مناسب استفاده روزمره، شبکه‌های اجتماعی و کار اداری سبک. خریدار حرفه‌ای جدول دوربین و باتری را خط‌به‌خط بسنجد.'
-		: 'خریدارانی که می‌خواهند مشخصات، تصاویر و متن فروش را قبل از انتشار خودشان تأیید کنند.';
-	const verdict = name + ' با دادهٔ کامل کاتالوگ برای انتشار در ووکامرس آماده است. ارزش صفحه در شفافیت مشخصات و متن کارشناسی است.';
-	const intro = name + ' برای فروشگاه آماده شده است.' + (brand ? ' برند: ' + brand + '.' : '') + (name2 ? ' شناسه بین‌المللی: ' + name2 + '.' : '') + (source ? ' ' + source.slice(0, 420) : ' در ادامه تحلیل و بررسی کارشناسی آمده است.');
+	const summaryLines = [];
+	Object.entries(bag).slice(0, 10).forEach(([k, v]) => {
+		summaryLines.push('• ' + k + ': ' + v);
+	});
+	const review = summaryLines.join('\n');
 
 	let descriptionHtml = '<div class="shoper-studio-copy">';
-	descriptionHtml += '<h2>معرفی محصول</h2><p>' + escHtml(intro) + '</p>';
+	descriptionHtml += '<h2>معرفی محصول</h2>' + body.split(/\n\n+/).map((p) => '<p>' + escHtml(p) + '</p>').join('');
 	if (highlights.length) {
 		descriptionHtml += '<h2>نکات برجسته</h2><ul>' + highlights.map((h) => '<li>' + escHtml(h) + '</li>').join('') + '</ul>';
 	}
-	descriptionHtml += '<h2>تحلیل کارشناسی</h2>' + analysis.split(/\n\n/).map((p) => '<p>' + escHtml(p) + '</p>').join('');
-	descriptionHtml += '<h2>بررسی محصول</h2>';
-	review.split(/\n+/).forEach((line) => {
-		if (line === 'نقاط قوت:') descriptionHtml += '<h3>نقاط قوت</h3>';
-		else if (line === 'نکات قابل توجه:') descriptionHtml += '<h3>نکات قابل توجه</h3>';
-		else if (line.indexOf('• ') === 0) descriptionHtml += '<p>• ' + escHtml(line.slice(2)) + '</p>';
-		else if (line) descriptionHtml += '<p>' + escHtml(line) + '</p>';
-	});
-	descriptionHtml += '<h2>مناسب برای چه کسانی؟</h2><p>' + escHtml(audience) + '</p>';
 	if (keys && Object.keys(keys).length) {
 		descriptionHtml += '<h2>مشخصات کلیدی</h2>' + renderSpecTable(keys);
 	}
@@ -785,39 +785,38 @@ function enhanceProduct(data) {
 			descriptionHtml += '<h3>' + escHtml(item.q) + '</h3><p>' + escHtml(item.a) + '</p>';
 		});
 	}
-	descriptionHtml += '<h2>جمع‌بندی خرید</h2><p>' + escHtml(verdict) + '</p>';
-	descriptionHtml += '<p class="shoper-source">متن فروش توسط <strong>Shoper Studio</strong> — خواجوی آماده شده است.</p></div>';
+	descriptionHtml += '<p class="shoper-source">متن از منبع مرتب شده است — <strong>Shoper Studio</strong> خواجوی.</p></div>';
 
-	const seo = buildSeo(data);
 	let seoTitle = 'خرید ' + name;
 	if (seoTitle.length < 50) seoTitle += ' | مشخصات کامل';
 	if (seoTitle.length > 60) seoTitle = seoTitle.slice(0, 57) + '…';
-	let seoDesc = 'خرید ' + name + ' با مشخصات کامل، بررسی کارشناسی و تصاویر واقعی.';
+	let seoDesc = 'خرید ' + name + ' با مشخصات کامل و تصاویر واقعی.';
 	if (name2) seoDesc += ' ' + name2;
-	if (seoDesc.length < 140) seoDesc += ' همین حالا مشخصات را ببینید و مقایسه کنید.';
+	if (seoDesc.length < 140) seoDesc += ' مشخصات را ببینید.';
 	if (seoDesc.length > 155) seoDesc = seoDesc.slice(0, 152) + '…';
+	const seo = buildSeo(data);
 	const tags = seo.tags.slice();
 	if (brand && tags.indexOf(brand) < 0) tags.unshift(brand);
 
 	const shortItems = Object.entries(keys).slice(0, 5).map(([k, v]) => '<li><strong>' + escHtml(k) + ':</strong> ' + escHtml(v) + '</li>').join('');
-	const short = (name2 ? '<p>' + escHtml(name2) + '</p>' : '') + '<p>' + escHtml(name) + ' — مشخصات فنی، تصاویر و متن کارشناسی آمادهٔ انتشار.</p>' + (shortItems ? '<ul>' + shortItems + '</ul>' : '');
+	const short = (name2 ? '<p>' + escHtml(name2) + '</p>' : '') + (name ? '<p>' + escHtml(name) + '</p>' : '') + (shortItems ? '<ul>' + shortItems + '</ul>' : '');
 
 	return {
 		title: name,
 		short_description: short,
 		description_html: descriptionHtml,
-		analysis,
+		analysis: body,
 		review,
 		highlights,
-		audience,
-		verdict,
+		audience: '',
+		verdict: '',
 		seo_title: seoTitle,
 		seo_desc: seoDesc,
 		focus_keyword: brand ? ('خرید ' + brand) : ('خرید ' + name.split(' ')[0]),
 		tags: tags.slice(0, 12),
 		faq,
 		provider: 'studio',
-		provider_label: 'استودیوی نویسندگی خواجوی',
+		provider_label: 'ویرایش منبع — استودیو خواجوی',
 		category: cat,
 	};
 }
@@ -836,5 +835,6 @@ module.exports = {
 	numberFormatFa,
 	escHtml,
 	enhanceProduct,
+	polishSource,
 	detectCategory,
 };

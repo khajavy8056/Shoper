@@ -421,7 +421,10 @@ class Shoper_Digikala_Client {
 		} elseif ( ! empty( $product['expert_reviews']['description'] ) ) {
 			$desc = (string) $product['expert_reviews']['description'];
 		}
-		$desc = trim( html_entity_decode( wp_strip_all_tags( $desc ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
+		$desc = html_entity_decode( $desc, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+		$desc = preg_replace( '/<\s*br\s*\/?>/iu', "\n", $desc );
+		$desc = preg_replace( '/<\/p>/iu', "\n\n", $desc );
+		$desc = trim( wp_strip_all_tags( $desc ) );
 
 		$price = $this->extract_price_toman( $product );
 		$uri   = ! empty( $product['url']['uri'] ) ? (string) $product['url']['uri'] : ( $id ? ( '/product/dkp-' . $id . '/' ) : '' );

@@ -23,7 +23,7 @@ const fixtureDir = path.join(__dirname, '../preview/fixtures');
 const searchRaw = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'search-samsung.json'), 'utf8'));
 const detailsRaw = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'details-9bcf3364.json'), 'utf8'));
 
-console.log('\nShoper 1.5.2 node tests\n');
+console.log('\nShoper 1.5.3 node tests\n');
 
 const search = logic.normalizeSearch(searchRaw);
 check('جستجوی fixture نرمال می‌شود', search.results && search.results.length > 0, search.results.length + ' نتیجه');
@@ -81,7 +81,7 @@ check('chooseSuggest لینک more_info را می‌فرستد', /preview\(it\.r
 check('fill هم product_json می‌فرستد', /shoper_fill[\s\S]{0,900}product_json/.test(pluginJs));
 
 const mainPhp = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/shoper-torob-importer.php'), 'utf8');
-check('plugin version 1.5.2', mainPhp.includes("define( 'SHOPER_VERSION', '1.5.2' )"));
+check('plugin version 1.5.3', mainPhp.includes("define( 'SHOPER_VERSION', '1.5.3' )"));
 check('کلاس تجمیع فروشنده بارگذاری می‌شود', mainPhp.includes('class-shoper-seller-aggregator.php'));
 
 check('digikala client required', mainPhp.includes('class-shoper-digikala-client.php') && mainPhp.includes('class-shoper-catalog.php'));
@@ -96,18 +96,22 @@ check('digikala expert review', (dkDetails.description || '').length > 20);
 check('admin.js knows dkp', pluginJs.includes('extractDkp') && pluginJs.includes('dk_search'));
 
 const ajax = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/includes/class-shoper-ajax.php'), 'utf8');
+const copyPhp = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/includes/class-shoper-copywriter.php'), 'utf8');
 
 check('copywriter/ai classes required', mainPhp.includes('class-shoper-copywriter.php') && mainPhp.includes('class-shoper-ai-client.php'));
 check('author Khajavy', mainPhp.includes('خواجوی'));
 const enh = logic.enhanceProduct(dkDetails);
-check('enhance analysis', !!(enh.analysis && enh.analysis.length > 40));
-check('enhance analysis 2026 context', String(enh.analysis || '').indexOf('۲۰۲۶') >= 0);
-check('enhance review', !!(enh.review && enh.review.indexOf('نقاط قوت') >= 0));
+check('enhance keeps source meaning', String(enh.analysis || '').indexOf('گلکسی') >= 0 || String(enh.analysis || '').indexOf('S25') >= 0);
+check('enhance is editor not essay', String(enh.analysis || '').indexOf('نظر ساختگی') < 0 && String(enh.description_html || '').indexOf('تحلیل کارشناسی') < 0);
+check('enhance review is spec summary', !!(enh.review && enh.review.indexOf('•') >= 0));
 check('enhance seo', !!(enh.seo_title && enh.seo_desc));
 check('enhance seo title خرید', String(enh.seo_title || '').indexOf('خرید') === 0);
 check('enhance faq', Array.isArray(enh.faq) && enh.faq.length >= 1);
 check('enhance keeps specs table', (enh.description_html || '').indexOf('مشخصات') >= 0);
 check('enhance has FAQ html', (enh.description_html || '').indexOf('پرسش') >= 0);
+const messy = logic.enhanceProduct(Object.assign({}, dkDetails, { description: 'گلکسی   S25  اولترا،،پرچمدار   سامسونگ' }));
+check('polish collapses spaces and punctuation', String(messy.analysis || '').indexOf('گلکسی S25') >= 0 && String(messy.analysis || '').indexOf('،،') < 0);
+check('copywriter organize in PHP', copyPhp.includes('function organize') && copyPhp.includes('function polish_source'));
 check('admin.js enhance + 4 steps', pluginJs.includes('queueEnhance') && pluginJs.includes('data-step="ai"') && pluginJs.includes('data-step="review"'));
 check('admin.js browserEnhance', pluginJs.includes('browserEnhance') && pluginJs.includes('parseAiJson') && pluginJs.includes('text.pollinations.ai'));
 check('admin.js rotates 3 free models', pluginJs.includes('aiProviderList') && pluginJs.includes('llm7.io') && pluginJs.includes('oai.endpoints.kepler.ai.cloud.ovh.net') && pluginJs.includes('mode: \'studio\''));
@@ -116,9 +120,8 @@ const aiPhp = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/inc
 check('AI uses 3 independent free families', aiPhp.includes('openai-fast') && aiPhp.includes('gpt-oss:20b') && aiPhp.includes('oai.endpoints.kepler.ai.cloud.ovh.net') && aiPhp.includes('Qwen3.6-27B'));
 check('old dead llm7 models removed', aiPhp.indexOf("'gpt-4o-mini-2024-07-18'") < 0 && aiPhp.indexOf("'gemma-2-9b-it'") < 0);
 check('merge keeps product data', aiPhp.includes('merge( $studio, $parsed, $data )'));
-check('prompt has SEO rules', aiPhp.includes('seo_title بین'));
+check('prompt is editor not copywriter', aiPhp.includes('ویراستار') && aiPhp.includes('تولید محتوای تازه ممنوع'));
 check('studio mode and max 3 tries', aiPhp.includes("'studio'") && aiPhp.includes('MAX_TRIES') && aiPhp.includes('clamp_seo'));
-const copyPhp = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/includes/class-shoper-copywriter.php'), 'utf8');
 check('copywriter has clamp_seo', copyPhp.includes('function clamp_seo'));
 check('create uses studio only', ajax.includes('mode') && fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/includes/class-shoper-product-builder.php'), 'utf8').includes('Shoper_Copywriter::enhance'));
 

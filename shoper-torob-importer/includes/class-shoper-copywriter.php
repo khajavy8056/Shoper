@@ -1,9 +1,9 @@
 <?php
 /**
- * استودیوی نویسندگی تجاری خواجوی.
+ * ویراستار متن محصول — مرتب‌سازی منبع، نه تولید محتوا.
  *
- * بدون کلید خارجی کار می‌کند. متن را فقط از دادهٔ واقعی محصول می‌سازد
- * و هیچ مشخصه یا نظر جعلی اختراع نمی‌کند.
+ * متن دیجی‌کالا/ترب را تمیز و پاراگراف‌بندی می‌کند.
+ * اگر ناقص باشد فقط از مشخصات واقعی همان کالا کاملش می‌کند.
  *
  * @package Shoper
  */
@@ -18,53 +18,51 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Shoper_Copywriter {
 
 	/**
-	 * بازنویسی کامل محصول برای فروشگاه.
+	 * مرتب‌سازی محصول برای فروشگاه.
 	 *
 	 * @param array $data دادهٔ نرمال محصول.
 	 * @return array
 	 */
 	public static function enhance( $data ) {
-		$data     = is_array( $data ) ? $data : array();
-		$name     = self::s( isset( $data['name1'] ) ? $data['name1'] : '' );
-		$name2    = self::s( isset( $data['name2'] ) ? $data['name2'] : '' );
-		$specs    = ( isset( $data['specs'] ) && is_array( $data['specs'] ) ) ? $data['specs'] : array();
-		$keys     = ( isset( $data['key_specs'] ) && is_array( $data['key_specs'] ) ) ? $data['key_specs'] : array();
-		$source   = self::s( isset( $data['description'] ) ? $data['description'] : '' );
-		$cat      = self::detect_category( $name . ' ' . $name2, $specs );
-		$brand    = self::spec( $specs, array( 'برند', 'سازنده', 'Brand' ) );
+		$data   = is_array( $data ) ? $data : array();
+		$name   = self::s( isset( $data['name1'] ) ? $data['name1'] : '' );
+		$name2  = self::s( isset( $data['name2'] ) ? $data['name2'] : '' );
+		$specs  = ( isset( $data['specs'] ) && is_array( $data['specs'] ) ) ? $data['specs'] : array();
+		$keys   = ( isset( $data['key_specs'] ) && is_array( $data['key_specs'] ) ) ? $data['key_specs'] : array();
+		$source = isset( $data['description'] ) ? (string) $data['description'] : '';
+		$cat    = self::detect_category( $name . ' ' . $name2, $specs );
+		$brand  = self::spec( $specs, array( 'برند', 'سازنده', 'Brand' ) );
+
+		$body       = self::organize( $source, $name, $name2, $brand, $specs, $keys );
 		$highlights = self::highlights( $cat, $specs, $keys );
-		$analysis = self::analysis( $cat, $name, $specs, $keys, $source );
-		$review   = self::review( $cat, $name, $specs, $keys );
-		$intro    = self::intro( $cat, $name, $name2, $brand, $source, $specs );
-		$audience = self::audience( $cat, $name, $specs );
-		$verdict  = self::verdict( $cat, $name, $highlights );
-		$faq      = self::faq( $cat, $name, $specs, $keys );
-		$short    = self::short_html( $name, $name2, $keys, $highlights );
-		$html     = self::assemble_html( $data, $intro, $highlights, $analysis, $review, $audience, $verdict, $faq );
-		$seo      = self::seo( $name, $name2, $brand, $cat, $keys, $specs );
+		$summary    = self::spec_summary( $specs, $keys );
+		$faq        = self::faq( $cat, $name, $specs, $keys );
+		$short      = self::short_html( $name, $name2, $keys, $highlights );
+		$html       = self::assemble_html( $data, $body, $highlights, $body, $summary, '', '', $faq );
+		$seo        = self::seo( $name, $name2, $brand, $cat, $keys, $specs );
 
 		return array(
-			'title'              => $name,
-			'short_description'  => $short,
-			'description_html'   => $html,
-			'analysis'           => $analysis,
-			'review'             => $review,
-			'highlights'         => $highlights,
-			'audience'           => $audience,
-			'verdict'            => $verdict,
-			'faq'                => $faq,
-			'seo_title'          => $seo['title'],
-			'seo_desc'           => $seo['description'],
-			'focus_keyword'      => $seo['keyword'],
-			'tags'               => $seo['tags'],
-			'provider'           => 'studio',
-			'provider_label'     => 'استودیوی نویسندگی خواجوی',
-			'category'           => $cat,
+			'title'             => $name,
+			'short_description' => $short,
+			'description_html'  => $html,
+			'analysis'          => $body,
+			'review'            => $summary,
+			'highlights'        => $highlights,
+			'audience'          => '',
+			'verdict'           => '',
+			'faq'               => $faq,
+			'seo_title'         => $seo['title'],
+			'seo_desc'          => $seo['description'],
+			'focus_keyword'     => $seo['keyword'],
+			'tags'              => $seo['tags'],
+			'provider'          => 'studio',
+			'provider_label'    => 'ویرایش منبع — استودیو خواجوی',
+			'category'          => $cat,
 		);
 	}
 
 	/**
-	 * برش امن رشته.
+	 * برش امن یک خط.
 	 *
 	 * @param mixed $value مقدار.
 	 * @return string
@@ -91,17 +89,17 @@ class Shoper_Copywriter {
 	}
 
 	/**
-	 * تشخیص دسته از نام و مشخصات.
+	 * تشخیص دسته.
 	 *
-	 * @param string $hay  متن.
+	 * @param string $hay   متن.
 	 * @param array  $specs مشخصات.
 	 * @return string
 	 */
 	public static function detect_category( $hay, $specs ) {
-		$hay = mb_strtolower( (string) $hay, 'UTF-8' );
+		$hay = function_exists( 'mb_strtolower' ) ? mb_strtolower( (string) $hay, 'UTF-8' ) : strtolower( (string) $hay );
 		$map = array(
 			'phone'     => array( 'گوشی', 'موبایل', 'smartphone', 'galaxy', 'iphone', 'redmi', 'poco', 'xiaomi', 'سامسونگ', 'شیائومی' ),
-			'laptop'    => array( 'لپ تاپ', 'لپ‌تاپ', 'لپتاپ', 'macbook', 'notebook', 'لپ تاپ' ),
+			'laptop'    => array( 'لپ تاپ', 'لپ‌تاپ', 'لپتاپ', 'macbook', 'notebook' ),
 			'tablet'    => array( 'تبلت', 'ipad', 'tablet' ),
 			'headphone' => array( 'هدفون', 'هندزفری', 'ایرپاد', 'earbuds', 'headset' ),
 			'watch'     => array( 'ساعت هوشمند', 'smartwatch', 'watch' ),
@@ -109,7 +107,11 @@ class Shoper_Copywriter {
 		);
 		foreach ( $map as $cat => $needles ) {
 			foreach ( $needles as $n ) {
-				if ( false !== mb_strpos( $hay, $n, 0, 'UTF-8' ) ) {
+				if ( function_exists( 'mb_strpos' ) ) {
+					if ( false !== mb_strpos( $hay, $n, 0, 'UTF-8' ) ) {
+						return $cat;
+					}
+				} elseif ( false !== strpos( $hay, $n ) ) {
 					return $cat;
 				}
 			}
@@ -140,77 +142,123 @@ class Shoper_Copywriter {
 	}
 
 	/**
-	 * معرفی تجاری.
+	 * تمیزکاری فاصله، علائم و پاراگراف متن منبع.
 	 *
-	 * @param string $cat   دسته.
-	 * @param string $name  نام.
-	 * @param string $name2 انگلیسی.
-	 * @param string $brand برند.
-	 * @param string $source توضیح منبع.
-	 * @param array  $specs مشخصات.
-	 * @return string
-	 */
-	public static function intro( $cat, $name, $name2, $brand, $source, $specs ) {
-		$label = self::category_label( $cat );
-		$parts = array();
-		$lead  = 'خرید ' . $name . ' یعنی انتخاب یک ' . $label;
-		if ( $brand ) {
-			$lead .= ' از برند ' . $brand;
-		}
-		$lead .= ' با مشخصات ثبت‌شده و قابل استناد برای خریدار ایرانی در سال ۲۰۲۶.';
-		$parts[] = $lead;
-		if ( $name2 ) {
-			$parts[] = 'شناسهٔ بین‌المللی محصول: ' . $name2 . '.';
-		}
-		if ( $source ) {
-			$parts[] = self::polish_source( $source );
-		} else {
-			$parts[] = 'در ادامه، تحلیل کارشناسی، بررسی نقاط قوت و جدول مشخصات فنی همین کالا آمده است تا تصمیم خرید بدون حدس و گمان باشد.';
-		}
-		$ram = self::spec( $specs, array( 'مقدار رم', 'حافظه RAM', 'رم' ) );
-		$storage = self::spec( $specs, array( 'حافظه داخلی', 'ظرفیت حافظه', 'حافظه' ) );
-		if ( $ram || $storage ) {
-			$bits = array();
-			if ( $ram ) {
-				$bits[] = 'رم ' . $ram;
-			}
-			if ( $storage ) {
-				$bits[] = 'حافظه ' . $storage;
-			}
-			$parts[] = 'پیکربندی اعلام‌شده شامل ' . implode( ' و ', $bits ) . ' است.';
-		}
-		return implode( ' ', $parts );
-	}
-
-	/**
-	 * پاکسازی توضیح منبع بدون اضافه کردن ادعا.
-	 *
-	 * @param string $source متن.
+	 * @param string $source متن خام.
 	 * @return string
 	 */
 	public static function polish_source( $source ) {
-		$source = self::s( $source );
-		if ( function_exists( 'mb_strlen' ) && mb_strlen( $source, 'UTF-8' ) > 1800 ) {
-			$source = mb_substr( $source, 0, 1780, 'UTF-8' ) . '…';
-		} elseif ( strlen( $source ) > 2200 ) {
-			$source = substr( $source, 0, 2180 ) . '…';
+		$source = (string) $source;
+		$source = html_entity_decode( $source, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+		$source = preg_replace( '/<\s*br\s*\/?>/iu', "\n", $source );
+		$source = preg_replace( '/<\/p>/iu', "\n\n", $source );
+		$source = wp_strip_all_tags( $source );
+		$source = str_replace( array( "\r\n", "\r" ), "\n", $source );
+		$source = preg_replace( '/[ \t\x{00A0}]+/u', ' ', $source );
+		$source = preg_replace( '/ *\n */u', "\n", $source );
+		$source = preg_replace( '/\n{3,}/u', "\n\n", $source );
+		$source = preg_replace( '/\s+([،,.;:!?])/u', '$1', $source );
+		$source = preg_replace( '/([،,.;:!?])\1+/u', '$1', $source );
+		$source = preg_replace( '/([،,.;:!?])(\S)/u', '$1 $2', $source );
+		$source = trim( $source );
+		if ( function_exists( 'mb_strlen' ) && mb_strlen( $source, 'UTF-8' ) > 6000 ) {
+			$source = mb_substr( $source, 0, 5980, 'UTF-8' ) . '…';
+		} elseif ( strlen( $source ) > 7000 ) {
+			$source = substr( $source, 0, 6980 ) . '…';
 		}
 		return $source;
 	}
 
 	/**
+	 * متن منبع را مرتب و در صورت نقص از مشخصات کامل می‌کند.
+	 *
+	 * @param string $source متن منبع.
+	 * @param string $name   نام.
+	 * @param string $name2  انگلیسی.
+	 * @param string $brand  برند.
+	 * @param array  $specs  مشخصات.
+	 * @param array  $keys   کلیدها.
+	 * @return string
+	 */
+	public static function organize( $source, $name, $name2, $brand, $specs, $keys ) {
+		$body = self::polish_source( $source );
+		if ( '' === $body ) {
+			$bits = array();
+			if ( $name ) {
+				$bits[] = $name;
+			}
+			if ( $name2 ) {
+				$bits[] = $name2;
+			}
+			if ( $brand ) {
+				$bits[] = 'برند ' . $brand;
+			}
+			$body = $bits ? implode( '. ', $bits ) . '.' : '';
+		}
+
+		$facts = array();
+		$pairs = array(
+			'رم'            => self::spec( $specs, array( 'مقدار رم', 'حافظه RAM', 'رم', 'مقدار RAM' ) ),
+			'حافظه داخلی'   => self::spec( $specs, array( 'حافظه داخلی', 'ظرفیت حافظه' ) ),
+			'باتری'         => self::spec( $specs, array( 'گنجایش باتری', 'ظرفیت باتری' ) ),
+			'دوربین اصلی'   => self::spec( $specs, array( 'دوربین اصلی', 'کیفیت دوربین اصلی' ) ),
+			'صفحه نمایش'    => self::spec( $specs, array( 'اندازه صفحه نمایش' ) ),
+			'پردازنده'      => self::spec( $specs, array( 'پردازنده', 'پردازنده مرکزی', 'تراشه' ) ),
+		);
+		$hay = function_exists( 'mb_strtolower' ) ? mb_strtolower( $body, 'UTF-8' ) : strtolower( $body );
+		foreach ( $pairs as $label => $val ) {
+			if ( '' === $val ) {
+				continue;
+			}
+			$needle = function_exists( 'mb_strtolower' ) ? mb_strtolower( $val, 'UTF-8' ) : strtolower( $val );
+			if ( $needle && false !== strpos( $hay, $needle ) ) {
+				continue;
+			}
+			$facts[] = $label . ' ' . $val;
+		}
+		if ( $facts ) {
+			$body .= "\n\n" . 'طبق مشخصات ثبت‌شده همین کالا: ' . implode( '؛ ', array_slice( $facts, 0, 6 ) ) . '.';
+		}
+		return trim( $body );
+	}
+
+	/**
+	 * خلاصه مشخصات برای تب ناظر — فقط دادهٔ واقعی.
+	 *
+	 * @param array $specs مشخصات.
+	 * @param array $keys  کلیدها.
+	 * @return string
+	 */
+	public static function spec_summary( $specs, $keys ) {
+		$bag = array_merge( (array) $keys, (array) $specs );
+		$out = array();
+		$i   = 0;
+		foreach ( $bag as $k => $v ) {
+			$line = self::s( $k ) . ': ' . self::s( $v );
+			if ( '' === $line || in_array( $line, $out, true ) ) {
+				continue;
+			}
+			$out[] = '• ' . $line;
+			if ( ++$i >= 10 ) {
+				break;
+			}
+		}
+		return $out ? implode( "\n", $out ) : '';
+	}
+
+	/**
 	 * نکات برجسته از مشخصات واقعی.
 	 *
-	 * @param string $cat  دسته.
+	 * @param string $cat   دسته.
 	 * @param array  $specs مشخصات.
-	 * @param array  $keys کلیدها.
+	 * @param array  $keys  کلیدها.
 	 * @return array
 	 */
 	public static function highlights( $cat, $specs, $keys ) {
 		$out   = array();
 		$pairs = array_merge( (array) $keys, (array) $specs );
 		$pref  = array(
-			'phone'     => array( 'برند', 'مدل', 'مقدار رم', 'حافظه RAM', 'حافظه داخلی', 'گنجایش باتری', 'ظرفیت باتری', 'دوربین اصلی', 'اندازه صفحه نمایش', 'سیستم عامل' ),
+			'phone'     => array( 'برند', 'مدل', 'مقدار رم', 'حافظه RAM', 'مقدار RAM', 'حافظه داخلی', 'گنجایش باتری', 'ظرفیت باتری', 'دوربین اصلی', 'اندازه صفحه نمایش', 'سیستم عامل' ),
 			'laptop'    => array( 'برند', 'پردازنده', 'پردازنده مرکزی', 'مقدار رم', 'حافظه RAM', 'حافظه داخلی', 'کارت گرافیک', 'اندازه صفحه نمایش' ),
 			'tablet'    => array( 'برند', 'اندازه صفحه نمایش', 'مقدار رم', 'حافظه داخلی', 'گنجایش باتری' ),
 			'headphone' => array( 'برند', 'نوع اتصال', 'عمر باتری', 'حذف نویز', 'درایور' ),
@@ -244,272 +292,6 @@ class Shoper_Copywriter {
 	}
 
 	/**
-	 * تحلیل کارشناسی بر اساس مشخصات واقعی.
-	 *
-	 * @param string $cat    دسته.
-	 * @param string $name   نام.
-	 * @param array  $specs  مشخصات.
-	 * @param array  $keys   کلیدها.
-	 * @param string $source توضیح منبع.
-	 * @return string
-	 */
-	public static function analysis( $cat, $name, $specs, $keys, $source ) {
-		$paras = array();
-		$paras[] = 'تحلیل زیر فقط از مشخصات اعلام‌شده برای «' . $name . '» استخراج شده است؛ هیچ عدد یا قابلیتی خارج از همین داده اضافه نشده.';
-
-		if ( 'phone' === $cat ) {
-			$paras[] = self::phone_analysis( $specs );
-		} elseif ( 'laptop' === $cat ) {
-			$paras[] = self::named_analysis(
-				$specs,
-				array(
-					array( array( 'پردازنده', 'پردازنده مرکزی' ), 'پردازندهٔ اعلام‌شده «%s» بار اصلی اجرای برنامه‌ها را مشخص می‌کند.' ),
-					array( array( 'مقدار رم', 'حافظه RAM' ), 'رم «%s» برای چندوظیفگی روزمره معیار مهمی است.' ),
-					array( array( 'حافظه داخلی' ), 'فضای ذخیره‌سازی «%s» سقف نگهداری فایل و نرم‌افزار را نشان می‌دهد.' ),
-					array( array( 'کارت گرافیک', 'پردازنده گرافیکی' ), 'گرافیک «%s» توان نمایش و کارهای تصویری را تعیین می‌کند.' ),
-				)
-			);
-		} else {
-			$paras[] = self::generic_analysis( $specs, $keys );
-		}
-
-		$os = self::spec( $specs, array( 'سیستم عامل', 'نسخه سیستم عامل' ) );
-		if ( $os ) {
-			$paras[] = 'سیستم‌عامل ثبت‌شده «' . $os . '» است؛ همین نسخه مبنای سازگاری نرم‌افزار و به‌روزرسانی در نظر گرفته شود.';
-		}
-		$weight = self::spec( $specs, array( 'وزن' ) );
-		$dim    = self::spec( $specs, array( 'ابعاد' ) );
-		if ( $weight || $dim ) {
-			$paras[] = 'از نظر فیزیکی' . ( $weight ? ' وزن ' . $weight : '' ) . ( $dim ? ( $weight ? ' و ابعاد ' : ' ابعاد ' ) . $dim : '' ) . ' اعلام شده که برای حمل روزانه و جای‌گیری در جعبه یا کیف قابل استناد است.';
-		}
-		if ( $source ) {
-			$paras[] = 'توضیح کارشناسی منبع نیز در معرفی محصول حفظ شده تا لحن فروشگاهی جای دادهٔ فنی را نگیرد.';
-		}
-		$extra = array();
-		$i     = 0;
-		foreach ( array_merge( (array) $keys, (array) $specs ) as $k => $v ) {
-			$line = self::s( $k ) . ' «' . self::s( $v ) . '»';
-			if ( '' === $line || in_array( $line, $extra, true ) ) {
-				continue;
-			}
-			$extra[] = $line;
-			if ( ++$i >= 8 ) {
-				break;
-			}
-		}
-		if ( $extra ) {
-			$paras[] = 'جزئیات دقیق همین مدل برای مقایسهٔ به‌روز: ' . implode( '؛ ', $extra ) . '. هر عدد فقط از کاتالوگ همین کالا آمده است.';
-		}
-		$paras[] = 'برای تصمیم خرید در سال ۲۰۲۶ همین جدول را با نیاز واقعی بسنجید؛ نسل جدید، امتیاز مشتری یا قابلیت خارج از مشخصات ثبت‌شده به متن اضافه نشده است.';
-		return implode( "\n\n", array_filter( $paras ) );
-	}
-
-	/**
-	 * تحلیل گوشی.
-	 *
-	 * @param array $specs مشخصات.
-	 * @return string
-	 */
-	private static function phone_analysis( $specs ) {
-		$bits = array();
-		$ram  = self::spec( $specs, array( 'مقدار رم', 'حافظه RAM', 'رم' ) );
-		$rom  = self::spec( $specs, array( 'حافظه داخلی' ) );
-		$bat  = self::spec( $specs, array( 'گنجایش باتری', 'ظرفیت باتری' ) );
-		$cam  = self::spec( $specs, array( 'دوربین اصلی', 'کیفیت دوربین اصلی' ) );
-		$front = self::spec( $specs, array( 'دوربین سلفی', 'کیفیت دوربین جلو' ) );
-		$scr  = self::spec( $specs, array( 'اندازه صفحه نمایش' ) );
-		$type = self::spec( $specs, array( 'نوع صفحه نمایش' ) );
-		$ref  = self::spec( $specs, array( 'نرخ نوسازی تصویر' ) );
-		$cpu  = self::spec( $specs, array( 'پردازنده', 'پردازنده مرکزی', 'تراشه' ) );
-		if ( $cpu ) {
-			$bits[] = 'تراشهٔ «' . $cpu . '» چارچوب توان پردازشی را مشخص می‌کند.';
-		}
-		if ( $ram ) {
-			$bits[] = 'رم «' . $ram . '» برای باز نگه داشتن چند برنامه هم‌زمان معیار عملی است.';
-		}
-		if ( $rom ) {
-			$bits[] = 'حافظهٔ داخلی «' . $rom . '» سقف نصب برنامه، عکس و ویدیو را تعیین می‌کند.';
-		}
-		if ( $scr || $type || $ref ) {
-			$screen = 'نمایشگر';
-			if ( $scr ) {
-				$screen .= ' ' . $scr;
-			}
-			if ( $type ) {
-				$screen .= ' از نوع ' . $type;
-			}
-			if ( $ref ) {
-				$screen .= ' با نرخ نوسازی ' . $ref;
-			}
-			$bits[] = $screen . ' تجربهٔ مشاهده و روانی رابط را شکل می‌دهد.';
-		}
-		if ( $cam ) {
-			$bits[] = 'دوربین اصلی «' . $cam . '» برای ثبت روزمره معیار اصلی عکاسی این مدل است.';
-		}
-		if ( $front ) {
-			$bits[] = 'دوربین جلو «' . $front . '» برای تماس تصویری و سلفی اعلام شده است.';
-		}
-		if ( $bat ) {
-			$bits[] = 'باتری «' . $bat . '» یکی از معیارهای دوام روزانه است؛ مصرف واقعی به تنظیمات نمایشگر و شبکه بستگی دارد.';
-		}
-		$reg = self::spec( $specs, array( 'وضعیت رجیستر' ) );
-		if ( $reg ) {
-			$bits[] = 'وضعیت رجیستر در منبع: «' . $reg . '».';
-		}
-		return $bits ? implode( ' ', $bits ) : 'مشخصات سخت‌افزاری این مدل در جدول فنی همین صفحه آمده و مبنای مقایسه با رقبا است.';
-	}
-
-	/**
-	 * تحلیل با الگوهای نام‌دار.
-	 *
-	 * @param array $specs مشخصات.
-	 * @param array $rules قوانین.
-	 * @return string
-	 */
-	private static function named_analysis( $specs, $rules ) {
-		$bits = array();
-		foreach ( $rules as $rule ) {
-			$val = self::spec( $specs, $rule[0] );
-			if ( $val ) {
-				$bits[] = sprintf( $rule[1], $val );
-			}
-		}
-		return $bits ? implode( ' ', $bits ) : self::generic_analysis( $specs, array() );
-	}
-
-	/**
-	 * تحلیل عمومی.
-	 *
-	 * @param array $specs مشخصات.
-	 * @param array $keys  کلیدها.
-	 * @return string
-	 */
-	private static function generic_analysis( $specs, $keys ) {
-		$use = $keys ? $keys : $specs;
-		$i   = 0;
-		$bits = array();
-		foreach ( $use as $k => $v ) {
-			$bits[] = $k . ' برابر «' . self::s( $v ) . '» ثبت شده است';
-			if ( ++$i >= 6 ) {
-				break;
-			}
-		}
-		if ( ! $bits ) {
-			return 'برای این کالا توضیح کارشناسی منبع محدود بود؛ جدول مشخصات و تصاویر مبنای تصمیم خرید است.';
-		}
-		return 'بر اساس دادهٔ کاتالوگ، ' . implode( '؛ ', $bits ) . '. همین مقادیر باید در تب ویژگی‌های ووکامرس هم دیده شوند.';
-	}
-
-	/**
-	 * بررسی (نقاط قوت / نکات قابل توجه) بدون نظر جعلی مشتری.
-	 *
-	 * @param string $cat   دسته.
-	 * @param string $name  نام.
-	 * @param array  $specs مشخصات.
-	 * @param array  $keys  کلیدها.
-	 * @return string
-	 */
-	public static function review( $cat, $name, $specs, $keys ) {
-		$pros = array();
-		$cons = array();
-		$pairs = array_merge( (array) $keys, (array) $specs );
-
-		foreach ( $pairs as $k => $v ) {
-			$v = self::s( $v );
-			if ( '' === $v ) {
-				continue;
-			}
-			if ( preg_match( '/رجیستر|گارانتی|ضدآب|IP68|IP67|وای‌فای 6|5G|OLED|AMOLED|120\s*Hz|144\s*Hz/iu', $k . ' ' . $v ) ) {
-				$pros[] = $k . ' — ' . $v;
-			}
-		}
-
-		$ram = self::spec( $specs, array( 'مقدار رم', 'حافظه RAM', 'رم' ) );
-		if ( $ram && preg_match( '/(\d+)/', $ram, $m ) && (int) $m[1] >= 8 ) {
-			$pros[] = 'رم نسبتاً بالا (' . $ram . ') برای استفادهٔ هم‌زمان چند برنامه.';
-		} elseif ( $ram && preg_match( '/(\d+)/', $ram, $m ) && (int) $m[1] > 0 && (int) $m[1] <= 4 ) {
-			$cons[] = 'رم اعلام‌شده (' . $ram . ') برای کارهای سنگین ممکن است محدود باشد.';
-		}
-
-		$bat = self::spec( $specs, array( 'گنجایش باتری', 'ظرفیت باتری' ) );
-		if ( $bat && preg_match( '/(\d{3,5})/', $bat, $m ) && (int) $m[1] >= 5000 ) {
-			$pros[] = 'ظرفیت باتری ' . $bat . ' برای استفادهٔ روزانه مناسب به‌نظر می‌رسد.';
-		}
-
-		$brand = self::spec( $specs, array( 'برند' ) );
-		if ( $brand ) {
-			$pros[] = 'برند مشخص و قابل پیگیری: ' . $brand . '.';
-		}
-
-		if ( empty( $pros ) ) {
-			foreach ( array_slice( $pairs, 0, 4, true ) as $k => $v ) {
-				$pros[] = $k . ' مشخص و ثبت‌شده است (' . self::s( $v ) . ').';
-			}
-		}
-
-		$missing = array(
-			'گواهی ضدآب' => 'مقاومت رسمی در برابر آب در مشخصات دیده نشد.',
-			'گارانتی'    => 'شرح گارانتی در دادهٔ منبع خالی است؛ قبل از انتشار در فروشگاه تکمیل شود.',
-		);
-		foreach ( $missing as $key => $msg ) {
-			if ( ! self::spec( $specs, array( $key ) ) ) {
-				$cons[] = $msg;
-			}
-			if ( count( $cons ) >= 3 ) {
-				break;
-			}
-		}
-		if ( empty( $cons ) ) {
-			$cons[] = 'قیمت نهایی فروشگاه را خودتان تعیین کنید؛ این بررسی روی مشخصات فنی است نه نرخ بازار.';
-		}
-
-		$out  = 'بررسی کارشناسی «' . $name . '» — نه نظر ساختگی مشتری، بلکه جمع‌بندی دادهٔ کاتالوگ.' . "\n\n";
-		$out .= "نقاط قوت:\n";
-		foreach ( array_slice( array_unique( $pros ), 0, 5 ) as $p ) {
-			$out .= '• ' . $p . "\n";
-		}
-		$out .= "\nنکات قابل توجه:\n";
-		foreach ( array_slice( array_unique( $cons ), 0, 4 ) as $c ) {
-			$out .= '• ' . $c . "\n";
-		}
-		$out .= "\nجمع‌بندی بررسی: اگر مشخصات بالا با نیاز خریدار هم‌خوان است، این مدل گزینهٔ شفافی برای انتشار در فروشگاه است. ناظر باید متن را یک‌بار بخواند و بعد منتشر کند.";
-		return trim( $out );
-	}
-
-	/**
-	 * مخاطب هدف.
-	 *
-	 * @param string $cat   دسته.
-	 * @param string $name  نام.
-	 * @param array  $specs مشخصات.
-	 * @return string
-	 */
-	public static function audience( $cat, $name, $specs ) {
-		if ( 'phone' === $cat ) {
-			$ram = self::spec( $specs, array( 'مقدار رم', 'حافظه RAM', 'رم' ) );
-			$extra = $ram ? ' پیکربندی رم «' . $ram . '» را با الگوی استفادهٔ روزانه بسنجید.' : '';
-			return 'مناسب کسانی که به‌دنبال ' . $name . ' با مشخصات شفاف‌اند؛ عکاسی روزمره، شبکه‌های اجتماعی و کار اداری سبک. خریدار حرفه‌ای بهتر است جدول دوربین و باتری را خط‌به‌خط تطبیق دهد.' . $extra;
-		}
-		if ( 'laptop' === $cat ) {
-			return 'برای دانشجو، کار اداری و تولید محتوای سبک، به‌شرط آن‌که پردازنده و رم اعلام‌شده با نرم‌افزارهای موردنظر سازگار باشد.';
-		}
-		return 'خریدارانی که می‌خواهند قبل از انتشار محصول، مشخصات، تصاویر و متن فروش را در یک صفحه ببینند و خودشان تأیید کنند.';
-	}
-
-	/**
-	 * جمع‌بندی خرید.
-	 *
-	 * @param string $cat        دسته.
-	 * @param string $name       نام.
-	 * @param array  $highlights نکات.
-	 * @return string
-	 */
-	public static function verdict( $cat, $name, $highlights ) {
-		$hint = $highlights ? ' محورهای اصلی: ' . implode( '؛ ', array_slice( $highlights, 0, 3 ) ) . '.' : '';
-		return $name . ' با دادهٔ کامل کاتالوگ برای انتشار در ووکامرس آماده است. قیمت را فروشگاه تعیین می‌کند؛ ارزش این صفحه در شفافیت مشخصات، تصاویر و متن کارشناسی است.' . $hint;
-	}
-
-	/**
 	 * توضیح کوتاه HTML.
 	 *
 	 * @param string $name       نام.
@@ -523,7 +305,9 @@ class Shoper_Copywriter {
 		if ( $name2 ) {
 			$html .= '<p>' . esc_html( $name2 ) . '</p>';
 		}
-		$html .= '<p>' . esc_html( $name ) . ' — مشخصات فنی دانه‌دانه، تصاویر فروشگاهی و متن کارشناسی آمادهٔ انتشار.</p>';
+		if ( $name ) {
+			$html .= '<p>' . esc_html( $name ) . '</p>';
+		}
 		$items = array();
 		$i     = 0;
 		foreach ( $keys as $k => $v ) {
@@ -544,7 +328,7 @@ class Shoper_Copywriter {
 	}
 
 	/**
-	 * سئو تجاری.
+	 * سئو از نام و مشخصات واقعی.
 	 *
 	 * @param string $name  نام.
 	 * @param string $name2 انگلیسی.
@@ -578,13 +362,7 @@ class Shoper_Copywriter {
 				break;
 			}
 		}
-		$desc = 'خرید ' . $name . ' با مشخصات کامل، بررسی کارشناسی و تصاویر واقعی. ' . implode( ' | ', $bits );
-		if ( function_exists( 'mb_strlen' ) && mb_strlen( $desc, 'UTF-8' ) > 155 ) {
-			$desc = mb_substr( $desc, 0, 152, 'UTF-8' ) . '…';
-		} elseif ( strlen( $desc ) > 155 ) {
-			$desc = substr( $desc, 0, 152 ) . '…';
-		}
-
+		$desc = 'خرید ' . $name . ' با مشخصات کامل و تصاویر واقعی. ' . implode( ' | ', $bits );
 		$tags = array();
 		$seen = array();
 		foreach ( array( $name, $name2, $brand, $label, 'خرید ' . $label ) as $c ) {
@@ -606,9 +384,6 @@ class Shoper_Copywriter {
 			}
 		}
 		$keyword = $brand ? ( 'خرید ' . $brand . ' ' . $label ) : ( 'خرید ' . $label );
-		if ( function_exists( 'mb_strlen' ) && mb_strlen( $keyword, 'UTF-8' ) > 40 ) {
-			$keyword = mb_substr( $keyword, 0, 40, 'UTF-8' );
-		}
 		$clamped = self::clamp_seo( $title, $desc, $keyword, $name, $keys );
 		return array(
 			'title'       => $clamped['title'],
@@ -653,7 +428,7 @@ class Shoper_Copywriter {
 			}
 		}
 		if ( '' === $desc ) {
-			$desc = 'خرید ' . $name . ' با مشخصات کامل، بررسی کارشناسی و تصاویر واقعی. مشاهده جزئیات.';
+			$desc = 'خرید ' . $name . ' با مشخصات کامل و تصاویر واقعی.';
 			if ( $bits ) {
 				$desc .= ' ' . implode( ' | ', $bits );
 			}
@@ -661,7 +436,7 @@ class Shoper_Copywriter {
 		$dlen = function_exists( 'mb_strlen' ) ? mb_strlen( $desc, 'UTF-8' ) : strlen( $desc );
 		if ( $dlen < 140 ) {
 			$extra = $bits ? ( ' ' . implode( ' | ', $bits ) ) : '';
-			$desc .= $extra . ' همین حالا مشخصات را ببینید و مقایسه کنید.';
+			$desc .= $extra . ' مشخصات را ببینید.';
 			$dlen   = function_exists( 'mb_strlen' ) ? mb_strlen( $desc, 'UTF-8' ) : strlen( $desc );
 		}
 		if ( $dlen > 155 ) {
@@ -685,31 +460,29 @@ class Shoper_Copywriter {
 	}
 
 	/**
-	 * مونتاژ HTML نهایی توضیحات.
+	 * پرسش از مشخصات واقعی.
 	 *
-	 * @param array  $data       داده.
-	 * @param string $intro      معرفی.
-	 * @param array  $highlights نکات.
-	 * @param string $analysis   تحلیل.
-	 * @param string $review     بررسی.
-	 * @param string $audience   مخاطب.
-	 * @param string $verdict    جمع‌بندی.
-	 * @return string
+	 * @param string $cat   دسته.
+	 * @param string $name  نام.
+	 * @param array  $specs مشخصات.
+	 * @param array  $keys  کلیدها.
+	 * @return array
 	 */
 	public static function faq( $cat, $name, $specs, $keys ) {
 		$out  = array();
 		$bag  = array_merge( (array) $keys, (array) $specs );
 		$pref = array(
-			'حافظه داخلی'      => 'حافظه داخلی این محصول چقدر است؟',
-			'مقدار رم'         => 'رم این محصول چقدر است؟',
-			'حافظه RAM'        => 'رم این محصول چقدر است؟',
-			'گنجایش باتری'     => 'ظرفیت باتری چقدر اعلام شده؟',
-			'ظرفیت باتری'      => 'ظرفیت باتری چقدر اعلام شده؟',
-			'دوربین اصلی'      => 'دوربین اصلی چه مشخصه‌ای دارد؟',
-			'اندازه صفحه نمایش'=> 'اندازه نمایشگر چقدر است؟',
-			'سیستم عامل'       => 'سیستم‌عامل چیست؟',
-			'پردازنده'         => 'پردازنده چه مدلی است؟',
-			'برند'             => 'برند سازنده چیست؟',
+			'حافظه داخلی'       => 'حافظه داخلی این محصول چقدر است؟',
+			'مقدار رم'          => 'رم این محصول چقدر است؟',
+			'حافظه RAM'         => 'رم این محصول چقدر است؟',
+			'مقدار RAM'         => 'رم این محصول چقدر است؟',
+			'گنجایش باتری'      => 'ظرفیت باتری چقدر اعلام شده؟',
+			'ظرفیت باتری'       => 'ظرفیت باتری چقدر اعلام شده؟',
+			'دوربین اصلی'       => 'دوربین اصلی چه مشخصه‌ای دارد؟',
+			'اندازه صفحه نمایش' => 'اندازه نمایشگر چقدر است؟',
+			'سیستم عامل'        => 'سیستم‌عامل چیست؟',
+			'پردازنده'          => 'پردازنده چه مدلی است؟',
+			'برند'              => 'برند سازنده چیست؟',
 		);
 		foreach ( $pref as $key => $q ) {
 			if ( empty( $bag[ $key ] ) ) {
@@ -723,32 +496,27 @@ class Shoper_Copywriter {
 				break;
 			}
 		}
-		if ( count( $out ) < 2 ) {
-			$out[] = array(
-				'q' => 'آیا مشخصات فنی کامل در صفحه آمده است؟',
-				'a' => 'بله. جدول مشخصات همین صفحه از کاتالوگ منبع پر شده و هر مورد به‌صورت ویژگی ووکامرس هم ثبت می‌شود.',
-			);
-		}
 		return $out;
 	}
 
 	/**
-	 * مونتاژ HTML نهایی توضیحات.
+	 * مونتاژ HTML نهایی: متن مرتب + جدول مشخصات.
 	 *
 	 * @param array  $data       داده.
-	 * @param string $intro      معرفی.
+	 * @param string $intro      متن مرتب.
 	 * @param array  $highlights نکات.
-	 * @param string $analysis   تحلیل.
-	 * @param string $review     بررسی.
-	 * @param string $audience   مخاطب.
-	 * @param string $verdict    جمع‌بندی.
+	 * @param string $analysis   همان متن (سازگاری).
+	 * @param string $review     خلاصه مشخصات.
+	 * @param string $audience   بلااستفاده.
+	 * @param string $verdict    بلااستفاده.
 	 * @param array  $faq        پرسش‌ها.
 	 * @return string
 	 */
 	public static function assemble_html( $data, $intro, $highlights, $analysis, $review, $audience, $verdict, $faq = array() ) {
+		$body  = $intro ? $intro : $analysis;
 		$html  = '<div class="shoper-studio-copy">';
 		$html .= '<h2>معرفی محصول</h2>';
-		$html .= wpautop( esc_html( $intro ) );
+		$html .= wpautop( esc_html( $body ) );
 
 		if ( $highlights ) {
 			$html .= '<h2>نکات برجسته</h2><ul>';
@@ -757,15 +525,6 @@ class Shoper_Copywriter {
 			}
 			$html .= '</ul>';
 		}
-
-		$html .= '<h2>تحلیل کارشناسی</h2>';
-		$html .= wpautop( esc_html( $analysis ) );
-
-		$html .= '<h2>بررسی محصول</h2>';
-		$html .= self::review_to_html( $review );
-
-		$html .= '<h2>مناسب برای چه کسانی؟</h2>';
-		$html .= wpautop( esc_html( $audience ) );
 
 		if ( ! empty( $data['key_specs'] ) && is_array( $data['key_specs'] ) ) {
 			$html .= '<h2>مشخصات کلیدی</h2>';
@@ -798,9 +557,6 @@ class Shoper_Copywriter {
 			}
 		}
 
-		$html .= '<h2>جمع‌بندی خرید</h2>';
-		$html .= wpautop( esc_html( $verdict ) );
-
 		$src = 'کاتالوگ';
 		if ( ! empty( $data['provider'] ) && 'digikala' === $data['provider'] ) {
 			$src = 'دیجی‌کالا';
@@ -808,56 +564,11 @@ class Shoper_Copywriter {
 			$src = 'ترب';
 		}
 		$html .= '<p class="shoper-source" style="font-size:12px;color:#888;margin-top:20px;">';
-		$html .= 'متن فروش توسط <strong>Shoper Studio</strong> — خواجوی آماده شده است. منبع مشخصات: ' . esc_html( $src ) . '.';
+		$html .= 'متن از منبع مرتب شده است — <strong>Shoper Studio</strong> خواجوی. منبع مشخصات: ' . esc_html( $src ) . '.';
 		if ( ! empty( $data['page_url'] ) ) {
 			$html .= ' <a href="' . esc_url( $data['page_url'] ) . '" target="_blank" rel="nofollow">صفحه منبع</a>.';
 		}
 		$html .= '</p></div>';
-		return $html;
-	}
-
-	/**
-	 * تبدیل متن بررسی به HTML.
-	 *
-	 * @param string $review متن.
-	 * @return string
-	 */
-	private static function review_to_html( $review ) {
-		$lines = preg_split( '/\n+/', (string) $review );
-		$html  = '';
-		$ul    = false;
-		foreach ( $lines as $line ) {
-			$line = trim( $line );
-			if ( '' === $line ) {
-				if ( $ul ) {
-					$html .= '</ul>';
-					$ul    = false;
-				}
-				continue;
-			}
-			if ( 0 === strpos( $line, '• ' ) ) {
-				if ( ! $ul ) {
-					$html .= '<ul>';
-					$ul    = true;
-				}
-				$html .= '<li>' . esc_html( substr( $line, 2 ) ) . '</li>';
-				continue;
-			}
-			if ( $ul ) {
-				$html .= '</ul>';
-				$ul    = false;
-			}
-			if ( 'نقاط قوت:' === $line ) {
-				$html .= '<h3>نقاط قوت</h3>';
-			} elseif ( 'نکات قابل توجه:' === $line ) {
-				$html .= '<h3>نکات قابل توجه</h3>';
-			} else {
-				$html .= '<p>' . esc_html( $line ) . '</p>';
-			}
-		}
-		if ( $ul ) {
-			$html .= '</ul>';
-		}
 		return $html;
 	}
 
@@ -871,8 +582,8 @@ class Shoper_Copywriter {
 		if ( empty( $pairs ) || ! is_array( $pairs ) ) {
 			return '';
 		}
-		$html  = '<table class="shoper-specs-table" style="width:100%;border-collapse:collapse;margin:12px 0;"><tbody>';
-		$i     = 0;
+		$html = '<table class="shoper-specs-table" style="width:100%;border-collapse:collapse;margin:12px 0;"><tbody>';
+		$i    = 0;
 		foreach ( $pairs as $k => $v ) {
 			$bg    = ( 0 === $i % 2 ) ? '#f8f8f8' : '#fff';
 			$html .= '<tr style="background:' . esc_attr( $bg ) . ';">';

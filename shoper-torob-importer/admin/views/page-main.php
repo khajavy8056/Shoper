@@ -93,9 +93,9 @@ $ai_auto = get_option( 'shoper_ai_auto', 'yes' );
 			</div>
 
 			<div class="shoper-card" id="shoper-preview-card" style="display:none;">
-				<h2>۲. پیش‌نمایش، بازنویسی و نظارت</h2>
+				<h2>۲. پیش‌نمایش، مرتب‌سازی متن و نظارت</h2>
 				<p class="description">
-					مرحله‌ها: اطلاعات → تصاویر → بازنویسی هوشمند (تحلیل و بررسی) → نظارت شما روی متن و سئو.
+					مرحله‌ها: اطلاعات → تصاویر → مرتب‌سازی متن منبع → نظارت شما روی متن و سئو.
 				</p>
 				<div id="shoper-preview"></div>
 
@@ -201,13 +201,13 @@ $ai_auto = get_option( 'shoper_ai_auto', 'yes' );
 							</td>
 						</tr>
 						<tr>
-							<th>بازنویسی هوشمند</th>
+							<th>مرتب‌سازی متن</th>
 							<td>
 								<label><input type="checkbox" name="ai_enabled" value="yes" <?php checked( $ai_enabled, 'yes' ); ?>>
-									فعال — سه مدل رایگان آماده: Pollinations + LLM7 + OVH
+									فعال — ویرایش منبع با Pollinations + LLM7 + OVH
 								</label>
 								<label style="display:block;margin-top:8px;"><input type="checkbox" name="ai_auto" value="yes" <?php checked( $ai_auto, 'yes' ); ?>>
-									بعد از دریافت محصول، بازنویسی خودکار شروع شود
+									بعد از دریافت محصول، مرتب‌سازی متن شروع شود
 								</label>
 								<p class="description" style="margin-top:8px;">این سه سرویس بدون کلید پولی در افزونه هستند و به‌نوبت عوض می‌شوند تا سقف رایگان یکی کار را نخواباند. کلید پولی داخل مخزن عمومی گذاشته نمی‌شود چون فوراً دزدیده می‌شود. اگر همه قطع باشند، <strong>متن کامل از استودیوی خواجوی</strong> نوشته می‌شود و محصول بدون توضیح نمی‌ماند.</p>
 								<p style="margin-top:8px;"><label>توکن اختیاری Hugging Face<br>
@@ -232,8 +232,8 @@ $ai_auto = get_option( 'shoper_ai_auto', 'yes' );
 			<div class="shoper-card shoper-help">
 				<h3>راهنما</h3>
 				<ul>
-					<li>جریان کار: <strong>نام</strong> → <strong>تصاویر</strong> → <strong>بازنویسی هوشمند</strong> → <strong>نظارت شما</strong>.</li>
-					<li>توضیحات شامل معرفی، تحلیل کارشناسی، بررسی نقاط قوت و سئو است؛ نظر جعلی مشتری ساخته نمی‌شود.</li>
+					<li>جریان کار: <strong>نام</strong> → <strong>تصاویر</strong> → <strong>مرتب‌سازی متن منبع</strong> → <strong>نظارت شما</strong>.</li>
+					<li>هوش مصنوعی محتوا نمی‌سازد؛ متن دیجی‌کالا را تمیز، پاراگراف‌بندی و در صورت نقص از مشخصات واقعی کامل می‌کند.</li>
 					<li>هر مشخصه به‌صورت <strong>یک ویژگی مجزا</strong> در تب ویژگی‌های ووکامرس ثبت می‌شود.</li>
 					<li>تصاویر در <strong>کتابخانه رسانه</strong> با نام محصول ذخیره می‌شوند.</li>
 					<li>محصول پیش‌فرض پیش‌نویس است تا ناظر قبل از انتشار تأیید کند.</li>

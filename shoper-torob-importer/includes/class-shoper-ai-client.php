@@ -208,7 +208,7 @@ class Shoper_AI_Client {
 			return $merged;
 		}
 
-		$studio['fallback_reason'] = 'سرویس ابری الان در دسترس نبود؛ متن کامل و سئو از استودیوی خواجوی روی مشخصات واقعی نوشته شد.';
+		$studio['fallback_reason'] = 'سرویس ابری الان در دسترس نبود؛ متن منبع همین‌جا مرتب و کامل شد.';
 		return $studio;
 	}
 
@@ -247,13 +247,12 @@ class Shoper_AI_Client {
 		}
 		$specs = implode( '؛ ', $spec_bits );
 
-		$rules = "نقش: نویسنده ارشد فروشگاه ایرانی در سال ۲۰۲۶. فقط فارسی رسمی و دقیق.\n"
-			. "کار: توضیح منبع را کامل، جزئی و به‌روز بازنویسی کن؛ تحلیل کارشناسی و بررسی و سئو را دقیق پر کن.\n"
-			. "ممنوع: اختراع مشخصه، قیمت، امتیاز مشتری، گارانتی ساختگی، نسل یا قابلیت خارج از جدول.\n"
-			. "سئو اجباری: seo_title بین ۵۰ تا ۶۰ نویسه و با کلمه خرید شروع شود؛ seo_desc بین ۱۴۰ تا ۱۵۵ نویسه شامل ۲ مشخصه واقعی و دعوت به مشاهده؛ focus_keyword دو تا چهار کلمه؛ tags هشت مورد.\n"
-			. "intro باید کلمه کلیدی را در جمله اول بیاورد. analysis حداقل سه بند از مشخصات واقعی. review نقاط قوت و نکات قابل توجه بدون نظر جعلی.\n"
-			. "خروجی فقط JSON با کلیدهای: intro, analysis, review, audience, verdict, highlights, faq, seo_title, seo_desc, focus_keyword, tags\n"
-			. "faq آرایه حداکثر ۴ مورد {q,a} از مشخصات واقعی.\n";
+		$rules = "نقش: ویراستار متن محصول. تولید محتوای تازه ممنوع.\n"
+			. "کار: متن منبع را تمیز کن؛ فاصله و علائم را درست کن؛ پاراگراف‌بندی کن؛ اگر ناقص است فقط از جدول مشخصات کاملش کن.\n"
+			. "ممنوع: نظر مشتری، تحلیل ساختگی، مشخصه یا قیمت یا گارانتی خارج از جدول.\n"
+			. "سئو اجباری: seo_title بین ۵۰ تا ۶۰ نویسه و با کلمه خرید؛ seo_desc بین ۱۴۰ تا ۱۵۵ نویسه با ۲ مشخصه واقعی؛ focus_keyword دو تا چهار کلمه؛ tags هشت مورد.\n"
+			. "خروجی فقط JSON با کلیدهای: intro, highlights, faq, seo_title, seo_desc, focus_keyword, tags\n"
+			. "intro همان متن مرتب و کامل منبع است. faq حداکثر ۴ مورد {q,a} از مشخصات واقعی.\n";
 
 		return $rules . "محصول: {$name}\nانگلیسی: {$name2}\nمنبع: {$source}\nمشخصات: {$specs}";
 	}
@@ -385,7 +384,7 @@ class Shoper_AI_Client {
 					'messages'    => array(
 						array(
 							'role'    => 'system',
-							'content' => 'You write commercial Persian product copy and valid JSON only. Never invent specs. Follow SEO length rules exactly.',
+							'content' => 'You are a Persian product-text editor, not a copywriter. Clean and organize the source. Never invent specs. Valid JSON only.',
 						),
 						array(
 							'role'    => 'user',
@@ -429,7 +428,7 @@ class Shoper_AI_Client {
 	 * @return string|WP_Error
 	 */
 	private function http( $method, $url, $headers, $body ) {
-		$ua = 'ShoperStudio/1.5.2 (Khajavy; +https://github.com/khajavy8056/Shoper)';
+		$ua = 'ShoperStudio/1.5.3 (Khajavy; +https://github.com/khajavy8056/Shoper)';
 		if ( function_exists( 'curl_init' ) ) {
 			$ch  = curl_init( $url );
 			$opt = array(
@@ -517,7 +516,7 @@ class Shoper_AI_Client {
 		if ( ! is_array( $data ) ) {
 			return null;
 		}
-		foreach ( array( 'analysis', 'review', 'intro', 'seo_title', 'seo_desc' ) as $k ) {
+		foreach ( array( 'intro', 'analysis', 'seo_title', 'seo_desc', 'review' ) as $k ) {
 			if ( ! empty( $data[ $k ] ) ) {
 				return $data;
 			}
