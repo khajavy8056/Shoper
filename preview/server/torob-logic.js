@@ -671,7 +671,7 @@ function normalizeDigikalaDetails(data) {
 	};
 }
 
-function detectCategory(hay) {
+function detectCategory(hay, specs) {
 	const t = String(hay || '').toLowerCase();
 	if (/گوشی|موبایل|galaxy|iphone|redmi|poco|xiaomi|سامسونگ/.test(t)) return 'phone';
 	if (/لپ[\s-]?تاپ|macbook|notebook/.test(t)) return 'laptop';
@@ -680,7 +680,73 @@ function detectCategory(hay) {
 	if (/ساعت هوشمند|smartwatch/.test(t)) return 'watch';
 	if (/تلویزیون|smart tv/.test(t)) return 'tv';
 	if (/پلی.?استیشن|playstation|xbox|nintendo|ps5|ps4|کنسول/.test(t)) return 'console';
+	if (specOf(specs || {}, ['گنجایش باتری', 'ظرفیت باتری', 'دوربین اصلی', 'حافظه RAM', 'مقدار رم'])) return 'phone';
 	return 'generic';
+}
+
+function specGroupsOf(data) {
+	const specs = (data && data.specs && typeof data.specs === 'object') ? data.specs : {};
+	const raw = (data && Array.isArray(data.spec_groups)) ? data.spec_groups : [];
+	const out = [];
+	raw.forEach((group) => {
+		if (!group || typeof group !== 'object') return;
+		const header = String(group.header || '').trim() || 'مشخصات';
+		const pairs = group.specs && typeof group.specs === 'object' ? group.specs : {};
+		const clean = {};
+		Object.keys(pairs).forEach((k) => {
+			const key = String(k || '').trim();
+			const val = String(pairs[k] || '').trim();
+			if (!key || !val) return;
+			if (Object.keys(specs).length && !Object.prototype.hasOwnProperty.call(specs, key)) return;
+			clean[key] = val;
+		});
+		if (Object.keys(clean).length) out.push({ header, specs: clean });
+	});
+	if (out.length) return out;
+	if (Object.keys(specs).length) return [{ header: 'مشخصات', specs }];
+	return [];
+}
+
+function groupSentence(header, specs) {
+	const bits = [];
+	Object.keys(specs || {}).forEach((k) => {
+		const v = String(specs[k] || '').trim();
+		if (k && v) bits.push(k + ' ' + v);
+	});
+	if (!bits.length) return '';
+	const list = bits.join('، ');
+	const h = String(header || '').trim();
+	if (h && h !== 'مشخصات' && h !== 'سایر مشخصات') return 'در بخش «' + h + '» ' + list + ' ثبت شده است.';
+	return list + ' برای این محصول ثبت شده است.';
+}
+
+function groupCloser(header, depth) {
+	if (depth === 'light') return '';
+	const h = String(header || '');
+	if (/نمایش|صفحه/.test(h)) return 'همین اعداد، فضای دید و کیفیت تصویر این مدل را برای کار روزمره مشخص می‌کنند.';
+	if (/دوربین/.test(h)) return 'همین ارقام ثبت‌شده، توان تصویربرداری روزمره را بدون اغراق نشان می‌دهند.';
+	if (/پردازنده|حافظه/.test(h)) return 'این ترکیب روی کاغذ ملاک روانی کار و فضای ذخیره‌سازی است.';
+	if (/باتری/.test(h)) return 'ظرفیت اعلام‌شده برای تخمین دوام روزانه کافی است.';
+	if (/گرافیک/.test(h)) return 'این مشخصه برای انتخاب بین کار اداری و اجرای سنگین‌تر کمک می‌کند.';
+	if (depth === 'full') return 'این موارد عیناً از منبع همین کالا آمده و مبنای تصمیم خرید است.';
+	return '';
+}
+
+function groupAnalysisParagraph(group, name, depth) {
+	const header = String((group && group.header) || '').trim();
+	const specs = (group && group.specs) || {};
+	const bits = [];
+	Object.keys(specs).forEach((k) => {
+		const v = String(specs[k] || '').trim();
+		if (k && v) bits.push(k + ' «' + v + '»');
+	});
+	if (!bits.length) return '';
+	const who = name ? ('«' + name + '»') : 'این محصول';
+	const head = header ? ('در بخش «' + header + '» ') : '';
+	let text = head + 'برای ' + who + ' این مقادیر آمده است: ' + bits.join('، ') + '.';
+	const close = groupCloser(header, depth);
+	if (close) text += ' ' + close;
+	return text;
 }
 
 function specOf(specs, names) {
@@ -726,7 +792,10 @@ function specSentence(label, val) {
 	return map[label] || (label + ' این محصول ' + val + ' است.');
 }
 
-function weaveSpecs(specs, keys) {
+function weaveSpecs(specs, keys, groups) {
+	if (groups && groups.length) {
+		return groups.map((g) => groupSentence(g.header, g.specs)).filter(Boolean).join(' ').trim();
+	}
 	const bag = Object.assign({}, keys || {}, specs || {});
 	const map = [
 		['پردازنده', ['پردازنده', 'پردازنده مرکزی', 'تراشه']],
@@ -765,7 +834,7 @@ function weaveSpecs(specs, keys) {
 	return bits.join(' ').trim();
 }
 
-function draftArticle(name, name2, brand, specs, keys, seed) {
+function draftArticle(name, name2, brand, specs, keys, seed, groups) {
 	let p1 = '';
 	if (name) {
 		p1 = name;
@@ -776,9 +845,16 @@ function draftArticle(name, name2, brand, specs, keys, seed) {
 	}
 	seed = String(seed || '').trim();
 	if (seed && p1.indexOf(seed) < 0) p1 += ' ' + seed;
-	const woven = weaveSpecs(specs, keys);
 	const paras = [p1];
-	if (woven) paras.push(woven);
+	if (groups && groups.length >= 2) {
+		groups.forEach((g) => {
+			const sent = groupSentence(g.header, g.specs);
+			if (sent) paras.push(sent);
+		});
+	} else {
+		const woven = weaveSpecs(specs, keys, groups);
+		if (woven) paras.push(woven);
+	}
 	const last = paras[paras.length - 1] || '';
 	if (last.indexOf('جدول مشخصات') < 0) {
 		paras.push('جزئیات کامل «' + (name || 'این محصول') + '» در جدول مشخصات همین صفحه آمده است.');
@@ -786,31 +862,41 @@ function draftArticle(name, name2, brand, specs, keys, seed) {
 	return paras.map((p) => p.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n\n');
 }
 
-function composeArticle(source, name, name2, brand, specs, keys) {
+function composeArticle(source, name, name2, brand, specs, keys, groups) {
 	const polished = polishSource(source);
 	if (polished.length >= 240) {
-		const pairs = [
-			['رم', ['مقدار رم', 'حافظه RAM', 'رم', 'مقدار RAM']],
-			['حافظه داخلی', ['حافظه داخلی', 'ظرفیت حافظه']],
-			['پردازنده', ['پردازنده', 'پردازنده مرکزی', 'تراشه']],
-			['صفحه نمایش', ['اندازه صفحه نمایش']],
-			['دوربین اصلی', ['دوربین اصلی', 'کیفیت دوربین اصلی']],
-			['باتری', ['گنجایش باتری', 'ظرفیت باتری']],
-		];
-		const bag = Object.assign({}, keys || {}, specs || {});
 		const miss = [];
-		pairs.forEach((row) => {
-			const val = specOf(bag, row[1]);
-			if (!val) return;
-			if (polished.toLowerCase().indexOf(String(val).toLowerCase()) >= 0) return;
-			miss.push(specSentence(row[0], val));
-		});
+		if (groups && groups.length) {
+			groups.forEach((g) => {
+				Object.keys(g.specs || {}).forEach((k) => {
+					const val = String(g.specs[k] || '').trim();
+					if (!val || polished.toLowerCase().indexOf(val.toLowerCase()) >= 0) return;
+					if (miss.length < 5) miss.push(k + ' ' + val + ' است.');
+				});
+			});
+		} else {
+			const pairs = [
+				['رم', ['مقدار رم', 'حافظه RAM', 'رم', 'مقدار RAM']],
+				['حافظه داخلی', ['حافظه داخلی', 'ظرفیت حافظه']],
+				['پردازنده', ['پردازنده', 'پردازنده مرکزی', 'تراشه']],
+				['صفحه نمایش', ['اندازه صفحه نمایش']],
+				['دوربین اصلی', ['دوربین اصلی', 'کیفیت دوربین اصلی']],
+				['باتری', ['گنجایش باتری', 'ظرفیت باتری']],
+			];
+			const bag = Object.assign({}, keys || {}, specs || {});
+			pairs.forEach((row) => {
+				const val = specOf(bag, row[1]);
+				if (!val) return;
+				if (polished.toLowerCase().indexOf(String(val).toLowerCase()) >= 0) return;
+				miss.push(specSentence(row[0], val));
+			});
+		}
 		if (miss.length >= 2) {
 			return polished + '\n\n' + ('در تکمیل معرفی «' + name + '»، ' + miss.slice(0, 5).join(' '));
 		}
 		return polished;
 	}
-	return draftArticle(name, name2, brand, specs, keys, polished);
+	return draftArticle(name, name2, brand, specs, keys, polished, groups);
 }
 
 function paragraphsHtml(text) {
@@ -869,27 +955,45 @@ function analysisCons(cat, specs, keys) {
 	return out.slice(0, 3);
 }
 
-function analysisText(cat, name, specs, pros, cons) {
-	if (contentDepth(cat, specs) === 'light') return '';
-	let text = 'تحلیل «' + (name || 'این محصول') + '» فقط از روی مشخصات ثبت‌شده همین کالا انجام شده است. ';
-	text += pros && pros.length ? 'نقاط قوت از عددها و امکانات واقعی خوانده می‌شود، نه از شعار تبلیغاتی. ' : '';
-	text += cons && cons.length ? 'محدودیت‌های احتمالی هم فقط جایی آمده که در جدول مشخصات نشانه دارد.' : 'در جدول مشخصات محدودیت واضحی دیده نشد.';
-	return text.trim();
+function analysisText(cat, name, specs, pros, cons, groups) {
+	const depth = contentDepth(cat, specs, groups);
+	if (depth === 'light') return '';
+	const limit = depth === 'full' ? 6 : 2;
+	const paras = [];
+	(groups || []).some((g) => {
+		const p = groupAnalysisParagraph(g, name, depth);
+		if (p) paras.push(p);
+		return paras.length >= limit;
+	});
+	if (!paras.length) {
+		let text = 'تحلیل «' + (name || 'این محصول') + '» فقط از روی مشخصات ثبت‌شده همین کالا انجام شده است.';
+		if (cons && cons.length) text += ' محدودیت احتمالی فقط جایی آمده که در جدول مشخصات نشانه دارد.';
+		return text;
+	}
+	paras.push(cons && cons.length
+		? 'محدودیت احتمالی فقط جایی آمده که در همین مشخصات نشانه دارد.'
+		: 'در مشخصات ثبت‌شده این مدل محدودیت واضحی دیده نشد.');
+	return paras.join('\n\n');
 }
 
-function verdictText(cat, name, brand, specs, keys) {
+function verdictText(cat, name, brand, specs, keys, groups) {
 	const who = name || 'این محصول';
-	if (contentDepth(cat, specs) === 'light') {
+	if (contentDepth(cat, specs, groups) === 'light') {
 		return who + ' با مشخصات ثبت‌شده در همین صفحه معرفی شده است. اگر این مشخصات با نیازتان جور است، خرید آن می‌تواند انتخاب ساده‌ای باشد.';
 	}
 	const bag = Object.assign({}, keys || {}, specs || {});
 	const bits = [];
-	const ram = specOf(bag, ['مقدار رم', 'حافظه RAM', 'رم', 'مقدار RAM']);
-	const cam = specOf(bag, ['دوربین اصلی', 'کیفیت دوربین اصلی']);
-	const bat = specOf(bag, ['گنجایش باتری', 'ظرفیت باتری']);
-	if (ram) bits.push('رم ' + ram);
-	if (cam) bits.push('دوربین ' + cam);
-	if (bat) bits.push('باتری ' + bat);
+	['مقدار رم', 'حافظه RAM', 'رم', 'پردازنده', 'تراشه', 'دوربین اصلی', 'ظرفیت باتری', 'گنجایش باتری', 'کارت گرافیک', 'اندازه صفحه نمایش'].forEach((k) => {
+		if (!bag[k] || bits.length >= 3) return;
+		bits.push(k + ' ' + bag[k]);
+	});
+	if (bits.length < 2) {
+		(groups || []).some((g) => Object.keys(g.specs || {}).some((k) => {
+			const line = k + ' ' + String(g.specs[k] || '').trim();
+			if (line && bits.indexOf(line) < 0) bits.push(line);
+			return bits.length >= 3;
+		}));
+	}
 	let text = who + (brand ? (' از برند ' + brand) : '') + ' است.';
 	if (bits.length) text += ' ترکیب ' + bits.join('، ') + ' روی کاغذ برای کار روزمره منطقی به نظر می‌رسد.';
 	text += ' اگر همین مشخصات با نیازتان هم‌خوان است، همین صفحه برای تصمیم خرید کافی است.';
@@ -934,11 +1038,21 @@ function assembleProductHtml(data, body, highlights, faq, extras) {
 		highlights.forEach((h) => { html += '<li>' + escHtml(h) + '</li>'; });
 		html += '</ul></section>';
 	}
-	const pairs = Object.assign({}, keys, specs);
-	if (Object.keys(pairs).length) {
+	const groups = specGroupsOf(data || {});
+	if (groups.length) {
 		html += '<section class="product-description-section product-specifications" style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;margin:0 0 20px;overflow:hidden;padding:20px;" aria-labelledby="specifications-title">';
 		html += '<h3 id="specifications-title" style="color:#111827;font-size:19px;line-height:1.8;margin:0 0 12px;">مشخصات فنی کامل</h3>';
-		html += productSpecsTable(pairs, title) + '</section>';
+		if (groups.length === 1) {
+			html += productSpecsTable(groups[0].specs, title);
+		} else {
+			groups.forEach((g) => {
+				html += '<div class="product-spec-group" style="margin:0 0 18px;">';
+				if (g.header) html += '<h4 class="product-spec-group-title" style="color:#173b73;font-size:16px;margin:0 0 8px;">' + escHtml(g.header) + '</h4>';
+				html += productSpecsTable(g.specs, '');
+				html += '</div>';
+			});
+		}
+		html += '</section>';
 	}
 	if (analysis || (pros && pros.length) || (cons && cons.length)) {
 		html += '<section class="product-description-section product-analysis" style="background:#fffbeb;border:1px solid #e5e7eb;border-right:5px solid #d97706;border-radius:12px;margin:0 0 20px;padding:20px;" aria-labelledby="analysis-title">';
@@ -971,17 +1085,28 @@ function enhanceProduct(data) {
 	const name2 = String((data && data.name2) || '');
 	const specs = (data && data.specs) || {};
 	const keys = (data && data.key_specs) || {};
-	const cat = detectCategory(name + ' ' + name2);
+	const groups = specGroupsOf(data || {});
+	const cat = detectCategory(name + ' ' + name2, specs);
 	const brand = specOf(specs, ['برند', 'سازنده']);
-	const body = composeArticle((data && data.description) || '', name, name2, brand, specs, keys);
+	const body = composeArticle((data && data.description) || '', name, name2, brand, specs, keys, groups);
 
 	const highlights = [];
-	const prefer = ['برند', 'مدل', 'مقدار رم', 'حافظه RAM', 'مقدار RAM', 'حافظه داخلی', 'گنجایش باتری', 'ظرفیت باتری', 'دوربین اصلی', 'اندازه صفحه نمایش', 'پردازنده'];
+	Object.keys(keys).forEach((k) => {
+		const line = k + ': ' + keys[k];
+		if (highlights.indexOf(line) < 0) highlights.push(line);
+	});
+	groups.forEach((g) => {
+		let n = 0;
+		Object.keys(g.specs || {}).forEach((k) => {
+			if (highlights.length >= 6 || n >= 2) return;
+			const line = k + ': ' + g.specs[k];
+			if (highlights.indexOf(line) < 0) {
+				highlights.push(line);
+				n += 1;
+			}
+		});
+	});
 	const bag = Object.assign({}, keys, specs);
-	for (const k of prefer) {
-		if (bag[k]) highlights.push(k + ': ' + bag[k]);
-		if (highlights.length >= 6) break;
-	}
 	if (highlights.length < 4) {
 		for (const [k, v] of Object.entries(bag)) {
 			const line = k + ': ' + v;
@@ -1001,10 +1126,10 @@ function enhanceProduct(data) {
 	Object.keys(qmap).forEach((k) => {
 		if (specs[k] || keys[k]) faq.push({ q: qmap[k], a: String(specs[k] || keys[k]) + ' — طبق مشخصات ثبت‌شده.' });
 	});
-	const pros = analysisPros(cat, specs, keys);
+	const pros = analysisPros(cat, specs, keys, groups);
 	const cons = analysisCons(cat, specs, keys);
-	const analysis = analysisText(cat, name, specs, pros, cons);
-	const verdict = verdictText(cat, name, brand, specs, keys);
+	const analysis = analysisText(cat, name, specs, pros, cons, groups);
+	const verdict = verdictText(cat, name, brand, specs, keys, groups);
 	const descriptionHtml = assembleProductHtml(data, body, highlights, faq, { pros, cons, analysis, verdict });
 
 	let seoTitle = 'خرید ' + name;
@@ -1029,7 +1154,7 @@ function enhanceProduct(data) {
 		review,
 		highlights,
 		audience: '',
-		verdict: '',
+		verdict,
 		seo_title: seoTitle,
 		seo_desc: seoDesc,
 		focus_keyword: brand ? ('خرید ' + brand) : ('خرید ' + name.split(' ')[0]),
@@ -1038,6 +1163,8 @@ function enhanceProduct(data) {
 		provider: 'studio',
 		provider_label: 'معرفی و بررسی — استودیو خواجوی',
 		category: cat,
+		tech_analysis: analysis,
+		layout_groups: groups.length,
 	};
 }
 

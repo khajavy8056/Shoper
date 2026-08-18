@@ -385,6 +385,9 @@ class Shoper_Ajax {
 					}
 				}
 				$data['specs'] = $filtered;
+				if ( class_exists( 'Shoper_Copywriter' ) ) {
+					$data['spec_groups'] = Shoper_Copywriter::spec_groups( $data );
+				}
 			}
 		}
 

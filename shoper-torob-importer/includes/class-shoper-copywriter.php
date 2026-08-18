@@ -1,10 +1,10 @@
 <?php
 /**
- * استودیوی متن محصول — معرفی و بررسی + جدول مشخصات.
+ * استودیوی متن محصول — چیدمان از مشخصات همان کالا.
  *
- * متن منبع (دیجی‌کالا/ترب) را تمیز می‌کند.
- * اگر ناقص یا خالی باشد، از مشخصات واقعی همان کالا یک معرفی کوتاه می‌نویسد
- * تا صفحه محصول خالی نماند. مشخصه تازه اختراع نمی‌شود.
+ * ظاهر کلی (رنگ، فونت، جدول) ثابت می‌ماند.
+ * بخش‌ها، ترتیب جدول‌ها و عمق تحلیل از گروه‌های منبع همان محصول می‌آید.
+ * مشخصه تازه اختراع نمی‌شود.
  *
  * @package Shoper
  */
@@ -31,17 +31,18 @@ class Shoper_Copywriter {
 		$specs  = ( isset( $data['specs'] ) && is_array( $data['specs'] ) ) ? $data['specs'] : array();
 		$keys   = ( isset( $data['key_specs'] ) && is_array( $data['key_specs'] ) ) ? $data['key_specs'] : array();
 		$source = isset( $data['description'] ) ? (string) $data['description'] : '';
+		$groups = self::spec_groups( $data );
 		$cat    = self::detect_category( $name . ' ' . $name2, $specs );
 		$brand  = self::spec( $specs, array( 'برند', 'سازنده', 'Brand' ) );
 
-		$article    = self::compose_article( $source, $name, $name2, $brand, $specs, $keys, $cat );
-		$highlights = self::highlights( $cat, $specs, $keys );
+		$article    = self::compose_article( $source, $name, $name2, $brand, $specs, $keys, $cat, $groups );
+		$highlights = self::highlights( $cat, $specs, $keys, $groups );
 		$summary    = self::spec_summary( $specs, $keys );
 		$faq        = self::faq( $cat, $name, $specs, $keys );
-		$pros       = self::analysis_pros( $cat, $specs, $keys );
+		$pros       = self::analysis_pros( $cat, $specs, $keys, $groups );
 		$cons       = self::analysis_cons( $cat, $specs, $keys );
-		$analysis   = self::analysis_text( $cat, $name, $specs, $keys, $pros, $cons );
-		$verdict    = self::verdict_text( $cat, $name, $brand, $specs, $keys );
+		$analysis   = self::analysis_text( $cat, $name, $specs, $keys, $pros, $cons, $groups );
+		$verdict    = self::verdict_text( $cat, $name, $brand, $specs, $keys, $groups );
 		$short      = self::short_html( $name, $name2, $keys, $highlights );
 		$html       = self::assemble_html( $data, $article, $highlights, $analysis, $summary, '', $verdict, $faq, $pros, $cons );
 		$seo        = self::seo( $name, $name2, $brand, $cat, $keys, $specs );
@@ -50,7 +51,8 @@ class Shoper_Copywriter {
 			'title'             => $name,
 			'short_description' => $short,
 			'description_html'  => $html,
-			'analysis'          => $analysis ? $analysis : $article,
+			'analysis'          => $article,
+			'tech_analysis'     => $analysis,
 			'review'            => $summary,
 			'highlights'        => $highlights,
 			'pros'              => $pros,
@@ -65,6 +67,7 @@ class Shoper_Copywriter {
 			'provider'          => 'studio',
 			'provider_label'    => 'معرفی و بررسی — استودیو خواجوی',
 			'category'          => $cat,
+			'layout_groups'     => count( $groups ),
 		);
 	}
 
@@ -127,6 +130,58 @@ class Shoper_Copywriter {
 			}
 		}
 		return '';
+	}
+
+	/**
+	 * گروه‌های مشخصات همین کالا از منبع.
+	 *
+	 * اگر مشخصات فیلتر شده باشند، فقط همان‌ها در گروه می‌مانند.
+	 *
+	 * @param array $data دادهٔ محصول.
+	 * @return array
+	 */
+	public static function spec_groups( $data ) {
+		$data  = is_array( $data ) ? $data : array();
+		$specs = ( isset( $data['specs'] ) && is_array( $data['specs'] ) ) ? $data['specs'] : array();
+		$raw   = ( isset( $data['spec_groups'] ) && is_array( $data['spec_groups'] ) ) ? $data['spec_groups'] : array();
+		$out   = array();
+		foreach ( $raw as $group ) {
+			if ( ! is_array( $group ) ) {
+				continue;
+			}
+			$header = self::s( isset( $group['header'] ) ? $group['header'] : '' );
+			$pairs  = ( isset( $group['specs'] ) && is_array( $group['specs'] ) ) ? $group['specs'] : array();
+			$clean  = array();
+			foreach ( $pairs as $k => $v ) {
+				$k = self::s( $k );
+				$v = self::s( $v );
+				if ( '' === $k || '' === $v ) {
+					continue;
+				}
+				if ( $specs && ! array_key_exists( $k, $specs ) ) {
+					continue;
+				}
+				$clean[ $k ] = $v;
+			}
+			if ( $clean ) {
+				$out[] = array(
+					'header' => $header ? $header : 'مشخصات',
+					'specs'  => $clean,
+				);
+			}
+		}
+		if ( $out ) {
+			return $out;
+		}
+		if ( $specs ) {
+			return array(
+				array(
+					'header' => 'مشخصات',
+					'specs'  => $specs,
+				),
+			);
+		}
+		return array();
 	}
 
 	/**
@@ -211,10 +266,10 @@ class Shoper_Copywriter {
 	}
 
 	/**
-	 * معرفی و بررسی محصول به سبک صفحه دیجی‌کالا.
+	 * معرفی و بررسی محصول.
 	 *
 	 * اگر متن منبع کافی باشد همان را مرتب می‌کند.
-	 * اگر کوتاه یا خالی باشد از مشخصات واقعی مقاله کوتاه می‌سازد.
+	 * اگر کوتاه یا خالی باشد از گروه‌های همین کالا معرفی می‌سازد.
 	 *
 	 * @param string $source متن منبع.
 	 * @param string $name   نام.
@@ -223,15 +278,16 @@ class Shoper_Copywriter {
 	 * @param array  $specs  مشخصات.
 	 * @param array  $keys   کلیدها.
 	 * @param string $cat    دسته.
+	 * @param array  $groups گروه‌های منبع.
 	 * @return string
 	 */
-	public static function compose_article( $source, $name, $name2, $brand, $specs, $keys, $cat ) {
+	public static function compose_article( $source, $name, $name2, $brand, $specs, $keys, $cat, $groups = array() ) {
 		$polished = self::polish_source( $source );
 		if ( self::len( $polished ) >= 240 ) {
-			$extra = self::missing_facts_paragraph( $polished, $name, $specs, $keys );
+			$extra = self::missing_facts_paragraph( $polished, $name, $specs, $keys, $groups );
 			return $extra ? ( $polished . "\n\n" . $extra ) : $polished;
 		}
-		return self::draft_article( $name, $name2, $brand, $specs, $keys, $cat, $polished );
+		return self::draft_article( $name, $name2, $brand, $specs, $keys, $cat, $polished, $groups );
 	}
 
 	/**
@@ -246,23 +302,30 @@ class Shoper_Copywriter {
 	 * @return string
 	 */
 	public static function organize( $source, $name, $name2, $brand, $specs, $keys ) {
-		$cat = self::detect_category( $name . ' ' . $name2, $specs );
-		return self::compose_article( $source, $name, $name2, $brand, $specs, $keys, $cat );
+		$cat    = self::detect_category( $name . ' ' . $name2, $specs );
+		$groups = self::spec_groups(
+			array(
+				'specs'       => $specs,
+				'spec_groups' => array(),
+			)
+		);
+		return self::compose_article( $source, $name, $name2, $brand, $specs, $keys, $cat, $groups );
 	}
 
 	/**
-	 * نوشتن معرفی کوتاه از روی مشخصات واقعی.
+	 * نوشتن معرفی از روی مشخصات و گروه‌های همین کالا.
 	 *
-	 * @param string $name  نام.
-	 * @param string $name2 انگلیسی.
-	 * @param string $brand برند.
-	 * @param array  $specs مشخصات.
-	 * @param array  $keys  کلیدها.
-	 * @param string $cat   دسته.
-	 * @param string $seed  متن کوتاه منبع.
+	 * @param string $name   نام.
+	 * @param string $name2  انگلیسی.
+	 * @param string $brand  برند.
+	 * @param array  $specs  مشخصات.
+	 * @param array  $keys   کلیدها.
+	 * @param string $cat    دسته.
+	 * @param string $seed   متن کوتاه منبع.
+	 * @param array  $groups گروه‌ها.
 	 * @return string
 	 */
-	public static function draft_article( $name, $name2, $brand, $specs, $keys, $cat, $seed = '' ) {
+	public static function draft_article( $name, $name2, $brand, $specs, $keys, $cat, $seed = '', $groups = array() ) {
 		$label = self::category_label( $cat );
 		$p1    = '';
 		if ( $name ) {
@@ -286,22 +349,31 @@ class Shoper_Copywriter {
 			$p1 .= ' ' . $seed;
 		}
 
-		$woven = self::weave_specs( $specs, $keys );
 		$paras = array( $p1 );
-		if ( $woven ) {
-			$chunks = preg_split( '/(?<=[.؟])\s+/u', $woven );
-			$chunks = array_values( array_filter( array_map( 'trim', (array) $chunks ) ) );
-			if ( count( $chunks ) > 4 ) {
-				$paras[] = implode( ' ', array_slice( $chunks, 0, 4 ) );
-				$paras[] = implode( ' ', array_slice( $chunks, 4, 5 ) );
-			} else {
-				$paras[] = $woven;
+		if ( $groups && count( $groups ) >= 2 ) {
+			foreach ( $groups as $group ) {
+				$sent = self::group_sentence( isset( $group['header'] ) ? $group['header'] : '', isset( $group['specs'] ) ? $group['specs'] : array() );
+				if ( $sent ) {
+					$paras[] = $sent;
+				}
+			}
+		} else {
+			$woven = self::weave_specs( $specs, $keys, $groups );
+			if ( $woven ) {
+				$chunks = preg_split( '/(?<=[.؟])\s+/u', $woven );
+				$chunks = array_values( array_filter( array_map( 'trim', (array) $chunks ) ) );
+				if ( count( $chunks ) > 4 ) {
+					$paras[] = implode( ' ', array_slice( $chunks, 0, 4 ) );
+					$paras[] = implode( ' ', array_slice( $chunks, 4, 5 ) );
+				} else {
+					$paras[] = $woven;
+				}
 			}
 		}
 
 		$last = end( $paras );
 		if ( ! self::has( $last, 'جدول مشخصات' ) ) {
-			$who    = $name ? ( '«' . $name . '»' ) : 'این محصول';
+			$who     = $name ? ( '«' . $name . '»' ) : 'این محصول';
 			$paras[] = 'جزئیات کامل ' . $who . ' در جدول مشخصات همین صفحه آمده است.';
 		}
 
@@ -316,13 +388,55 @@ class Shoper_Copywriter {
 	}
 
 	/**
-	 * بافتن مشخصات واقعی به جملهٔ روان.
+	 * جمله از یک گروه منبع.
 	 *
-	 * @param array $specs مشخصات.
-	 * @param array $keys  کلیدها.
+	 * @param string $header عنوان گروه.
+	 * @param array  $specs  زوج‌ها.
 	 * @return string
 	 */
-	public static function weave_specs( $specs, $keys ) {
+	public static function group_sentence( $header, $specs ) {
+		$header = self::s( $header );
+		$bits   = array();
+		foreach ( (array) $specs as $k => $v ) {
+			$k = self::s( $k );
+			$v = self::s( $v );
+			if ( '' === $k || '' === $v ) {
+				continue;
+			}
+			$bits[] = $k . ' ' . $v;
+		}
+		if ( ! $bits ) {
+			return '';
+		}
+		$list = implode( '، ', $bits );
+		if ( $header && ! in_array( $header, array( 'مشخصات', 'سایر مشخصات' ), true ) ) {
+			return 'در بخش «' . $header . '» ' . $list . ' ثبت شده است.';
+		}
+		return $list . ' برای این محصول ثبت شده است.';
+	}
+
+	/**
+	 * بافتن مشخصات واقعی به جملهٔ روان.
+	 *
+	 * اگر گروه منبع باشد همان را مبنا می‌گذارد؛ وگرنه از نقشهٔ شناخته‌شده.
+	 *
+	 * @param array $specs  مشخصات.
+	 * @param array $keys   کلیدها.
+	 * @param array $groups گروه‌ها.
+	 * @return string
+	 */
+	public static function weave_specs( $specs, $keys, $groups = array() ) {
+		if ( $groups ) {
+			$bits = array();
+			foreach ( $groups as $group ) {
+				$sent = self::group_sentence( isset( $group['header'] ) ? $group['header'] : '', isset( $group['specs'] ) ? $group['specs'] : array() );
+				if ( $sent ) {
+					$bits[] = $sent;
+				}
+			}
+			return trim( implode( ' ', $bits ) );
+		}
+
 		$bag  = array_merge( (array) $keys, (array) $specs );
 		$map  = array(
 			array( 'پردازنده', array( 'پردازنده', 'پردازنده مرکزی', 'تراشه' ) ),
@@ -409,28 +523,42 @@ class Shoper_Copywriter {
 	 * @param string $name    نام.
 	 * @param array  $specs   مشخصات.
 	 * @param array  $keys    کلیدها.
+	 * @param array  $groups  گروه‌ها.
 	 * @return string
 	 */
-	public static function missing_facts_paragraph( $article, $name, $specs, $keys ) {
-		$bag   = array_merge( (array) $keys, (array) $specs );
-		$pairs = array(
-			array( 'رم', array( 'مقدار رم', 'حافظه RAM', 'رم', 'مقدار RAM' ) ),
-			array( 'حافظه داخلی', array( 'حافظه داخلی', 'ظرفیت حافظه' ) ),
-			array( 'پردازنده', array( 'پردازنده', 'پردازنده مرکزی', 'تراشه' ) ),
-			array( 'صفحه نمایش', array( 'اندازه صفحه نمایش' ) ),
-			array( 'دوربین اصلی', array( 'دوربین اصلی', 'کیفیت دوربین اصلی' ) ),
-			array( 'باتری', array( 'گنجایش باتری', 'ظرفیت باتری' ) ),
-		);
-		$miss  = array();
-		foreach ( $pairs as $row ) {
-			$val = self::spec( $bag, $row[1] );
-			if ( '' === $val ) {
-				continue;
+	public static function missing_facts_paragraph( $article, $name, $specs, $keys, $groups = array() ) {
+		$miss = array();
+		if ( $groups ) {
+			foreach ( $groups as $group ) {
+				$pairs = isset( $group['specs'] ) ? $group['specs'] : array();
+				foreach ( (array) $pairs as $k => $v ) {
+					$v = self::s( $v );
+					if ( '' === $v || self::has( $article, $v ) ) {
+						continue;
+					}
+					$miss[] = self::s( $k ) . ' ' . $v . ' است.';
+					if ( count( $miss ) >= 5 ) {
+						break 2;
+					}
+				}
 			}
-			if ( self::has( $article, $val ) ) {
-				continue;
+		} else {
+			$bag   = array_merge( (array) $keys, (array) $specs );
+			$pairs = array(
+				array( 'رم', array( 'مقدار رم', 'حافظه RAM', 'رم', 'مقدار RAM' ) ),
+				array( 'حافظه داخلی', array( 'حافظه داخلی', 'ظرفیت حافظه' ) ),
+				array( 'پردازنده', array( 'پردازنده', 'پردازنده مرکزی', 'تراشه' ) ),
+				array( 'صفحه نمایش', array( 'اندازه صفحه نمایش' ) ),
+				array( 'دوربین اصلی', array( 'دوربین اصلی', 'کیفیت دوربین اصلی' ) ),
+				array( 'باتری', array( 'گنجایش باتری', 'ظرفیت باتری' ) ),
+			);
+			foreach ( $pairs as $row ) {
+				$val = self::spec( $bag, $row[1] );
+				if ( '' === $val || self::has( $article, $val ) ) {
+					continue;
+				}
+				$miss[] = self::spec_sentence( $row[0], $val );
 			}
-			$miss[] = self::spec_sentence( $row[0], $val );
 		}
 		if ( count( $miss ) < 2 ) {
 			return '';
@@ -464,15 +592,42 @@ class Shoper_Copywriter {
 	}
 
 	/**
-	 * نکات برجسته از مشخصات واقعی.
+	 * نکات برجسته از مشخصات و گروه‌های همین کالا.
 	 *
-	 * @param string $cat   دسته.
-	 * @param array  $specs مشخصات.
-	 * @param array  $keys  کلیدها.
+	 * @param string $cat    دسته.
+	 * @param array  $specs  مشخصات.
+	 * @param array  $keys   کلیدها.
+	 * @param array  $groups گروه‌ها.
 	 * @return array
 	 */
-	public static function highlights( $cat, $specs, $keys ) {
-		$out   = array();
+	public static function highlights( $cat, $specs, $keys, $groups = array() ) {
+		$out = array();
+		foreach ( (array) $keys as $k => $v ) {
+			$line = self::s( $k ) . ': ' . self::s( $v );
+			if ( ': ' === $line || in_array( $line, $out, true ) ) {
+				continue;
+			}
+			$out[] = $line;
+			if ( count( $out ) >= 6 ) {
+				return $out;
+			}
+		}
+		foreach ( (array) $groups as $group ) {
+			$n = 0;
+			foreach ( (array) ( isset( $group['specs'] ) ? $group['specs'] : array() ) as $k => $v ) {
+				$line = self::s( $k ) . ': ' . self::s( $v );
+				if ( ': ' === $line || in_array( $line, $out, true ) ) {
+					continue;
+				}
+				$out[] = $line;
+				if ( count( $out ) >= 6 || ++$n >= 2 ) {
+					break;
+				}
+			}
+			if ( count( $out ) >= 6 ) {
+				return $out;
+			}
+		}
 		$pairs = array_merge( (array) $keys, (array) $specs );
 		$pref  = array(
 			'phone'     => array( 'برند', 'مدل', 'مقدار رم', 'حافظه RAM', 'مقدار RAM', 'حافظه داخلی', 'گنجایش باتری', 'ظرفیت باتری', 'دوربین اصلی', 'اندازه صفحه نمایش', 'سیستم عامل' ),
@@ -489,15 +644,18 @@ class Shoper_Copywriter {
 			if ( empty( $pairs[ $k ] ) ) {
 				continue;
 			}
-			$out[] = $k . ': ' . self::s( $pairs[ $k ] );
+			$line = $k . ': ' . self::s( $pairs[ $k ] );
+			if ( ! in_array( $line, $out, true ) ) {
+				$out[] = $line;
+			}
 			if ( count( $out ) >= 6 ) {
 				break;
 			}
 		}
 		if ( count( $out ) < 4 ) {
 			foreach ( $pairs as $k => $v ) {
-				$line = $k . ': ' . self::s( $v );
-				if ( in_array( $line, $out, true ) ) {
+				$line = self::s( $k ) . ': ' . self::s( $v );
+				if ( ': ' === $line || in_array( $line, $out, true ) ) {
 					continue;
 				}
 				$out[] = $line;
@@ -506,7 +664,7 @@ class Shoper_Copywriter {
 				}
 			}
 		}
-		return $out;
+		return array_slice( $out, 0, 6 );
 	}
 
 	/**
@@ -718,33 +876,36 @@ class Shoper_Copywriter {
 	}
 
 	/**
-	 * عمق محتوا بر اساس دسته و تعداد مشخصات.
+	 * عمق محتوا بر اساس دسته، تعداد مشخصات و گروه‌های منبع.
 	 *
-	 * @param string $cat   دسته.
-	 * @param array  $specs مشخصات.
+	 * @param string $cat    دسته.
+	 * @param array  $specs  مشخصات.
+	 * @param array  $groups گروه‌ها.
 	 * @return string full|medium|light
 	 */
-	public static function content_depth( $cat, $specs ) {
-		$count = is_array( $specs ) ? count( $specs ) : 0;
-		$rich  = array( 'phone', 'laptop', 'tablet', 'console', 'tv', 'watch' );
-		if ( in_array( $cat, $rich, true ) && $count >= 8 ) {
+	public static function content_depth( $cat, $specs, $groups = array() ) {
+		$count  = is_array( $specs ) ? count( $specs ) : 0;
+		$gcount = is_array( $groups ) ? count( $groups ) : 0;
+		$rich   = array( 'phone', 'laptop', 'tablet', 'console', 'tv', 'watch' );
+		if ( in_array( $cat, $rich, true ) && ( $count >= 8 || $gcount >= 3 ) ) {
 			return 'full';
 		}
-		if ( $count >= 5 ) {
+		if ( $count >= 5 || $gcount >= 2 ) {
 			return 'medium';
 		}
 		return 'light';
 	}
 
 	/**
-	 * مزایای واقعی از مشخصات.
+	 * مزایای واقعی از مشخصات همین کالا.
 	 *
-	 * @param string $cat   دسته.
-	 * @param array  $specs مشخصات.
-	 * @param array  $keys  کلیدها.
+	 * @param string $cat    دسته.
+	 * @param array  $specs  مشخصات.
+	 * @param array  $keys   کلیدها.
+	 * @param array  $groups گروه‌ها.
 	 * @return array
 	 */
-	public static function analysis_pros( $cat, $specs, $keys ) {
+	public static function analysis_pros( $cat, $specs, $keys, $groups = array() ) {
 		$bag  = array_merge( (array) $keys, (array) $specs );
 		$out  = array();
 		$ram  = self::spec( $bag, array( 'مقدار رم', 'حافظه RAM', 'رم', 'مقدار RAM' ) );
@@ -789,6 +950,19 @@ class Shoper_Copywriter {
 		}
 		if ( $gpu ) {
 			$out[] = 'کارت گرافیک ' . $gpu;
+		}
+		if ( count( $out ) < 3 ) {
+			foreach ( (array) $groups as $group ) {
+				foreach ( (array) ( isset( $group['specs'] ) ? $group['specs'] : array() ) as $k => $v ) {
+					$line = self::s( $k ) . ': ' . self::s( $v );
+					if ( $line && ! in_array( $line, $out, true ) ) {
+						$out[] = $line;
+					}
+					if ( count( $out ) >= 4 ) {
+						break 2;
+					}
+				}
+			}
 		}
 		if ( count( $out ) < 3 ) {
 			foreach ( array_slice( $bag, 0, 8 ) as $k => $v ) {
@@ -839,63 +1013,162 @@ class Shoper_Copywriter {
 	}
 
 	/**
-	 * متن تحلیل فنی.
+	 * متن تحلیل فنی از گروه‌های همین کالا.
 	 *
-	 * @param string $cat   دسته.
-	 * @param string $name  نام.
-	 * @param array  $specs مشخصات.
-	 * @param array  $keys  کلیدها.
-	 * @param array  $pros  مزایا.
-	 * @param array  $cons  معایب.
+	 * @param string $cat    دسته.
+	 * @param string $name   نام.
+	 * @param array  $specs  مشخصات.
+	 * @param array  $keys   کلیدها.
+	 * @param array  $pros   مزایا.
+	 * @param array  $cons   معایب.
+	 * @param array  $groups گروه‌ها.
 	 * @return string
 	 */
-	public static function analysis_text( $cat, $name, $specs, $keys, $pros, $cons ) {
-		$depth = self::content_depth( $cat, $specs );
+	public static function analysis_text( $cat, $name, $specs, $keys, $pros, $cons, $groups = array() ) {
+		$depth = self::content_depth( $cat, $specs, $groups );
 		if ( 'light' === $depth ) {
 			return '';
 		}
+		if ( ! $groups ) {
+			$groups = self::spec_groups(
+				array(
+					'specs'     => $specs,
+					'key_specs' => $keys,
+				)
+			);
+		}
+		$who   = $name ? ( '«' . $name . '»' ) : 'این محصول';
+		$limit = ( 'full' === $depth ) ? 6 : 2;
+		$paras = array();
+		$i     = 0;
+		foreach ( $groups as $group ) {
+			$p = self::group_analysis_paragraph( $group, $name, $depth );
+			if ( $p ) {
+				$paras[] = $p;
+				if ( ++$i >= $limit ) {
+					break;
+				}
+			}
+		}
+		if ( ! $paras ) {
+			$text = 'تحلیل ' . $who . ' فقط از روی مشخصات ثبت‌شده همین کالا انجام شده است.';
+			if ( $cons ) {
+				$text .= ' محدودیت احتمالی فقط جایی آمده که در جدول مشخصات نشانه دارد.';
+			}
+			return $text;
+		}
+		$paras[] = $cons
+			? 'محدودیت احتمالی فقط جایی آمده که در همین مشخصات نشانه دارد.'
+			: 'در مشخصات ثبت‌شده این مدل محدودیت واضحی دیده نشد.';
+		return implode( "\n\n", $paras );
+	}
+
+	/**
+	 * پاراگراف تحلیل یک گروه منبع.
+	 *
+	 * @param array  $group گروه.
+	 * @param string $name  نام.
+	 * @param string $depth عمق.
+	 * @return string
+	 */
+	public static function group_analysis_paragraph( $group, $name, $depth ) {
+		$header = self::s( isset( $group['header'] ) ? $group['header'] : '' );
+		$specs  = ( isset( $group['specs'] ) && is_array( $group['specs'] ) ) ? $group['specs'] : array();
+		$bits   = array();
+		foreach ( $specs as $k => $v ) {
+			$k = self::s( $k );
+			$v = self::s( $v );
+			if ( $k && $v ) {
+				$bits[] = $k . ' «' . $v . '»';
+			}
+		}
+		if ( ! $bits ) {
+			return '';
+		}
 		$who  = $name ? ( '«' . $name . '»' ) : 'این محصول';
-		$text = 'تحلیل ' . $who . ' فقط از روی مشخصات ثبت‌شده همین کالا انجام شده است. ';
-		if ( $pros ) {
-			$text .= 'نقاط قوت از عددها و امکانات واقعی خوانده می‌شود، نه از شعار تبلیغاتی. ';
+		$list = implode( '، ', $bits );
+		$head = $header ? ( 'در بخش «' . $header . '» ' ) : '';
+		$text = $head . 'برای ' . $who . ' این مقادیر آمده است: ' . $list . '.';
+		$close = self::group_closer( $header, $depth );
+		if ( $close ) {
+			$text .= ' ' . $close;
 		}
-		if ( $cons ) {
-			$text .= 'محدودیت‌های احتمالی هم فقط جایی آمده که در جدول مشخصات نشانه دارد.';
-		} else {
-			$text .= 'در جدول مشخصات محدودیت واضحی دیده نشد.';
+		return $text;
+	}
+
+	/**
+	 * جملهٔ کوتاه کمکی برای یک گروه — بدون اختراع مشخصه.
+	 *
+	 * @param string $header عنوان گروه.
+	 * @param string $depth  عمق.
+	 * @return string
+	 */
+	public static function group_closer( $header, $depth ) {
+		if ( 'light' === $depth ) {
+			return '';
 		}
-		return trim( $text );
+		if ( self::has( $header, 'نمایش' ) || self::has( $header, 'صفحه' ) ) {
+			return 'همین اعداد، فضای دید و کیفیت تصویر این مدل را برای کار روزمره مشخص می‌کنند.';
+		}
+		if ( self::has( $header, 'دوربین' ) ) {
+			return 'همین ارقام ثبت‌شده، توان تصویربرداری روزمره را بدون اغراق نشان می‌دهند.';
+		}
+		if ( self::has( $header, 'پردازنده' ) || self::has( $header, 'حافظه' ) ) {
+			return 'این ترکیب روی کاغذ ملاک روانی کار و فضای ذخیره‌سازی است.';
+		}
+		if ( self::has( $header, 'باتری' ) ) {
+			return 'ظرفیت اعلام‌شده برای تخمین دوام روزانه کافی است.';
+		}
+		if ( self::has( $header, 'گرافیک' ) ) {
+			return 'این مشخصه برای انتخاب بین کار اداری و اجرای سنگین‌تر کمک می‌کند.';
+		}
+		if ( 'full' === $depth ) {
+			return 'این موارد عیناً از منبع همین کالا آمده و مبنای تصمیم خرید است.';
+		}
+		return '';
 	}
 
 	/**
 	 * نتیجه‌گیری نامحسوس برای تصمیم خرید.
 	 *
-	 * @param string $cat   دسته.
-	 * @param string $name  نام.
-	 * @param string $brand برند.
-	 * @param array  $specs مشخصات.
-	 * @param array  $keys  کلیدها.
+	 * @param string $cat    دسته.
+	 * @param string $name   نام.
+	 * @param string $brand  برند.
+	 * @param array  $specs  مشخصات.
+	 * @param array  $keys   کلیدها.
+	 * @param array  $groups گروه‌ها.
 	 * @return string
 	 */
-	public static function verdict_text( $cat, $name, $brand, $specs, $keys ) {
-		$depth = self::content_depth( $cat, $specs );
+	public static function verdict_text( $cat, $name, $brand, $specs, $keys, $groups = array() ) {
+		$depth = self::content_depth( $cat, $specs, $groups );
 		$who   = $name ? $name : 'این محصول';
 		$label = self::category_label( $cat );
 		if ( 'light' === $depth ) {
 			return $who . ' با مشخصات ثبت‌شده در همین صفحه معرفی شده است. اگر این مشخصات با نیازتان جور است، خرید آن می‌تواند انتخاب ساده‌ای باشد.';
 		}
 		$bits = array();
-		$ram  = self::spec( array_merge( (array) $keys, (array) $specs ), array( 'مقدار رم', 'حافظه RAM', 'رم', 'مقدار RAM' ) );
-		$cam  = self::spec( array_merge( (array) $keys, (array) $specs ), array( 'دوربین اصلی', 'کیفیت دوربین اصلی' ) );
-		$bat  = self::spec( array_merge( (array) $keys, (array) $specs ), array( 'گنجایش باتری', 'ظرفیت باتری' ) );
-		if ( $ram ) {
-			$bits[] = 'رم ' . $ram;
+		$bag  = array_merge( (array) $keys, (array) $specs );
+		foreach ( array( 'مقدار رم', 'حافظه RAM', 'رم', 'پردازنده', 'تراشه', 'دوربین اصلی', 'ظرفیت باتری', 'گنجایش باتری', 'کارت گرافیک', 'اندازه صفحه نمایش' ) as $k ) {
+			if ( empty( $bag[ $k ] ) ) {
+				continue;
+			}
+			$bits[] = self::s( $k ) . ' ' . self::s( $bag[ $k ] );
+			if ( count( $bits ) >= 3 ) {
+				break;
+			}
 		}
-		if ( $cam ) {
-			$bits[] = 'دوربین ' . $cam;
-		}
-		if ( $bat ) {
-			$bits[] = 'باتری ' . $bat;
+		if ( count( $bits ) < 2 ) {
+			foreach ( (array) $groups as $group ) {
+				foreach ( (array) ( isset( $group['specs'] ) ? $group['specs'] : array() ) as $k => $v ) {
+					$line = self::s( $k ) . ' ' . self::s( $v );
+					if ( $line && ! in_array( $line, $bits, true ) ) {
+						$bits[] = $line;
+					}
+					if ( count( $bits ) >= 3 ) {
+						break 2;
+					}
+				}
+			}
 		}
 		$text = $who . ' یک ' . $label;
 		if ( $brand ) {
@@ -910,16 +1183,18 @@ class Shoper_Copywriter {
 	}
 
 	/**
-	 * HTML ثابت صفحه محصول به قالب نقد و بررسی تخصصی.
+	 * HTML صفحه محصول: ظاهر ثابت، چیدمان از گروه‌های همین کالا.
 	 *
 	 * @param array  $data       داده.
 	 * @param string $intro      معرفی و بررسی.
 	 * @param array  $highlights نکات.
-	 * @param string $analysis   همان معرفی (سازگاری).
+	 * @param string $analysis   تحلیل.
 	 * @param string $review     خلاصه مشخصات.
 	 * @param string $audience   بلااستفاده.
-	 * @param string $verdict    بلااستفاده.
+	 * @param string $verdict    نتیجه‌گیری.
 	 * @param array  $faq        پرسش‌ها.
+	 * @param array  $pros       مزایا.
+	 * @param array  $cons       معایب.
 	 * @return string
 	 */
 	public static function assemble_html( $data, $intro, $highlights, $analysis, $review, $audience, $verdict, $faq = array(), $pros = array(), $cons = array() ) {
@@ -955,21 +1230,22 @@ class Shoper_Copywriter {
 			$html .= '</ul></section>';
 		}
 
-		$pairs = array();
-		if ( ! empty( $data['key_specs'] ) && is_array( $data['key_specs'] ) ) {
-			$pairs = $data['key_specs'];
-		}
-		if ( ! empty( $data['specs'] ) && is_array( $data['specs'] ) ) {
-			foreach ( $data['specs'] as $k => $v ) {
-				if ( ! isset( $pairs[ $k ] ) ) {
-					$pairs[ $k ] = $v;
-				}
-			}
-		}
-		if ( $pairs ) {
+		$groups = self::spec_groups( is_array( $data ) ? $data : array() );
+		if ( $groups ) {
 			$html .= '<section class="product-description-section product-specifications" style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;margin:0 0 20px;overflow:hidden;padding:20px;" aria-labelledby="specifications-title">';
 			$html .= '<h3 id="specifications-title" style="color:#111827;font-size:19px;line-height:1.8;margin:0 0 12px;">مشخصات فنی کامل</h3>';
-			$html .= self::table( $pairs, $title ? $title : $name );
+			if ( 1 === count( $groups ) ) {
+				$html .= self::table( $groups[0]['specs'], $title ? $title : $name );
+			} else {
+				foreach ( $groups as $group ) {
+					$html .= '<div class="product-spec-group" style="margin:0 0 18px;">';
+					if ( ! empty( $group['header'] ) ) {
+						$html .= '<h4 class="product-spec-group-title" style="color:#173b73;font-size:16px;margin:0 0 8px;">' . esc_html( $group['header'] ) . '</h4>';
+					}
+					$html .= self::table( $group['specs'], '' );
+					$html .= '</div>';
+				}
+			}
 			$html .= '</section>';
 		}
 
@@ -1036,7 +1312,8 @@ class Shoper_Copywriter {
 	/**
 	 * جدول مشخصات.
 	 *
-	 * @param array $pairs زوج‌ها.
+	 * @param array  $pairs   زوج‌ها.
+	 * @param string $caption عنوان.
 	 * @return string
 	 */
 	private static function table( $pairs, $caption = '' ) {

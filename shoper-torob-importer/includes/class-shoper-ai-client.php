@@ -247,8 +247,8 @@ class Shoper_AI_Client {
 		}
 		$specs = implode( '؛ ', $spec_bits );
 
-		$rules = "نقش: نویسنده صفحه محصول فروشگاهی به قالب نقد و بررسی تخصصی.\n"
-			. "کار: از متن منبع و جدول مشخصات، معرفی کامل‌تر بنویس. اگر کالا ساده است متن را کوتاه نگه دار؛ برای موبایل و لپ‌تاپ کامل‌تر بنویس.\n"
+		$rules = "نقش: نویسنده صفحه نقد و بررسی همین کالا.\n"
+			. "کار: متن را فقط از منبع و مشخصات همین کالا بنویس. چیدمان را از گروه‌های همین کالا بساز؛ قالب گوشی را روی کالای دیگر کپی نکن. کالا ساده را کوتاه، موبایل و لپ‌تاپ را کامل‌تر بنویس.\n"
 			. "لحن: متقاعدکننده اما نامحسوس. شعار نزن. نظر مشتری نساز. مشخصه تازه اختراع نکن.\n"
 			. "سئو اجباری: seo_title بین ۵۰ تا ۶۰ نویسه و با کلمه خرید؛ seo_desc بین ۱۴۰ تا ۱۵۵ نویسه با ۲ مشخصه واقعی؛ focus_keyword دو تا چهار کلمه؛ tags هشت مورد.\n"
 			. "خروجی فقط JSON با کلیدهای: intro, highlights, pros, cons, verdict, seo_title, seo_desc, focus_keyword, tags\n"
@@ -428,7 +428,7 @@ class Shoper_AI_Client {
 	 * @return string|WP_Error
 	 */
 	private function http( $method, $url, $headers, $body ) {
-		$ua = 'ShoperStudio/1.5.4 (Khajavy; +https://github.com/khajavy8056/Shoper)';
+		$ua = 'ShoperStudio/1.5.6 (Khajavy; +https://github.com/khajavy8056/Shoper)';
 		if ( function_exists( 'curl_init' ) ) {
 			$ch  = curl_init( $url );
 			$opt = array(
@@ -626,11 +626,22 @@ class Shoper_AI_Client {
 		$out['seo_desc']      = $seo['description'];
 		$out['focus_keyword'] = $seo['keyword'];
 
+		$tech = '';
+		if ( ! empty( $remote['analysis'] ) && is_string( $remote['analysis'] ) && Shoper_Copywriter::len( $remote['analysis'] ) > 70 ) {
+			$tech = Shoper_Copywriter::s( $remote['analysis'] );
+		} elseif ( ! empty( $studio['tech_analysis'] ) ) {
+			$tech = $studio['tech_analysis'];
+		}
+		$out['tech_analysis'] = $tech;
+		if ( $intro ) {
+			$out['analysis'] = $intro;
+		}
+
 		$out['description_html'] = Shoper_Copywriter::assemble_html(
 			$data,
 			$intro,
 			$out['highlights'],
-			$out['analysis'],
+			$tech,
 			$out['review'],
 			$out['audience'],
 			isset( $out['verdict'] ) ? $out['verdict'] : '',

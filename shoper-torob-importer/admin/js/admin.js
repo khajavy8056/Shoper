@@ -1127,7 +1127,7 @@
 			html += '<div class="shoper-ai-pane" data-pane="verdict" style="display:none;"><textarea id="shoper-p-verdict" rows="6"></textarea></div>';
 			html += '<div class="shoper-ai-pane" data-pane="review" style="display:none;"><textarea id="shoper-p-review" rows="8"></textarea></div>';
 			html += '<textarea id="shoper-p-audience" style="display:none;"></textarea>';
-			html += '<p class="description">قالب ثابت: معرفی، ویژگی‌های برجسته، جدول مشخصات، تحلیل مزایا/معایب و نتیجه‌گیری خرید. لحن فروش نامحسوس است و مشخصه تازه ساخته نمی‌شود.</p>';
+			html += '<p class="description">چیدمان از گروه‌های مشخصات همین کالا ساخته می‌شود. ظاهر ثابت است؛ متن و جدول‌ها مال همین محصول‌اند. مشخصه تازه ساخته نمی‌شود.</p>';
 			html += '<p><button type="button" class="button" id="shoper-ai-rerun">ساخت دوباره معرفی</button></p>';
 				html += '</div>';
 
@@ -1751,12 +1751,13 @@
 				if (++n >= max) break;
 			}
 			var source = String(data.description || '').replace(/\s+/g, ' ').slice(0, compact ? 360 : 1400);
-			return 'نقش: نویسنده صفحه محصول فروشگاهی به قالب نقد و بررسی تخصصی.\\n'
-				+ 'کار: از متن منبع و جدول مشخصات معرفی کامل‌تر بنویس. کالا ساده را کوتاه، موبایل را کامل‌تر.\\n'
-				+ 'لحن متقاعدکننده اما نامحسوس. نظر مشتری و مشخصه تازه نساز.\\n'
-				+ 'سئو اجباری: seo_title بین ۵۰ تا ۶۰ نویسه و با کلمه خرید؛ seo_desc بین ۱۴۰ تا ۱۵۵ نویسه با ۲ مشخصه واقعی؛ focus_keyword دو تا چهار کلمه؛ tags هشت مورد.\\n'
-				+ 'خروجی فقط JSON با کلیدهای: intro, highlights, pros, cons, verdict, seo_title, seo_desc, focus_keyword, tags\\n'
-				+ 'intro معرفی و بررسی. pros مزایا از مشخصات. cons فقط اگر در جدول نشانه دارد. verdict نتیجه‌گیری خرید.\\n'
+			return 'نقش: نویسنده صفحه محصول فروشگاهی.\n'
+				+ 'کار: متن را فقط از منبع و مشخصات همین کالا بنویس. چیدمان را از گروه‌های همین کالا بساز؛ قالب گوشی را روی کالای دیگر کپی نکن.\n'
+				+ 'کالا ساده را کوتاه، موبایل و لپ‌تاپ را کامل‌تر بنویس.\n'
+				+ 'لحن متقاعدکننده اما نامحسوس. نظر مشتری و مشخصه تازه نساز.\n'
+				+ 'سئو اجباری: seo_title بین ۵۰ تا ۶۰ نویسه و با کلمه خرید؛ seo_desc بین ۱۴۰ تا ۱۵۵ نویسه با ۲ مشخصه واقعی؛ focus_keyword دو تا چهار کلمه؛ tags هشت مورد.\n'
+				+ 'خروجی فقط JSON با کلیدهای: intro, highlights, pros, cons, verdict, seo_title, seo_desc, focus_keyword, tags\n'
+				+ 'intro معرفی همین کالا. highlights از مشخصات واقعی. cons فقط اگر در جدول نشانه دارد. verdict نتیجه‌گیری خرید.\n'
 				+ 'محصول: ' + (data.name1 || '') + '\nانگلیسی: ' + (data.name2 || '') + '\nمنبع: ' + source + '\nمشخصات: ' + specs.join('؛ ');
 		},
 

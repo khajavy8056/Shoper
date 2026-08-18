@@ -23,7 +23,7 @@ const fixtureDir = path.join(__dirname, '../preview/fixtures');
 const searchRaw = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'search-samsung.json'), 'utf8'));
 const detailsRaw = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'details-9bcf3364.json'), 'utf8'));
 
-console.log('\nShoper 1.5.5 node tests\n');
+console.log('\nShoper 1.5.6 node tests\n');
 
 const search = logic.normalizeSearch(searchRaw);
 check('جستجوی fixture نرمال می‌شود', search.results && search.results.length > 0, search.results.length + ' نتیجه');
@@ -81,7 +81,7 @@ check('chooseSuggest لینک more_info را می‌فرستد', /preview\(it\.r
 check('fill هم product_json می‌فرستد', /shoper_fill[\s\S]{0,900}product_json/.test(pluginJs));
 
 const mainPhp = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/shoper-torob-importer.php'), 'utf8');
-check('plugin version 1.5.5', mainPhp.includes("define( 'SHOPER_VERSION', '1.5.5' )"));
+check('plugin version 1.5.6', mainPhp.includes("define( 'SHOPER_VERSION', '1.5.6' )"));
 check('کلاس تجمیع فروشنده بارگذاری می‌شود', mainPhp.includes('class-shoper-seller-aggregator.php'));
 
 check('digikala client required', mainPhp.includes('class-shoper-digikala-client.php') && mainPhp.includes('class-shoper-catalog.php'));
@@ -123,6 +123,43 @@ check('empty source still has fixed html sections', (emptyDesc.description_html 
 check('copywriter compose article in PHP', copyPhp.includes('function compose_article') && copyPhp.includes('function polish_source') && copyPhp.includes('معرفی و بررسی محصول'));
 const glove = logic.enhanceProduct({ name1: 'دستکش کار ساده', name2: '', description: '', specs: { رنگ: 'مشکی' }, key_specs: { رنگ: 'مشکی' } });
 check('simple product stays short', String(glove.verdict || '').length < 220 && (glove.description_html || '').indexOf('product-description-wrapper') >= 0);
+check('phone layout uses source group headings', (enh.description_html || '').indexOf('صفحه نمایش') >= 0 && (enh.description_html || '').indexOf('دوربین') >= 0 && (enh.description_html || '').indexOf('product-spec-group') >= 0);
+check('phone analysis cites this product specs', String(enh.tech_analysis || enh.description_html || '').indexOf('Snapdragon') >= 0 || String(enh.description_html || '').indexOf('200 مگاپیکسل') >= 0);
+const gloveFull = logic.enhanceProduct({
+	name1: 'دستکش ایمنی چرمی',
+	name2: '',
+	description: '',
+	specs: { رنگ: 'مشکی', جنس: 'چرم طبیعی' },
+	key_specs: { جنس: 'چرم طبیعی' },
+	spec_groups: [{ header: 'جنس و رنگ', specs: { رنگ: 'مشکی', جنس: 'چرم طبیعی' } }],
+});
+check('glove layout uses its own group not phone groups', (gloveFull.description_html || '').indexOf('جنس و رنگ') >= 0 && (gloveFull.description_html || '').indexOf('Snapdragon') < 0 && (gloveFull.description_html || '').indexOf('دوربین اصلی') < 0);
+check('glove skips long technical analysis', (gloveFull.description_html || '').indexOf('تحلیل و آنالیز فنی') < 0);
+const laptop = logic.enhanceProduct({
+	name1: 'لپ‌تاپ ایسوس Vivobook 15',
+	name2: 'ASUS Vivobook 15',
+	description: '',
+	specs: {
+		برند: 'ایسوس',
+		پردازنده: 'Core i7-1355U',
+		'مقدار رم': '16 گیگابایت',
+		'حافظه داخلی': '512 گیگابایت',
+		'کارت گرافیک': 'Intel Iris Xe',
+		'اندازه صفحه نمایش': '15.6 اینچ',
+		وزن: '1.7 کیلوگرم',
+		'سیستم عامل': 'Windows 11',
+	},
+	key_specs: { پردازنده: 'Core i7-1355U', 'کارت گرافیک': 'Intel Iris Xe' },
+	spec_groups: [
+		{ header: 'پردازنده', specs: { پردازنده: 'Core i7-1355U', 'مقدار رم': '16 گیگابایت' } },
+		{ header: 'کارت گرافیک', specs: { 'کارت گرافیک': 'Intel Iris Xe' } },
+		{ header: 'صفحه نمایش', specs: { 'اندازه صفحه نمایش': '15.6 اینچ' } },
+		{ header: 'حافظه', specs: { 'حافظه داخلی': '512 گیگابایت' } },
+	],
+});
+check('laptop layout uses gpu group from source', (laptop.description_html || '').indexOf('کارت گرافیک') >= 0 && (laptop.description_html || '').indexOf('Intel Iris Xe') >= 0);
+check('laptop analysis follows its groups', String(laptop.tech_analysis || '').indexOf('در بخش') >= 0 && String(laptop.tech_analysis || '').indexOf('Core i7') >= 0);
+check('phone and glove html are not the same shape', ((gloveFull.description_html || '').match(/product-spec-group/g) || []).length !== ((enh.description_html || '').match(/product-spec-group/g) || []).length);
 check('admin.js enhance + 4 steps', pluginJs.includes('queueEnhance') && pluginJs.includes('data-step="ai"') && pluginJs.includes('data-step="review"'));
 check('admin.js browserEnhance', pluginJs.includes('browserEnhance') && pluginJs.includes('parseAiJson') && pluginJs.includes('text.pollinations.ai'));
 check('admin.js rotates 3 free models', pluginJs.includes('aiProviderList') && pluginJs.includes('llm7.io') && pluginJs.includes('oai.endpoints.kepler.ai.cloud.ovh.net') && pluginJs.includes('mode: \'studio\''));
@@ -131,7 +168,8 @@ const aiPhp = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/inc
 check('AI uses 3 independent free families', aiPhp.includes('openai-fast') && aiPhp.includes('gpt-oss:20b') && aiPhp.includes('oai.endpoints.kepler.ai.cloud.ovh.net') && aiPhp.includes('Qwen3.6-27B'));
 check('old dead llm7 models removed', aiPhp.indexOf("'gpt-4o-mini-2024-07-18'") < 0 && aiPhp.indexOf("'gemma-2-9b-it'") < 0);
 check('merge keeps product data', aiPhp.includes('merge( $studio, $parsed, $data )'));
-check('prompt writes review template', aiPhp.includes('نقد و بررسی') && aiPhp.includes('verdict') && aiPhp.includes('pros'));
+check('prompt writes review template', aiPhp.includes('نقد و بررسی') && aiPhp.includes('verdict') && aiPhp.includes('pros') && aiPhp.includes('گروه‌'));
+check('copywriter builds layout from spec groups', copyPhp.includes('function spec_groups') && copyPhp.includes('product-spec-group') && copyPhp.includes('function group_analysis_paragraph'));
 check('studio mode and max 3 tries', aiPhp.includes("'studio'") && aiPhp.includes('MAX_TRIES') && aiPhp.includes('clamp_seo'));
 check('copywriter has clamp_seo', copyPhp.includes('function clamp_seo'));
 check('create uses studio only', ajax.includes('mode') && fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/includes/class-shoper-product-builder.php'), 'utf8').includes('Shoper_Copywriter::enhance'));

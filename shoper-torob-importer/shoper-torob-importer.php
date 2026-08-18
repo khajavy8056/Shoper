@@ -3,7 +3,7 @@
  * Plugin Name:       Shoper Studio – سازنده هوشمند محصول
  * Plugin URI:        https://github.com/khajavy8056/Shoper
  * Description:       از نام محصول تا صفحه فروش: معرفی و بررسی، جدول مشخصات، گالری تصاویر و ویژگی‌های دانه‌دانه.
- * Version:           1.5.5
+ * Version:           1.5.6
  * Author:            خواجوی
  * Author URI:        https://github.com/khajavy8056
  * License:           GPL v2 or later
@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // تعریف ثابت‌های افزونه.
-define( 'SHOPER_VERSION', '1.5.5' );
+define( 'SHOPER_VERSION', '1.5.6' );
 define( 'SHOPER_AUTHOR', 'خواجوی' );
 define( 'SHOPER_PLUGIN_FILE', __FILE__ );
 define( 'SHOPER_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );

@@ -82,3 +82,11 @@
 .product-table-wrap {
 	overflow-x: auto;
 }
+.product-spec-group {
+	margin: 0 0 18px;
+}
+.product-spec-group-title {
+	color: #173b73;
+	font-size: 16px;
+	margin: 0 0 8px;
+}

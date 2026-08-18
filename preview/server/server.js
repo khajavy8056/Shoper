@@ -378,7 +378,12 @@ const handlers = {
 					}
 					if (Array.isArray(remote.tags) && remote.tags.length) enh.tags = remote.tags.slice(0, 12);
 					if (Array.isArray(remote.faq) && remote.faq.length) enh.faq = remote.faq.slice(0, 5);
-					enh.description_html = logic.assembleProductHtml(data, enh.analysis, enh.highlights || [], enh.faq || []);
+					enh.description_html = logic.assembleProductHtml(data, enh.analysis, enh.highlights || [], enh.faq || [], {
+						pros: enh.pros || [],
+						cons: enh.cons || [],
+						analysis: enh.tech_analysis || '',
+						verdict: enh.verdict || '',
+					});
 					enh.provider = params.get('remote_provider') || 'browser';
 					enh.provider_label = (enh.provider) + ' + استودیو خواجوی';
 					enh.remote = true;
@@ -727,13 +732,13 @@ const server = http.createServer(async (req, res) => {
 	}
 
 	// --- دانلود آخرین نسخه‌ی افزونه (ZIP) ---
-	if (pathname === '/download/latest' || pathname === '/download/shoper-torob-importer-1.5.5.zip') {
-		const zip = path.join(ROOT, 'dist', 'shoper-torob-importer-1.5.5.zip');
+	if (pathname === '/download/latest' || pathname === '/download/shoper-torob-importer-1.5.6.zip') {
+		const zip = path.join(ROOT, 'dist', 'shoper-torob-importer-1.5.6.zip');
 		try {
 			const data = await fsp.readFile(zip);
 			res.writeHead(200, {
 				'Content-Type': 'application/zip',
-				'Content-Disposition': 'attachment; filename="shoper-torob-importer-1.5.5.zip"',
+				'Content-Disposition': 'attachment; filename="shoper-torob-importer-1.5.6.zip"',
 				'Content-Length': data.length,
 				'Cache-Control': 'no-store',
 			});
