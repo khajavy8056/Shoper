@@ -146,6 +146,11 @@ function filterFixtureSearch(normalized, query) {
 }
 
 async function getDetails(prk, searchId, mode) {
+	if (String(prk || '').indexOf('DKP-') === 0 || /^\d{4,}$/.test(String(prk || ''))) {
+		const raw = await readFixture('dk-details-17918956.json');
+		const data = logic.normalizeDigikalaDetails(raw);
+		return { data, source: 'fixture', note: '' };
+	}
 	if (mode !== 'fixture') {
 		try {
 			const raw = await torobFetch('/v4/base-product/details/', {
@@ -269,6 +274,17 @@ const handlers = {
 		if (!decoded || typeof decoded !== 'object') return fail(res, 'دادهٔ دریافتی از مرورگر قابل پردازش نیست.');
 
 		try {
+			if (kind === 'dk_search') {
+				const data = logic.normalizeDigikalaSearch(decoded);
+				return ok(res, { ...data, _source: 'browser' });
+			}
+			if (kind === 'dk_details') {
+				const data = logic.normalizeDigikalaDetails(decoded);
+				data.aggregate = logic.aggregate([], 3, 'score');
+				data.description_html = logic.buildDescriptionHtml(data);
+				data._source = 'browser';
+				return ok(res, data);
+			}
 			if (kind === 'search') {
 				const data = logic.normalizeSearch(decoded);
 				return ok(res, { ...data, _source: 'browser' });
@@ -674,8 +690,8 @@ const server = http.createServer(async (req, res) => {
 	}
 
 	// --- دانلود آخرین نسخه‌ی افزونه (ZIP) ---
-	if (pathname === '/download/latest' || pathname === '/download/shoper-torob-importer-1.3.2.zip') {
-		const zip = path.join(ROOT, 'dist', 'shoper-torob-importer-1.3.2.zip');
+	if (pathname === '/download/latest' || pathname === '/download/shoper-torob-importer-1.4.0.zip') {
+		const zip = path.join(ROOT, 'dist', 'shoper-torob-importer-1.4.0.zip');
 		try {
 			const data = await fsp.readFile(zip);
 			res.writeHead(200, {

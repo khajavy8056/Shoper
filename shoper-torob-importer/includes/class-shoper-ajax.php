@@ -453,15 +453,18 @@ class Shoper_Ajax {
 	 */
 	public function test_connection() {
 		$this->guard();
+		$dk = new Shoper_Digikala_Client();
+		$dk_result = $dk->test_connection();
+		if ( ! empty( $dk_result['ok'] ) ) {
+			wp_send_json_success( $dk_result );
+		}
 		$client = new Shoper_Torob_Client();
 		$result = $client->test_connection();
-
 		if ( ! empty( $result['ok'] ) ) {
 			wp_send_json_success( $result );
 		}
-
-		$code    = isset( $result['code'] ) ? $result['code'] : 'connection_failed';
-		$message = isset( $result['message'] ) ? $result['message'] : 'اتصال به ترب برقرار نشد.';
+		$code    = isset( $dk_result['code'] ) ? $dk_result['code'] : ( isset( $result['code'] ) ? $result['code'] : 'connection_failed' );
+		$message = 'دیجی‌کالا: ' . ( isset( $dk_result['message'] ) ? $dk_result['message'] : 'ناموفق' ) . ' | ترب: ' . ( isset( $result['message'] ) ? $result['message'] : 'ناموفق' );
 		$error   = new WP_Error( $code, $message );
 		$this->send_error( $error );
 	}

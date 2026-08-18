@@ -53,6 +53,7 @@ class Shoper_Diagnostics {
 		foreach ( self::gateway_checks( $search_url ) as $gw_check ) {
 			$checks[] = $gw_check;
 		}
+		$checks[] = self::digikala_check();
 
 		$summary = self::summarize( $checks );
 
@@ -266,6 +267,31 @@ class Shoper_Diagnostics {
 			$out[] = $item;
 		}
 		return $out;
+	}
+
+	/**
+	 * بررسی اتصال به دیجی‌کالا (منبع جایگزین مشخصات کامل).
+	 *
+	 * @return array
+	 */
+	private static function digikala_check() {
+		$url    = Shoper_Digikala_Client::build_search_url( 's25', 1 );
+		$result = self::curl_request( $url, array( 'encoding' => 'gzip, deflate', 'ua' => self::ua( 0 ) ) );
+		$item   = self::analyze( 'digikala', 'دیجی‌کالا — جستجوی محصول', 'digikala', $result );
+		if ( isset( $result['body'] ) ) {
+			$json = json_decode( $result['body'], true );
+			$list = is_array( $json ) ? Shoper_Digikala_Client::extract_product_list( $json ) : array();
+			if ( ! empty( $list ) ) {
+				$item['status']        = 'ok';
+				$item['has_results']   = true;
+				$item['results_count'] = count( $list );
+				$item['note']          = 'دیجی‌کالا در دسترس است. افزونه می‌تواند مشخصات و تصاویر کامل را از اینجا بسازد.';
+			} elseif ( 'ok' === $item['status'] ) {
+				$item['status'] = 'warn';
+				$item['note']   = 'پاسخ دیجی‌کالا آمد اما لیست محصول خالی بود.';
+			}
+		}
+		return $item;
 	}
 
 	/**

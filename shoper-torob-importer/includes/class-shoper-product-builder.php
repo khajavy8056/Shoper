@@ -15,7 +15,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Shoper_Product_Builder {
 
 	/**
-	 * سرویس‌گیرنده‌ی ترب.
+	 * کاتالوگ چندمنبعی.
+	 *
+	 * @var Shoper_Catalog
+	 */
+	private $catalog;
+
+	/**
+	 * سرویس‌گیرنده‌ی ترب (سازگاری).
 	 *
 	 * @var Shoper_Torob_Client
 	 */
@@ -49,6 +56,7 @@ class Shoper_Product_Builder {
 		if ( ! class_exists( 'Shoper_Seller_Aggregator' ) ) {
 			require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-seller-aggregator.php';
 		}
+		$this->catalog    = new Shoper_Catalog();
 		$this->client     = new Shoper_Torob_Client();
 		$this->images     = new Shoper_Image_Handler();
 		$this->attributes = new Shoper_Attribute_Handler();
@@ -66,7 +74,7 @@ class Shoper_Product_Builder {
 	 * @return array|WP_Error
 	 */
 	public function suggest( $term ) {
-		return $this->client->suggest( $term, 8 );
+		return $this->catalog->suggest( $term );
 	}
 
 	/**
@@ -76,7 +84,7 @@ class Shoper_Product_Builder {
 	 * @return array|WP_Error
 	 */
 	public function search( $query ) {
-		return $this->client->search( $query, 0, 10 );
+		return $this->catalog->search( $query );
 	}
 
 	/**
@@ -88,7 +96,7 @@ class Shoper_Product_Builder {
 	 * @return array|WP_Error
 	 */
 	public function preview( $prk, $search_id = '', $more_info_url = '' ) {
-		$data = $this->client->details( $prk, $search_id, $more_info_url );
+		$data = $this->catalog->details( $prk, $search_id, $more_info_url );
 		if ( is_wp_error( $data ) ) {
 			return $data;
 		}
@@ -104,7 +112,7 @@ class Shoper_Product_Builder {
 	 * @return array|WP_Error
 	 */
 	public function preview_from_url( $url ) {
-		$data = $this->client->details_from_url( $url );
+		$data = $this->catalog->details_from_url( $url );
 		if ( is_wp_error( $data ) ) {
 			return $data;
 		}
@@ -119,18 +127,11 @@ class Shoper_Product_Builder {
 	 * @return array|WP_Error
 	 */
 	public function preview_from_raw( $kind, $raw ) {
-		if ( 'search' === $kind ) {
-			return $this->client->ingest_search( $raw );
-		}
-		if ( 'search_item' === $kind ) {
-			$data = $this->client->ingest_search_item( $raw );
-			if ( is_wp_error( $data ) ) {
-				return $data;
-			}
-			return $this->finalize( $data );
-		}
-		$data = $this->client->ingest_details( $raw );
+		$data = $this->catalog->ingest( $kind, $raw );
 		if ( is_wp_error( $data ) ) {
+			return $data;
+		}
+		if ( 'search' === $kind || 'dk_search' === $kind ) {
 			return $data;
 		}
 		return $this->finalize( $data );
@@ -247,7 +248,9 @@ class Shoper_Product_Builder {
 		}
 
 		if ( ! empty( $data['random_key'] ) ) {
-			$product->set_sku( 'TRB-' . $data['random_key'] );
+			$key = (string) $data['random_key'];
+			$sku = ( 0 === strpos( $key, 'DKP-' ) || 0 === strpos( $key, 'TRB-' ) ) ? $key : ( 'TRB-' . $key );
+			$product->set_sku( $sku );
 		}
 
 		if ( 'none' !== $price_mode && ! empty( $data['price'] ) ) {

@@ -175,6 +175,25 @@
 			return this.cfg('fetchMode', 'auto');
 		},
 
+		isDkp: function (value) {
+			return /^(DKP-)?\d{4,}$/i.test(String(value || '')) || /dkp-\d+/i.test(String(value || ''));
+		},
+
+		extractDkp: function (value) {
+			var m = String(value || '').match(/dkp-(\d+)/i) || String(value || '').match(/^(\d{4,})$/);
+			return m ? m[1] : '';
+		},
+
+		dkSearchUrl: function (query) {
+			var base = this.cfg('dkApiBase', 'https://api.digikala.com');
+			return base + '/v1/search/?q=' + encodeURIComponent(query) + '&page=1';
+		},
+
+		dkDetailsUrl: function (id) {
+			var base = this.cfg('dkApiBase', 'https://api.digikala.com');
+			return base + '/v2/product/' + encodeURIComponent(id) + '/';
+		},
+
 		torobSearchUrl: function (query, size) {
 			var base = this.cfg('apiBase', 'https://api.torob.com');
 			var path = this.cfg('searchPath', '/v4/base-product/search/');
@@ -301,7 +320,7 @@
 				var target = targets[i++];
 				var wait = (i === 1) ? 2500 : 5000;
 				self.fetchOne(target, wait).done(function (json) {
-					if (json && (json.results || json.random_key || json.name1)) {
+					if (json && (json.results || json.random_key || json.name1 || (json.data && (json.data.products || json.data.product)))) {
 						dfd.resolve(json);
 					} else {
 						next();
@@ -424,7 +443,38 @@
 				});
 			};
 
-			this.browserFetch(this.torobSearchUrl(term, 8)).done(function (raw) {
+			this.browserFetch(this.dkSearchUrl(term)).done(function (raw) {
+				if (raw && raw.data) {
+					self.ingest('dk_search', raw, function (data) {
+						var list = [];
+						var seen = {};
+						(data.results || []).forEach(function (item) {
+							if (!item.name1 || seen[item.name1]) { return; }
+							seen[item.name1] = true;
+							list.push({
+								label: item.name1,
+								name2: item.name2 || '',
+								random_key: item.random_key || '',
+								search_id: '',
+								image_url: item.image_url || '',
+								price: item.price || 0,
+								price_text: item.price_text || '',
+								shop_text: item.shop_text || 'دیجی‌کالا',
+								more_info_url: '',
+								gallery: item.gallery || [],
+								page_url: item.page_url || '',
+								provider: 'digikala'
+							});
+						});
+						if (list.length) {
+							self.lastResults = data.results || [];
+							self.applySuggestList(term, list.slice(0, 8));
+							return;
+						}
+						runServer();
+					}, function () { runServer(); });
+					return;
+				}
 				if (!raw || !raw.results) {
 					runServer();
 					return;
@@ -466,7 +516,7 @@
 				return;
 			}
 			this.$suggest
-				.html('<div class="shoper-suggest-loading"><span class="shoper-loading-inline"></span> در حال گرفتن پیشنهاد از ترب…</div>')
+				.html('<div class="shoper-suggest-loading"><span class="shoper-loading-inline"></span> در حال گرفتن پیشنهاد…</div>')
 				.show();
 			this.sugOpen = true;
 		},
@@ -766,13 +816,16 @@
 					return;
 				}
 				this.status(ShoperData.i18n.loading, 'loading');
-				// برای لینک: ابتدا prk را استخراج و سپس مستقیم prevew می‌کنیم.
+				var dkp = this.extractDkp(url);
+				if (dkp) {
+					this.preview('DKP-' + dkp);
+					return;
+				}
 				var uuidMatch = url.match(/\/p\/([0-9a-f\-]{36})/i);
 				if (uuidMatch) {
 					this.preview(uuidMatch[1]);
 					return;
 				}
-				// اگر فرمت URL شناخته‌شده نبود، به‌عنوان query استفاده می‌کنیم.
 				query = url;
 			}
 
@@ -798,7 +851,13 @@
 				}
 				self.status(msg, 'error');
 			};
-			this.browserFetch(this.torobSearchUrl(query, 10)).done(function (raw) {
+			this.browserFetch(this.dkSearchUrl(query)).done(function (raw) {
+				if (raw && raw.data) {
+					self.ingest('dk_search', raw, showSearch, function () {
+						self.ajax('shoper_search', { query: query }, showSearch, searchFail);
+					});
+					return;
+				}
 				if (raw && raw.results) {
 					self.ingest('search', raw, showSearch, function () {
 						self.ajax('shoper_search', { query: query }, showSearch, searchFail);

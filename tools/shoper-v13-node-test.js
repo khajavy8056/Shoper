@@ -23,7 +23,7 @@ const fixtureDir = path.join(__dirname, '../preview/fixtures');
 const searchRaw = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'search-samsung.json'), 'utf8'));
 const detailsRaw = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'details-9bcf3364.json'), 'utf8'));
 
-console.log('\nShoper 1.3.2 node tests\n');
+console.log('\nShoper 1.4 node tests\n');
 
 const search = logic.normalizeSearch(searchRaw);
 check('جستجوی fixture نرمال می‌شود', search.results && search.results.length > 0, search.results.length + ' نتیجه');
@@ -81,8 +81,19 @@ check('chooseSuggest لینک more_info را می‌فرستد', /preview\(it\.r
 check('fill هم product_json می‌فرستد', /shoper_fill[\s\S]{0,400}product_json/.test(pluginJs));
 
 const mainPhp = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/shoper-torob-importer.php'), 'utf8');
-check('نسخه افزونه ۱.۳ است', /SHOPER_VERSION', '1\.3\.\d+'/.test(mainPhp));
+check('plugin version 1.4', mainPhp.includes("define( 'SHOPER_VERSION', '1.4.0' )"));
 check('کلاس تجمیع فروشنده بارگذاری می‌شود', mainPhp.includes('class-shoper-seller-aggregator.php'));
+
+check('digikala client required', mainPhp.includes('class-shoper-digikala-client.php') && mainPhp.includes('class-shoper-catalog.php'));
+const dkSearch = logic.normalizeDigikalaSearch(JSON.parse(fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/assets/mock/digikala-search-sample.json'), 'utf8')));
+check('digikala search normalize', dkSearch.results && dkSearch.results.length > 0, dkSearch.results.length + ' items');
+check('digikala id prefix', /^DKP-\d+$/.test(dkSearch.results[0].random_key));
+const dkDetails = logic.normalizeDigikalaDetails(JSON.parse(fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/assets/mock/digikala-details-sample.json'), 'utf8')));
+check('digikala details name', !!dkDetails.name1);
+check('digikala details specs', dkDetails.specs && Object.keys(dkDetails.specs).length >= 8, Object.keys(dkDetails.specs || {}).length + ' specs');
+check('digikala details gallery', Array.isArray(dkDetails.gallery) && dkDetails.gallery.length >= 3);
+check('digikala expert review', (dkDetails.description || '').length > 20);
+check('admin.js knows dkp', pluginJs.includes('extractDkp') && pluginJs.includes('dk_search'));
 
 const ajax = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/includes/class-shoper-ajax.php'), 'utf8');
 check('اکشن ingest ثبت شده', ajax.includes("wp_ajax_shoper_ingest") && ajax.includes('preview_from_payload'));

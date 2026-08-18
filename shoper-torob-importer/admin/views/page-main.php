@@ -12,7 +12,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 // ذخیره‌ی تنظیمات.
 if ( isset( $_POST['shoper_save_settings'] ) && check_admin_referer( 'shoper_settings' ) ) {
 	$options = array(
-		'shoper_data_source'    => isset( $_POST['data_source'] ) ? sanitize_text_field( wp_unslash( $_POST['data_source'] ) ) : 'direct',
+		'shoper_data_source'    => isset( $_POST['data_source'] ) ? sanitize_text_field( wp_unslash( $_POST['data_source'] ) ) : 'auto',
+		'shoper_catalog_source' => isset( $_POST['catalog_source'] ) ? sanitize_text_field( wp_unslash( $_POST['catalog_source'] ) ) : 'auto',
 		'shoper_product_status' => isset( $_POST['product_status'] ) ? sanitize_text_field( wp_unslash( $_POST['product_status'] ) ) : 'draft',
 		'shoper_import_gallery' => isset( $_POST['import_gallery'] ) ? 'yes' : 'no',
 		'shoper_price_behavior' => isset( $_POST['price_behavior'] ) ? sanitize_text_field( wp_unslash( $_POST['price_behavior'] ) ) : 'cheapest',
@@ -29,7 +30,8 @@ if ( isset( $_POST['shoper_save_settings'] ) && check_admin_referer( 'shoper_set
 	echo '<div class="notice notice-success is-dismissible"><p>تنظیمات ذخیره شد.</p></div>';
 }
 
-$data_source    = get_option( 'shoper_data_source', 'direct' );
+$data_source    = get_option( 'shoper_data_source', 'auto' );
+$catalog_source = get_option( 'shoper_catalog_source', 'auto' );
 $product_status = get_option( 'shoper_product_status', 'draft' );
 $import_gallery = get_option( 'shoper_import_gallery', 'yes' );
 $price_behavior = get_option( 'shoper_price_behavior', 'cheapest' );
@@ -52,7 +54,7 @@ $shoper_debug = get_option( 'shoper_debug', '' );
 					نام محصول را بنویسید تا از ترب پیدا کنیم. می‌توانید لینک مستقیم محصول ترب را هم بچسبانید.
 				</p>
 				<div class="notice notice-info inline" style="margin:10px 0 0;">
-					<p>در نسخه ۱.۲ لیست از <strong>همان مسیر سرور</strong> می‌آمد؛ کلیک به‌خاطر نرفتن لینک جزئیات خالی می‌ماند. اگر امروز مسیر مستقیم کد ۴۹۰ بدهد، افزونه خودکار از <strong>درگاه تست‌شده</strong> همان لیست را می‌آورد — نام را همین‌جا بنویسید.</p>
+					<p>نام محصول را بنویسید. افزونه اول از <strong>دیجی‌کالا</strong> مشخصات، توضیحات و تصاویر کامل می‌گیرد (هر مشخصه یک ویژگی ووکامرس). اگر لازم شد سراغ ترب می‌رود. لینک <code>digikala.com/product/dkp-…</code> هم قبول است.</p>
 				</div>
 
 				<div class="shoper-field shoper-mode-toggle">
@@ -105,10 +107,13 @@ $shoper_debug = get_option( 'shoper_debug', '' );
 						<tr>
 							<th>منبع داده</th>
 							<td>
-								<select name="data_source">
-									<option value="direct" <?php selected( $data_source, 'direct' ); ?>>API مستقیم ترب</option>
-									<option value="mock" <?php selected( $data_source, 'mock' ); ?>>داده نمونه (آزمایشی)</option>
+								<select name="catalog_source">
+									<option value="auto" <?php selected( $catalog_source, 'auto' ); ?>>خودکار (دیجی‌کالا، بعد ترب)</option>
+									<option value="digikala" <?php selected( $catalog_source, 'digikala' ); ?>>فقط دیجی‌کالا</option>
+									<option value="torob" <?php selected( $catalog_source, 'torob' ); ?>>فقط ترب</option>
+									<option value="mock" <?php selected( $catalog_source, 'mock' ); ?>>داده نمونه</option>
 								</select>
+								<input type="hidden" name="data_source" value="auto">
 							</td>
 						</tr>
 						<tr>

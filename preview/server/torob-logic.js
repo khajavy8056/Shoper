@@ -572,9 +572,110 @@ function fileBase(title) {
 	return base || 'shoper-product';
 }
 
+function firstDkImage(node) {
+	if (!node) return '';
+	if (typeof node === 'string' && node.indexOf('http') === 0) return node;
+	const bag = node.url || node.webp_url;
+	if (Array.isArray(bag) && bag[0]) return bag[0];
+	if (typeof bag === 'string') return bag;
+	return '';
+}
+
+function extractDkProducts(data) {
+	if (data && data.data && Array.isArray(data.data.products)) {
+		if (data.data.products[0] && data.data.products[0].id) return data.data.products;
+		if (data.data.products.products) return data.data.products.products;
+	}
+	if (data && Array.isArray(data.products)) return data.products;
+	return [];
+}
+
+function normalizeDigikalaSearch(data) {
+	const raw = extractDkProducts(data);
+	const results = raw.map((item) => {
+		const id = item.id || 0;
+		const rial = (item.default_variant && item.default_variant.price && item.default_variant.price.selling_price) || 0;
+		const price = rial >= 1000 && rial % 10 === 0 ? Math.round(rial / 10) : rial;
+		const img = firstDkImage(item.images && item.images.main);
+		const uri = (item.url && item.url.uri) || '';
+		return {
+			random_key: id ? ('DKP-' + id) : '',
+			search_id: '',
+			name1: item.title_fa || '',
+			name2: item.title_en || '',
+			price,
+			price_text: price ? (price + ' تومان') : '',
+			shop_text: 'دیجی‌کالا',
+			image_url: img,
+			gallery: img ? [img] : [],
+			page_url: uri ? ('https://www.digikala.com' + uri) : '',
+			more_info_url: '',
+			is_adv: false,
+			provider: 'digikala',
+		};
+	}).filter((x) => x.random_key && x.name1);
+	return { count: results.length, results, next: '', provider: 'digikala' };
+}
+
+function normalizeDigikalaDetails(data) {
+	const product = (data && data.data && data.data.product) || (data && data.product) || data || {};
+	const id = product.id || 0;
+	const gallery = [];
+	const main = firstDkImage(product.images && product.images.main);
+	if (main) gallery.push(main);
+	(product.images && product.images.list || []).forEach((img) => {
+		const u = firstDkImage(img);
+		if (u && gallery.indexOf(u) < 0) gallery.push(u);
+	});
+	const specs = {};
+	const specGroups = [];
+	const keySpecs = {};
+	(product.specifications || []).forEach((group) => {
+		const pairs = {};
+		(group.attributes || []).forEach((attr) => {
+			const title = (attr.title || '').trim();
+			const values = (attr.values || []).map((v) => String(v).trim()).filter(Boolean);
+			if (!title || !values.length) return;
+			const value = values.join('، ');
+			specs[title] = value;
+			pairs[title] = value;
+			if (Object.keys(keySpecs).length < 8) keySpecs[title] = value;
+		});
+		if (Object.keys(pairs).length) specGroups.push({ header: group.title || 'مشخصات', specs: pairs });
+	});
+	if (!specs['برند'] && product.brand && product.brand.title_fa) {
+		specs['برند'] = product.brand.title_fa;
+		keySpecs['برند'] = product.brand.title_fa;
+	}
+	const rial = (product.default_variant && product.default_variant.price && product.default_variant.price.selling_price) || 0;
+	const price = rial >= 1000 && rial % 10 === 0 ? Math.round(rial / 10) : rial;
+	const uri = (product.url && product.url.uri) || (id ? ('/product/dkp-' + id + '/') : '');
+	return {
+		random_key: id ? ('DKP-' + id) : '',
+		search_id: '',
+		name1: product.title_fa || '',
+		name2: product.title_en || '',
+		description: (product.review && product.review.description) || '',
+		price,
+		price_text: price ? (price + ' تومان') : '',
+		image_url: gallery[0] || '',
+		gallery,
+		specs,
+		key_specs: keySpecs,
+		spec_groups: specGroups,
+		sellers: [],
+		sellers_count: 0,
+		page_url: uri ? ('https://www.digikala.com' + uri) : '',
+		variants: [],
+		provider: 'digikala',
+	};
+}
+
 module.exports = {
 	normalizeSearch,
 	normalizeDetails,
+	normalizeDigikalaSearch,
+	normalizeDigikalaDetails,
 	aggregate,
 	buildDescriptionHtml,
 	buildShortDescription,

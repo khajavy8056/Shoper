@@ -3,7 +3,7 @@
  * Plugin Name:       Shoper – درون‌ریز محصول از ترب
  * Plugin URI:        https://github.com/khajavy8056/Shoper
  * Description:       با نوشتن نام محصول یا چسباندن لینک ترب، اطلاعات کامل محصول (نام، توضیحات، تصاویر و تمام مشخصات فنی به‌صورت ویژگی‌های مجزا) را از ترب دریافت و یک محصول کامل ووکامرس بسازید.
- * Version:           1.3.2
+ * Version:           1.4.0
  * Author:            Shoper
  * Author URI:        https://github.com/khajavy8056/Shoper
  * License:           GPL v2 or later
@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // تعریف ثابت‌های افزونه.
-define( 'SHOPER_VERSION', '1.3.2' );
+define( 'SHOPER_VERSION', '1.4.0' );
 define( 'SHOPER_PLUGIN_FILE', __FILE__ );
 define( 'SHOPER_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SHOPER_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -107,6 +107,8 @@ if ( ! class_exists( 'Shoper_Torob_Importer' ) ) {
 		require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-debug.php';
 		require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-diagnostics.php';
 		require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-torob-client.php';
+		require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-digikala-client.php';
+		require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-catalog.php';
 		require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-seller-aggregator.php';
 		require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-image-handler.php';
 		require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-attribute-handler.php';
@@ -168,7 +170,8 @@ add_action( 'plugins_loaded', array( 'Shoper_Torob_Importer', 'instance' ) );
 register_activation_hook( __FILE__, 'shoper_activate' );
 function shoper_activate() {
 	$defaults = array(
-		'data_source'      => 'direct', // direct | mock.
+		'data_source'      => 'auto',
+		'catalog_source'   => 'auto',
 		'product_status'   => 'draft',  // draft | publish | pending.
 		'product_type'     => 'simple', // simple در فاز اول.
 		'import_gallery'   => 'yes',
