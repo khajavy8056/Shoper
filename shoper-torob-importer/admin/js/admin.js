@@ -42,6 +42,8 @@
 			this.$postId      = $('#shoper-post-id');
 			this.$testConn    = $('#shoper-test-conn');
 			this.$connResult  = $('#shoper-conn-result');
+			this.$diagBtn     = $('#shoper-diagnostics-btn');
+			this.$diag        = $('#shoper-diagnostics');
 			this.$createStatus= $('#shoper-create-status');
 			this.$fillBtn     = $('#shoper-fill-btn');
 			this.$fillRow     = $('#shoper-fill-row');
@@ -137,6 +139,11 @@
 			this.$testConn.on('click', function (e) {
 				e.preventDefault();
 				self.testConnection();
+			});
+
+			this.$diagBtn.on('click', function (e) {
+				e.preventDefault();
+				self.diagnostics();
 			});
 
 			// پر کردن محصول فعلی (در صفحه ویرایش).
@@ -417,7 +424,16 @@
 			this.$status.removeClass('loading success error').hide().empty();
 		},
 
-		ajax: function (action, data, onSuccess) {
+		/**
+		 * درخواست AJAX یکپارچه با پیام خطای دقیق.
+		 *
+		 * @param {string}   action    نام اکشن.
+		 * @param {Object}   data      داده‌ها.
+		 * @param {Function} onSuccess موفق.
+		 * @param {Function} onError   خطا (اختیاری) — { code, message, status }.
+		 * @return {jqXHR}
+		 */
+		ajax: function (action, data, onSuccess, onError) {
 			var self = this;
 			data = data || {};
 			data.action = action;
@@ -428,13 +444,104 @@
 					if (resp && resp.success) {
 						onSuccess(resp.data || {});
 					} else {
-						var msg = (resp && resp.data && resp.data.message) ? resp.data.message : ShoperData.i18n.error;
-						self.status(msg, 'error');
+						var info = self.describeError(resp);
+						if (onError) {
+							onError(info);
+						} else {
+							self.status(info.message, 'error');
+						}
 					}
 				})
-				.fail(function () {
-					self.status('خطا در برقراری ارتباط با سرور.', 'error');
+				.fail(function (xhr, status) {
+					var info = self.describeFail(xhr, status);
+					if (onError) {
+						onError(info);
+					} else {
+						self.status(info.message, 'error');
+					}
 				});
+		},
+
+		/**
+		 * تحلیل پاسخ خطای JSON برگشتی از PHP.
+		 *
+		 * @param {Object} resp پاسخ.
+		 * @return {Object} { code, message, status }
+		 */
+		describeError: function (resp) {
+			var data = (resp && resp.data) ? resp.data : {};
+			var code = data.code || 'error';
+			return {
+				code: code,
+				message: data.message || this.errorText(code),
+				status: data.status || 0
+			};
+		},
+
+		/**
+		 * تحلیل خطای سطح شبکه/HTTP (fail).
+		 *
+		 * @param {jqXHR}  xhr    درخواست.
+		 * @param {string} status وضعیت jQuery.
+		 * @return {Object} { code, message }
+		 */
+		describeFail: function (xhr, status) {
+			if (status === 'timeout') {
+				return { code: 'timeout', message: 'زمان پاسخ سرور به پایان رسید؛ دوباره تلاش کنید.' };
+			}
+
+			var http = xhr.status || 0;
+			var parsed = null;
+			try {
+				parsed = JSON.parse(xhr.responseText);
+			} catch (e) {
+				parsed = null;
+			}
+
+			if (parsed && parsed.data) {
+				return {
+					code: parsed.data.code || ('http_' + http),
+					message: parsed.data.message || this.errorText(parsed.data.code),
+					status: http
+				};
+			}
+
+			if (http === 0) {
+				return { code: 'network', message: 'ارتباط با سرور برقرار نشد. اتصال اینترنت یا سرور را بررسی کنید.' };
+			}
+			if (http === 403) {
+				return { code: 'forbidden', message: 'دسترسی غیرمجاز یا نشانه‌ی امنیتی نامعتبر؛ صفحه را تازه‌سازی کنید.' };
+			}
+			return { code: 'http_' + http, message: 'پاسخ نامعتبر از سرور دریافت شد (کد ' + http + ').' };
+		},
+
+		/**
+		 * پیام فارسی پیش‌فرض هر کد خطا (اگر سرور پیام نداد).
+		 *
+		 * @param {string} code کد خطا.
+		 * @return {string}
+		 */
+		errorText: function (code) {
+			var map = {
+				'forbidden': 'دسترسی غیرمجاز برای انجام این عملیات.',
+				'nonce_failed': 'نشانه‌ی امنیتی منقضی شده است؛ صفحه را تازه‌سازی کنید.',
+				'empty_query': 'نام محصول را وارد کنید.',
+				'invalid_prk': 'شناسه محصول نامعتبر است.',
+				'invalid_url': 'لینک محصول ترب معتبر نیست.',
+				'rate_limited': 'ترب تعداد درخواست‌ها را محدود کرده است؛ کمی بعد دوباره تلاش کنید.',
+				'blocked': 'ترب این درخواست را مسدود کرده است (کد 403/490).',
+				'torob_blocked': 'ترب این درخواست را مسدود کرده است.',
+				'connection_failed': 'اتصال به ترب برقرار نشد.',
+				'curl_failed': 'خطا در برقراری اتصال (cURL).',
+				'curl_unavailable': 'کتابخانه‌ی cURL روی سرور فعال نیست.',
+				'http_error': 'پاسخ غیرمنتظره از ترب دریافت شد.',
+				'invalid_json': 'پاسخ دریافتی از ترب قابل پردازش نیست.',
+				'invalid_response': 'ساختار پاسخ ترب تغییر کرده است.',
+				'torob_error': 'خطای ترب.',
+				'network': 'ارتباط با سرور برقرار نشد.',
+				'timeout': 'زمان پاسخ سرور به پایان رسید.'
+			};
+			return map[code] || 'خطا در انجام عملیات.';
 		},
 
 		search: function () {
@@ -965,9 +1072,137 @@
 			this.$connResult.html('<span class="shoper-loading-inline"></span> در حال تست...');
 			this.ajax('shoper_test_connection', {}, function (data) {
 				self.$connResult.html('<span style="color:#00a32a;">✓ ' + self.esc(data.message) + '</span>');
-			}).fail(function () {
-				self.$connResult.html('<span style="color:#d63638;">✗ خطا</span>');
+			}, function (info) {
+				self.$connResult.html('<span style="color:#d63638;">✗ ' + self.esc(info.message) + '</span>');
 			});
+		},
+
+		/**
+		 * عیب‌یابی کامل اتصال: اجرای همه‌ی بررسی‌ها و نمایش گزارش قابل کپی.
+		 */
+		diagnostics: function () {
+			var self = this;
+			if (!this.$diag.length) {
+				this.status('عنصر گزارش عیب‌یابی یافت نشد.', 'error');
+				return;
+			}
+
+			this.$diagBtn.prop('disabled', true);
+			this.$diag.show().html('<div class="shoper-diag-loading"><span class="shoper-loading-inline"></span> در حال اجرای عیب‌یابی کامل… این کار چند ده ثانیه طول می‌کشد.</div>');
+
+			this.ajax('shoper_diagnostics', {}, function (data) {
+				self.$diagBtn.prop('disabled', false);
+				self.renderDiagnostics(data);
+			}, function (info) {
+				self.$diagBtn.prop('disabled', false);
+				self.$diag.html('<div class="shoper-diag-error">خطا در اجرای عیب‌یابی: ' + self.esc(info.message) + '</div>');
+			});
+		},
+
+		/**
+		 * رندر گزارش عیب‌یابی + دکمه‌ی کپی.
+		 *
+		 * @param {Object} d گزارش.
+		 */
+		renderDiagnostics: function (d) {
+			var html = '';
+			var verdict = (d.summary && d.summary.verdict) || 'unknown';
+			var verdictLabel = { ok: 'اتصال برقرار است', warn: 'پاسخ غیرمعتبر', fail: 'اتصال برقرار نشد' }[verdict] || 'نامشخص';
+			var verdictColor = { ok: '#00a32a', warn: '#dba617', fail: '#d63638' }[verdict] || '#555';
+
+			html += '<div class="shoper-diag">';
+			html += '<div class="shoper-diag-summary" style="border:1px solid ' + verdictColor + ';color:' + verdictColor + ';">';
+			html += '<strong>' + this.esc(verdictLabel) + '</strong> — ' + this.esc((d.summary && d.summary.message) || '');
+			html += ' <span style="font-size:11px;opacity:.8;">(' + this.esc(d.generated_at) + ')</span>';
+			html += '</div>';
+
+			// محیط.
+			if (d.environment) {
+				var e = d.environment;
+				html += '<h4 class="shoper-diag-h">محیط</h4>';
+				html += '<table class="shoper-diag-env">';
+				html += this.diagRow('نسخه افزونه', e.plugin_version);
+				html += this.diagRow('PHP', e.php_version);
+				html += this.diagRow('وردپرس', e.wp_version);
+				html += this.diagRow('ووکامرس', e.wc_version);
+				html += this.diagRow('cURL', e.curl ? e.curl_version : 'موجود نیست');
+				html += this.diagRow('allow_url_fopen', e.allow_url_fopen ? 'فعال' : 'غیرفعال');
+				html += this.diagRow('OpenSSL', e.openssl);
+				html += this.diagRow('منبع داده', e.data_source);
+				html += this.diagRow('timeout / connect', e.timeout + ' / ' + e.connect_timeout);
+				html += this.diagRow('پروکسی', e.proxy_configured ? e.proxy : 'تنظیم نشده');
+				html += this.diagRow('لاگ اشکال‌زدایی', e.debug_enabled ? 'فعال' : 'غیرفعال');
+				html += '</table>';
+			}
+
+			// بررسی‌ها.
+			if (d.checks && d.checks.length) {
+				html += '<h4 class="shoper-diag-h">بررسی‌های اتصال</h4>';
+				for (var i = 0; i < d.checks.length; i++) {
+					var c = d.checks[i];
+					var st = c.status || 'unknown';
+					var stLabel = { ok: 'موفق', warn: 'هشدار', fail: 'ناموفق', skip: 'رد شده' }[st] || st;
+					var stColor = { ok: '#00a32a', warn: '#dba617', fail: '#d63638', skip: '#888' }[st] || '#555';
+					html += '<div class="shoper-diag-check">';
+					html += '<div class="shoper-diag-check-head"><span class="shoper-diag-badge" style="background:' + stColor + ';">' + stLabel + '</span> <strong>' + this.esc(c.label) + '</strong></div>';
+					if (c.code !== undefined) html += '<div class="shoper-diag-line">HTTP status: <code>' + c.code + '</code></div>';
+					if (c.content_type) html += '<div class="shoper-diag-line">Content-Type: <code>' + this.esc(c.content_type) + '</code></div>';
+					if (c.duration !== undefined) html += '<div class="shoper-diag-line">زمان: ' + c.duration + 's</div>';
+					if (c.curl_errno !== undefined) html += '<div class="shoper-diag-line">curl errno: ' + c.curl_errno + (c.curl_error ? ' — ' + this.esc(c.curl_error) : '') + '</div>';
+					if (c.wp_error_code) html += '<div class="shoper-diag-line">WP_Error: ' + this.esc(c.wp_error_code) + (c.wp_error_message ? ' — ' + this.esc(c.wp_error_message) : '') + '</div>';
+					if (c.body_length !== undefined) html += '<div class="shoper-diag-line">طول پاسخ: ' + c.body_length + ' بایت</div>';
+					if (c.has_results !== undefined) html += '<div class="shoper-diag-line">کلید results: ' + (c.has_results ? 'دارد (' + (c.results_count || 0) + ' نتیجه)' : 'ندارد') + '</div>';
+					if (c.detail) html += '<div class="shoper-diag-line">جزئیات: ' + this.esc(c.detail) + '</div>';
+					if (c.note) html += '<div class="shoper-diag-note">' + this.esc(c.note) + '</div>';
+					if (c.body_sample) html += '<details class="shoper-diag-sample"><summary>نمونه‌ی پاسخ</summary><pre>' + this.esc(c.body_sample) + '</pre></details>';
+					html += '</div>';
+				}
+			}
+
+			// گزارش متنی کامل + کپی.
+			if (d.text) {
+				html += '<div class="shoper-diag-copybar">';
+				html += '<button type="button" class="button button-primary shoper-diag-copy" data-id="shoper-diag-text">📋 کپی گزارش کامل</button>';
+				html += '<span class="shoper-diag-copy-ok" style="display:none;color:#00a32a;">کپی شد!</span>';
+				html += '</div>';
+				html += '<textarea id="shoper-diag-text" class="shoper-diag-text" readonly rows="14">' + this.esc(d.text) + '</textarea>';
+			}
+
+			html += '</div>';
+
+			this.$diag.html(html);
+
+			// کپی به کلیپ‌بورد.
+			var $copy = this.$diag.find('.shoper-diag-copy');
+			$copy.on('click', function () {
+				var $ta = $('#shoper-diag-text');
+				var copied = false;
+				$ta[0].select();
+				$ta[0].setSelectionRange(0, 99999999);
+				try {
+					copied = document.execCommand('copy');
+				} catch (e) {
+					copied = false;
+				}
+				if (!copied && navigator.clipboard) {
+					navigator.clipboard.writeText($ta.val()).then(function () {
+						self.$diag.find('.shoper-diag-copy-ok').show().fadeOut(2500);
+					}).catch(function () {});
+					return;
+				}
+				self.$diag.find('.shoper-diag-copy-ok').show().fadeOut(2500);
+			});
+		},
+
+		/**
+		 * ساخت یک ردیف جدول محیط.
+		 *
+		 * @param {string} k کلید.
+		 * @param {string} v مقدار.
+		 * @return {string}
+		 */
+		diagRow: function (k, v) {
+			return '<tr><th>' + this.esc(k) + '</th><td>' + this.esc(v === undefined || v === null ? '—' : v) + '</td></tr>';
 		},
 
 		esc: function (str) {

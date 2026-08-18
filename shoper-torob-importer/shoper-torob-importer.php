@@ -104,6 +104,8 @@ if ( ! class_exists( 'Shoper_Torob_Importer' ) ) {
 		 * @return void
 		 */
 		private function includes() {
+			require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-debug.php';
+			require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-diagnostics.php';
 			require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-torob-client.php';
 			require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-image-handler.php';
 			require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-attribute-handler.php';
@@ -173,6 +175,9 @@ function shoper_activate() {
 		'price_behavior'   => 'cheapest', // cheapest | none.
 		'user_agent'       => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
 		'request_timeout'  => 25,
+		'connect_timeout'  => 10,
+		'proxy_url'        => '',
+		'debug'            => '', // فعال‌سازی لاگ اشکال‌زدایی.
 	);
 	foreach ( $defaults as $key => $value ) {
 		if ( false === get_option( 'shoper_' . $key ) ) {
