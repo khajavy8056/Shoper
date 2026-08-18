@@ -247,12 +247,12 @@ class Shoper_AI_Client {
 		}
 		$specs = implode( '؛ ', $spec_bits );
 
-		$rules = "نقش: ویراستار متن محصول. تولید محتوای تازه ممنوع.\n"
-			. "کار: متن منبع را تمیز کن؛ فاصله و علائم را درست کن؛ پاراگراف‌بندی کن؛ اگر ناقص است فقط از جدول مشخصات کاملش کن.\n"
-			. "ممنوع: نظر مشتری، تحلیل ساختگی، مشخصه یا قیمت یا گارانتی خارج از جدول.\n"
+		$rules = "نقش: نویسنده معرفی کالا به سبک دیجی‌کالا.\n"
+			. "کار: از متن منبع و جدول مشخصات، یک معرفی و بررسی کوتاه و خوانا بنویس (۲ تا ۴ پاراگراف، نه خیلی طولانی). متن منبع را تمیز و پاراگراف‌بندی کن؛ اگر ناقص یا خالی است فقط از مشخصات واقعی مقاله بساز تا صفحه خالی نماند.\n"
+			. "ممنوع: نظر مشتری ساختگی، تیتر تحلیل کارشناسی، مناسب برای چه کسانی، قیمت یا گارانتی خارج از داده، ادعای بهترین بودن.\n"
 			. "سئو اجباری: seo_title بین ۵۰ تا ۶۰ نویسه و با کلمه خرید؛ seo_desc بین ۱۴۰ تا ۱۵۵ نویسه با ۲ مشخصه واقعی؛ focus_keyword دو تا چهار کلمه؛ tags هشت مورد.\n"
 			. "خروجی فقط JSON با کلیدهای: intro, highlights, faq, seo_title, seo_desc, focus_keyword, tags\n"
-			. "intro همان متن مرتب و کامل منبع است. faq حداکثر ۴ مورد {q,a} از مشخصات واقعی.\n";
+			. "intro همان معرفی و بررسی محصول است. faq حداکثر ۴ مورد {q,a} از مشخصات واقعی.\n";
 
 		return $rules . "محصول: {$name}\nانگلیسی: {$name2}\nمنبع: {$source}\nمشخصات: {$specs}";
 	}
@@ -384,7 +384,7 @@ class Shoper_AI_Client {
 					'messages'    => array(
 						array(
 							'role'    => 'system',
-							'content' => 'You are a Persian product-text editor, not a copywriter. Clean and organize the source. Never invent specs. Valid JSON only.',
+							'content' => 'You write a short Digikala-style Persian product introduction from the given source and specs only. Do not invent specs, prices, reviews, or audience claims. Valid JSON only.',
 						),
 						array(
 							'role'    => 'user',
@@ -428,7 +428,7 @@ class Shoper_AI_Client {
 	 * @return string|WP_Error
 	 */
 	private function http( $method, $url, $headers, $body ) {
-		$ua = 'ShoperStudio/1.5.3 (Khajavy; +https://github.com/khajavy8056/Shoper)';
+		$ua = 'ShoperStudio/1.5.4 (Khajavy; +https://github.com/khajavy8056/Shoper)';
 		if ( function_exists( 'curl_init' ) ) {
 			$ch  = curl_init( $url );
 			$opt = array(

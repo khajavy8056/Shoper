@@ -1,0 +1,71 @@
+/**
+ * قالب ثابت صفحه محصول Shoper Studio.
+ */
+.shoper-page {
+	max-width: 860px;
+	margin: 0 auto;
+	color: #3f4064;
+	font-size: 15px;
+	line-height: 2;
+}
+.shoper-sec {
+	margin: 0 0 28px;
+}
+.shoper-sec-title {
+	font-size: 18px;
+	font-weight: 700;
+	color: #23254e;
+	margin: 0 0 16px;
+	padding: 0 0 10px;
+	border-bottom: 2px solid #e0e0e2;
+}
+.shoper-sec-review .shoper-sec-title {
+	border-bottom-color: #ef394e;
+}
+.shoper-sec-specs .shoper-sec-title {
+	border-bottom-color: #19bfd3;
+}
+.shoper-prose {
+	text-align: justify;
+}
+.shoper-prose p {
+	margin: 0 0 14px;
+}
+.shoper-sec-highlights {
+	background: #f7f7f8;
+	border-radius: 12px;
+	padding: 16px 18px;
+}
+.shoper-sec-highlights .shoper-sec-title {
+	font-size: 16px;
+	border: 0;
+	padding: 0;
+	margin: 0 0 10px;
+}
+.shoper-specs-table {
+	width: 100%;
+	border-collapse: collapse;
+	margin: 0 0 12px;
+}
+.shoper-specs-table th,
+.shoper-specs-table td {
+	padding: 10px 14px;
+	border: 1px solid #f0f0f1;
+	text-align: right;
+	vertical-align: top;
+}
+.shoper-specs-table th {
+	width: 38%;
+	color: #62666d;
+	font-weight: 500;
+	background: #f7f7f8;
+}
+.shoper-specs-table tr:nth-child(even) th,
+.shoper-specs-table tr:nth-child(even) td {
+	background: #fff;
+}
+.shoper-source {
+	font-size: 12px;
+	color: #888;
+	margin-top: 20px;
+}

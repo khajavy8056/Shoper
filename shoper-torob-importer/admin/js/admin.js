@@ -1008,7 +1008,7 @@
 				html += '<div class="shoper-stepper">';
 				html += '<div class="shoper-step is-active" data-step="info"><span class="shoper-step-num">۱</span> دریافت اطلاعات</div>';
 				html += '<div class="shoper-step" data-step="images"><span class="shoper-step-num">۲</span> انتخاب تصاویر</div>';
-				html += '<div class="shoper-step" data-step="ai"><span class="shoper-step-num">۳</span> مرتب‌سازی متن</div>';
+				html += '<div class="shoper-step" data-step="ai"><span class="shoper-step-num">۳</span> معرفی و بررسی</div>';
 				html += '<div class="shoper-step" data-step="review"><span class="shoper-step-num">۴</span> نظارت و سئو</div>';
 				html += '</div>';
 			}
@@ -1117,16 +1117,16 @@
 			// --- بخش ۳: بازنویسی هوشمند ---
 			if (isMain) {
 				html += '<div class="shoper-step-body" data-step-body="ai">';
-				html += '<div id="shoper-ai-status" class="shoper-ai-status">متن منبع مرتب می‌شود؛ محتوای تازه ساخته نمی‌شود.</div>';
-				html += '<div class="shoper-ai-tabs">';
-				html += '<button type="button" class="shoper-ai-tab is-active" data-tab="analysis">متن مرتب‌شده</button>';
-				html += '<button type="button" class="shoper-ai-tab" data-tab="review">خلاصه مشخصات</button>';
-				html += '</div>';
-				html += '<div class="shoper-ai-pane" data-pane="analysis"><textarea id="shoper-p-analysis" rows="8"></textarea></div>';
-				html += '<div class="shoper-ai-pane" data-pane="review" style="display:none;"><textarea id="shoper-p-review" rows="8"></textarea></div>';
-				html += '<textarea id="shoper-p-audience" style="display:none;"></textarea>';
-				html += '<p class="description">هوش مصنوعی ویراستار است: فاصله، پاراگراف و نقص متن منبع را درست می‌کند. مشخصه تازه اختراع نمی‌شود.</p>';
-				html += '<p><button type="button" class="button" id="shoper-ai-rerun">مرتب‌سازی دوباره</button></p>';
+			html += '<div id="shoper-ai-status" class="shoper-ai-status">معرفی و بررسی از روی اطلاعات محصول آماده می‌شود؛ مشخصات در جدول جدا می‌ماند.</div>';
+			html += '<div class="shoper-ai-tabs">';
+			html += '<button type="button" class="shoper-ai-tab is-active" data-tab="analysis">معرفی و بررسی</button>';
+			html += '<button type="button" class="shoper-ai-tab" data-tab="review">خلاصه مشخصات</button>';
+			html += '</div>';
+			html += '<div class="shoper-ai-pane" data-pane="analysis"><textarea id="shoper-p-analysis" rows="8"></textarea></div>';
+			html += '<div class="shoper-ai-pane" data-pane="review" style="display:none;"><textarea id="shoper-p-review" rows="8"></textarea></div>';
+			html += '<textarea id="shoper-p-audience" style="display:none;"></textarea>';
+			html += '<p class="description">مدل از متن منبع و مشخصات واقعی، یک معرفی کوتاه مقاله‌ای می‌سازد تا صفحه خالی نماند. مشخصه تازه اختراع نمی‌شود. جدول فنی جداگانه می‌ماند.</p>';
+			html += '<p><button type="button" class="button" id="shoper-ai-rerun">ساخت دوباره معرفی</button></p>';
 				html += '</div>';
 
 				var seo = this.buildSeo(d);
@@ -1748,12 +1748,12 @@
 				if (++n >= max) break;
 			}
 			var source = String(data.description || '').replace(/\s+/g, ' ').slice(0, compact ? 360 : 1400);
-			return 'نقش: ویراستار متن محصول. تولید محتوای تازه ممنوع.\n'
-				+ 'کار: متن منبع را تمیز کن؛ فاصله و علائم را درست کن؛ پاراگراف‌بندی کن؛ اگر ناقص است فقط از جدول مشخصات کاملش کن.\n'
-				+ 'ممنوع: نظر مشتری، تحلیل ساختگی، مشخصه یا قیمت خارج از جدول.\n'
+			return 'نقش: نویسنده معرفی کالا به سبک دیجی‌کالا.\n'
+				+ 'کار: از متن منبع و جدول مشخصات، یک معرفی و بررسی کوتاه و خوانا بنویس (۲ تا ۴ پاراگراف، نه خیلی طولانی). متن منبع را تمیز کن؛ اگر ناقص یا خالی است فقط از مشخصات واقعی مقاله بساز.\n'
+				+ 'ممنوع: نظر مشتری ساختگی، تیتر تحلیل کارشناسی، مناسب برای چه کسانی، قیمت یا گارانتی خارج از داده.\n'
 				+ 'سئو اجباری: seo_title بین ۵۰ تا ۶۰ نویسه و با کلمه خرید؛ seo_desc بین ۱۴۰ تا ۱۵۵ نویسه با ۲ مشخصه واقعی؛ focus_keyword دو تا چهار کلمه؛ tags هشت مورد.\n'
 				+ 'خروجی فقط JSON با کلیدهای: intro, highlights, faq, seo_title, seo_desc, focus_keyword, tags\n'
-				+ 'intro همان متن مرتب منبع است. faq حداکثر ۴ مورد {q,a} از مشخصات واقعی.\n'
+				+ 'intro همان معرفی و بررسی محصول است. faq حداکثر ۴ مورد {q,a} از مشخصات واقعی.\n'
 				+ 'محصول: ' + (data.name1 || '') + '\nانگلیسی: ' + (data.name2 || '') + '\nمنبع: ' + source + '\nمشخصات: ' + specs.join('؛ ');
 		},
 
@@ -1818,7 +1818,7 @@
 			opts.body = JSON.stringify({
 				model: provider.model || 'openai-fast',
 				messages: [
-					{ role: 'system', content: 'You are a Persian product-text editor, not a copywriter. Clean and organize the source. Never invent specs.' },
+					{ role: 'system', content: 'You write a short Digikala-style Persian product introduction from the given source and specs only. Do not invent specs, prices, reviews, or audience claims.' },
 					{ role: 'user', content: prompt }
 				],
 				temperature: 0.25,
@@ -1875,7 +1875,7 @@
 			if (this.cfg('aiEnabled', 'yes') === 'no') { return; }
 			if (this._enhancing && !force) { return; }
 			this._enhancing = true;
-			this.setAiStatus((typeof ShoperData !== 'undefined' && ShoperData.i18n && ShoperData.i18n.enhancing) ? ShoperData.i18n.enhancing : 'در حال بازنویسی…', 'is-loading');
+			this.setAiStatus((typeof ShoperData !== 'undefined' && ShoperData.i18n && ShoperData.i18n.enhancing) ? ShoperData.i18n.enhancing : 'در حال آماده‌سازی معرفی و بررسی…', 'is-loading');
 			var payload = data || this.currentData || {};
 			var finish = function (resp) {
 				self._enhancing = false;
@@ -1919,7 +1919,7 @@
 				mode: 'studio'
 			}, function (resp) {
 				self.applyEnhance(resp);
-				self.setAiStatus('متن کامل آماده شد؛ در حال تقویت با مدل ابری رایگان…', 'is-loading');
+				self.setAiStatus('معرفی آماده شد؛ در حال تقویت با مدل ابری رایگان…', 'is-loading');
 				tryCloud();
 			}, function () {
 				tryCloud();

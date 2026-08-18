@@ -370,14 +370,18 @@ const handlers = {
 				try {
 					const remote = JSON.parse(remoteRaw);
 					if (remote && typeof remote === 'object') {
-						['analysis', 'review', 'audience', 'verdict', 'seo_title', 'seo_desc', 'focus_keyword'].forEach((k) => {
-							if (remote[k] && String(remote[k]).length > 18) enh[k] = String(remote[k]);
-						});
-						if (Array.isArray(remote.tags) && remote.tags.length) enh.tags = remote.tags.slice(0, 12);
-						if (Array.isArray(remote.faq) && remote.faq.length) enh.faq = remote.faq.slice(0, 5);
-						enh.provider = params.get('remote_provider') || 'browser';
-						enh.provider_label = (enh.provider) + ' + استودیو خواجوی';
-						enh.remote = true;
+					['analysis', 'review', 'audience', 'verdict', 'seo_title', 'seo_desc', 'focus_keyword'].forEach((k) => {
+						if (remote[k] && String(remote[k]).length > 18) enh[k] = String(remote[k]);
+					});
+					if (remote.intro && String(remote.intro).length > 40) {
+						enh.analysis = logic.polishSource(remote.intro);
+					}
+					if (Array.isArray(remote.tags) && remote.tags.length) enh.tags = remote.tags.slice(0, 12);
+					if (Array.isArray(remote.faq) && remote.faq.length) enh.faq = remote.faq.slice(0, 5);
+					enh.description_html = logic.assembleProductHtml(data, enh.analysis, enh.highlights || [], enh.faq || []);
+					enh.provider = params.get('remote_provider') || 'browser';
+					enh.provider_label = (enh.provider) + ' + استودیو خواجوی';
+					enh.remote = true;
 					}
 				} catch (e) { /* keep studio */ }
 			}
@@ -723,13 +727,13 @@ const server = http.createServer(async (req, res) => {
 	}
 
 	// --- دانلود آخرین نسخه‌ی افزونه (ZIP) ---
-	if (pathname === '/download/latest' || pathname === '/download/shoper-torob-importer-1.5.3.zip') {
-		const zip = path.join(ROOT, 'dist', 'shoper-torob-importer-1.5.3.zip');
+	if (pathname === '/download/latest' || pathname === '/download/shoper-torob-importer-1.5.4.zip') {
+		const zip = path.join(ROOT, 'dist', 'shoper-torob-importer-1.5.4.zip');
 		try {
 			const data = await fsp.readFile(zip);
 			res.writeHead(200, {
 				'Content-Type': 'application/zip',
-				'Content-Disposition': 'attachment; filename="shoper-torob-importer-1.5.3.zip"',
+				'Content-Disposition': 'attachment; filename="shoper-torob-importer-1.5.4.zip"',
 				'Content-Length': data.length,
 				'Cache-Control': 'no-store',
 			});

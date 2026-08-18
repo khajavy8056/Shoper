@@ -51,6 +51,7 @@ $extra_gateways = get_option( 'shoper_extra_gateways', '' );
 $shoper_debug = get_option( 'shoper_debug', '' );
 $ai_enabled = get_option( 'shoper_ai_enabled', 'yes' );
 $ai_auto = get_option( 'shoper_ai_auto', 'yes' );
+$hf_token = get_option( 'shoper_hf_token', '' );
 ?>
 <div class="wrap shoper-wrap" dir="rtl">
 	<div class="shoper-brand">
@@ -68,7 +69,7 @@ $ai_auto = get_option( 'shoper_ai_auto', 'yes' );
 			<div class="shoper-card">
 				<h2>۱. جستجوی محصول</h2>
 				<p class="description">
-					نام محصول را بنویسید. کاتالوگ، تصاویر، مشخصات و بعد متن کارشناسی آماده می‌شود؛ شما ناظر نهایی هستید.
+					نام محصول را بنویسید. کاتالوگ، تصاویر، مشخصات و بعد معرفی و بررسی آماده می‌شود؛ شما ناظر نهایی هستید.
 				</p>
 				<div class="notice notice-info inline" style="margin:10px 0 0;">
 					<p>نام محصول را بنویسید. افزونه اول از <strong>دیجی‌کالا</strong> مشخصات، توضیحات و تصاویر کامل می‌گیرد (هر مشخصه یک ویژگی ووکامرس). اگر لازم شد سراغ ترب می‌رود. لینک <code>digikala.com/product/dkp-…</code> هم قبول است.</p>
@@ -93,9 +94,9 @@ $ai_auto = get_option( 'shoper_ai_auto', 'yes' );
 			</div>
 
 			<div class="shoper-card" id="shoper-preview-card" style="display:none;">
-				<h2>۲. پیش‌نمایش، مرتب‌سازی متن و نظارت</h2>
+				<h2>۲. پیش‌نمایش، معرفی و بررسی، نظارت</h2>
 				<p class="description">
-					مرحله‌ها: اطلاعات → تصاویر → مرتب‌سازی متن منبع → نظارت شما روی متن و سئو.
+					مرحله‌ها: اطلاعات → تصاویر → معرفی و بررسی → نظارت شما روی متن و سئو.
 				</p>
 				<div id="shoper-preview"></div>
 
@@ -201,15 +202,15 @@ $ai_auto = get_option( 'shoper_ai_auto', 'yes' );
 							</td>
 						</tr>
 						<tr>
-							<th>مرتب‌سازی متن</th>
+							<th>معرفی و بررسی</th>
 							<td>
 								<label><input type="checkbox" name="ai_enabled" value="yes" <?php checked( $ai_enabled, 'yes' ); ?>>
-									فعال — ویرایش منبع با Pollinations + LLM7 + OVH
+									فعال — معرفی کوتاه از منبع و مشخصات با Pollinations + LLM7 + OVH
 								</label>
 								<label style="display:block;margin-top:8px;"><input type="checkbox" name="ai_auto" value="yes" <?php checked( $ai_auto, 'yes' ); ?>>
-									بعد از دریافت محصول، مرتب‌سازی متن شروع شود
+									بعد از دریافت محصول، معرفی و بررسی شروع شود
 								</label>
-								<p class="description" style="margin-top:8px;">این سه سرویس بدون کلید پولی در افزونه هستند و به‌نوبت عوض می‌شوند تا سقف رایگان یکی کار را نخواباند. کلید پولی داخل مخزن عمومی گذاشته نمی‌شود چون فوراً دزدیده می‌شود. اگر همه قطع باشند، <strong>متن کامل از استودیوی خواجوی</strong> نوشته می‌شود و محصول بدون توضیح نمی‌ماند.</p>
+								<p class="description" style="margin-top:8px;">مدل از متن منبع و مشخصات واقعی یک معرفی مقاله‌ای کوتاه می‌سازد تا صفحه خالی نماند. مشخصات فنی جداگانه در جدول می‌ماند. اگر سرویس ابری قطع باشد، <strong>استودیوی خواجوی</strong> همان قالب را پر می‌کند.</p>
 								<p style="margin-top:8px;"><label>توکن اختیاری Hugging Face<br>
 									<input type="password" class="regular-text" name="hf_token" value="<?php echo esc_attr( $hf_token ); ?>" autocomplete="off" placeholder="hf_… فقط اگر خودتان دارید">
 								</label></p>

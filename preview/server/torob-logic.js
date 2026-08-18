@@ -679,6 +679,7 @@ function detectCategory(hay) {
 	if (/هدفون|هندزفری|ایرپاد|earbuds/.test(t)) return 'headphone';
 	if (/ساعت هوشمند|smartwatch/.test(t)) return 'watch';
 	if (/تلویزیون|smart tv/.test(t)) return 'tv';
+	if (/پلی.?استیشن|playstation|xbox|nintendo|ps5|ps4|کنسول/.test(t)) return 'console';
 	return 'generic';
 }
 
@@ -703,6 +704,157 @@ function polishSource(source) {
 	return text.trim();
 }
 
+function specSentence(label, val) {
+	const map = {
+		'پردازنده': 'پردازنده آن ' + val + ' است.',
+		'رم': 'این مدل با رم ' + val + ' عرضه می‌شود.',
+		'حافظه داخلی': 'حافظه داخلی آن ' + val + ' اعلام شده است.',
+		'صفحه نمایش': 'اندازه صفحه نمایش ' + val + ' است.',
+		'نوع نمایشگر': 'نوع نمایشگر ' + val + ' ثبت شده است.',
+		'نرخ نوسازی': 'نرخ نوسازی تصویر ' + val + ' است.',
+		'دوربین اصلی': 'دوربین اصلی ' + val + ' دارد.',
+		'دوربین سلفی': 'دوربین سلفی ' + val + ' است.',
+		'باتری': 'ظرفیت باتری ' + val + ' است.',
+		'سیستم عامل': 'سیستم‌عامل ' + val + ' روی این محصول نصب شده است.',
+		'وزن': 'وزن دستگاه ' + val + ' است.',
+		'ابعاد': 'ابعاد آن ' + val + ' است.',
+		'رنگ': 'رنگ ثبت‌شده ' + val + ' است.',
+		'گواهی ضدآب': 'گواهی ضدآب ' + val + ' برای آن ثبت شده است.',
+		'کارت گرافیک': 'کارت گرافیک ' + val + ' است.',
+		'نوع اتصال': 'نوع اتصال ' + val + ' است.',
+	};
+	return map[label] || (label + ' این محصول ' + val + ' است.');
+}
+
+function weaveSpecs(specs, keys) {
+	const bag = Object.assign({}, keys || {}, specs || {});
+	const map = [
+		['پردازنده', ['پردازنده', 'پردازنده مرکزی', 'تراشه']],
+		['رم', ['مقدار رم', 'حافظه RAM', 'رم', 'مقدار RAM']],
+		['حافظه داخلی', ['حافظه داخلی', 'ظرفیت حافظه']],
+		['صفحه نمایش', ['اندازه صفحه نمایش']],
+		['نوع نمایشگر', ['نوع صفحه نمایش']],
+		['نرخ نوسازی', ['نرخ نوسازی تصویر']],
+		['دوربین اصلی', ['دوربین اصلی', 'کیفیت دوربین اصلی']],
+		['دوربین سلفی', ['دوربین سلفی', 'کیفیت دوربین جلو']],
+		['باتری', ['گنجایش باتری', 'ظرفیت باتری']],
+		['سیستم عامل', ['سیستم عامل']],
+		['وزن', ['وزن']],
+		['ابعاد', ['ابعاد']],
+		['رنگ', ['رنگ']],
+		['گواهی ضدآب', ['گواهی ضدآب']],
+		['کارت گرافیک', ['کارت گرافیک']],
+		['نوع اتصال', ['نوع اتصال']],
+	];
+	const used = {};
+	const bits = [];
+	map.forEach((row) => {
+		const val = specOf(bag, row[1]);
+		if (!val) return;
+		bits.push(specSentence(row[0], val));
+		row[1].forEach((k) => { used[k] = true; });
+	});
+	let extra = 0;
+	Object.keys(bag).forEach((k) => {
+		if (used[k] || extra >= 3) return;
+		const v = String(bag[k] || '').trim();
+		if (!k || !v) return;
+		bits.push(k + ' این محصول ' + v + ' است.');
+		extra += 1;
+	});
+	return bits.join(' ').trim();
+}
+
+function draftArticle(name, name2, brand, specs, keys, seed) {
+	let p1 = '';
+	if (name) {
+		p1 = name;
+		if (name2 && name.indexOf(name2) < 0) p1 += ' (' + name2 + ')';
+		p1 += brand ? (' محصول برند ' + brand + ' است.') : ' یک محصول است.';
+	} else {
+		p1 = 'این محصول بر اساس مشخصات ثبت‌شده معرفی می‌شود.';
+	}
+	seed = String(seed || '').trim();
+	if (seed && p1.indexOf(seed) < 0) p1 += ' ' + seed;
+	const woven = weaveSpecs(specs, keys);
+	const paras = [p1];
+	if (woven) paras.push(woven);
+	const last = paras[paras.length - 1] || '';
+	if (last.indexOf('جدول مشخصات') < 0) {
+		paras.push('جزئیات کامل «' + (name || 'این محصول') + '» در جدول مشخصات همین صفحه آمده است.');
+	}
+	return paras.map((p) => p.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n\n');
+}
+
+function composeArticle(source, name, name2, brand, specs, keys) {
+	const polished = polishSource(source);
+	if (polished.length >= 240) {
+		const pairs = [
+			['رم', ['مقدار رم', 'حافظه RAM', 'رم', 'مقدار RAM']],
+			['حافظه داخلی', ['حافظه داخلی', 'ظرفیت حافظه']],
+			['پردازنده', ['پردازنده', 'پردازنده مرکزی', 'تراشه']],
+			['صفحه نمایش', ['اندازه صفحه نمایش']],
+			['دوربین اصلی', ['دوربین اصلی', 'کیفیت دوربین اصلی']],
+			['باتری', ['گنجایش باتری', 'ظرفیت باتری']],
+		];
+		const bag = Object.assign({}, keys || {}, specs || {});
+		const miss = [];
+		pairs.forEach((row) => {
+			const val = specOf(bag, row[1]);
+			if (!val) return;
+			if (polished.toLowerCase().indexOf(String(val).toLowerCase()) >= 0) return;
+			miss.push(specSentence(row[0], val));
+		});
+		if (miss.length >= 2) {
+			return polished + '\n\n' + ('در تکمیل معرفی «' + name + '»، ' + miss.slice(0, 5).join(' '));
+		}
+		return polished;
+	}
+	return draftArticle(name, name2, brand, specs, keys, polished);
+}
+
+function paragraphsHtml(text) {
+	return String(text || '').split(/\n\s*\n/).map((p) => p.replace(/\s+/g, ' ').trim()).filter(Boolean)
+		.map((p) => '<p style="margin:0 0 14px;">' + escHtml(p) + '</p>').join('');
+}
+
+function assembleProductHtml(data, body, highlights, faq) {
+	const specs = (data && data.specs) || {};
+	const keys = (data && data.key_specs) || {};
+	let html = '<div class="shoper-page" dir="rtl" lang="fa">';
+	html += '<section class="shoper-sec shoper-sec-review">';
+	html += '<h2 class="shoper-sec-title">معرفی و بررسی محصول</h2>';
+	html += '<div class="shoper-prose">' + paragraphsHtml(body) + '</div></section>';
+	if (highlights && highlights.length) {
+		html += '<section class="shoper-sec shoper-sec-highlights"><h2 class="shoper-sec-title">نکات برجسته</h2><ul>';
+		highlights.forEach((h) => { html += '<li>' + escHtml(h) + '</li>'; });
+		html += '</ul></section>';
+	}
+	html += '<section class="shoper-sec shoper-sec-specs"><h2 class="shoper-sec-title">مشخصات فنی</h2>';
+	if (keys && Object.keys(keys).length) {
+		html += '<h3>مشخصات کلیدی</h3>' + renderSpecTable(keys);
+	}
+	if (data && data.spec_groups && data.spec_groups.length) {
+		data.spec_groups.forEach((g) => {
+			if (!g.specs || !Object.keys(g.specs).length) return;
+			if (g.header) html += '<h3>' + escHtml(g.header) + '</h3>';
+			html += renderSpecTable(g.specs);
+		});
+	} else if (specs && Object.keys(specs).length) {
+		html += renderSpecTable(specs);
+	}
+	html += '</section>';
+	if (faq && faq.length) {
+		html += '<section class="shoper-sec shoper-sec-faq"><h2 class="shoper-sec-title">پرسش‌های پرتکرار</h2>';
+		faq.forEach((item) => {
+			html += '<h3>' + escHtml(item.q) + '</h3><p>' + escHtml(item.a) + '</p>';
+		});
+		html += '</section>';
+	}
+	html += '<p class="shoper-source">معرفی و مشخصات توسط <strong>Shoper Studio</strong> خواجوی آماده شده است.</p></div>';
+	return html;
+}
+
 function enhanceProduct(data) {
 	const name = String((data && data.name1) || '');
 	const name2 = String((data && data.name2) || '');
@@ -710,30 +862,7 @@ function enhanceProduct(data) {
 	const keys = (data && data.key_specs) || {};
 	const cat = detectCategory(name + ' ' + name2);
 	const brand = specOf(specs, ['برند', 'سازنده']);
-	let body = polishSource((data && data.description) || '');
-	if (!body) {
-		body = [name, name2, brand ? ('برند ' + brand) : ''].filter(Boolean).join('. ');
-		if (body && body.slice(-1) !== '.') body += '.';
-	}
-	const facts = [];
-	const pairs = {
-		'رم': specOf(specs, ['مقدار رم', 'حافظه RAM', 'رم', 'مقدار RAM']),
-		'حافظه داخلی': specOf(specs, ['حافظه داخلی', 'ظرفیت حافظه']),
-		'باتری': specOf(specs, ['گنجایش باتری', 'ظرفیت باتری']),
-		'دوربین اصلی': specOf(specs, ['دوربین اصلی', 'کیفیت دوربین اصلی']),
-		'صفحه نمایش': specOf(specs, ['اندازه صفحه نمایش']),
-		'پردازنده': specOf(specs, ['پردازنده', 'پردازنده مرکزی', 'تراشه']),
-	};
-	const hay = body.toLowerCase();
-	Object.keys(pairs).forEach((label) => {
-		const val = pairs[label];
-		if (!val) return;
-		if (hay.indexOf(String(val).toLowerCase()) >= 0) return;
-		facts.push(label + ' ' + val);
-	});
-	if (facts.length) {
-		body += '\n\nطبق مشخصات ثبت‌شده همین کالا: ' + facts.slice(0, 6).join('؛ ') + '.';
-	}
+	const body = composeArticle((data && data.description) || '', name, name2, brand, specs, keys);
 
 	const highlights = [];
 	const prefer = ['برند', 'مدل', 'مقدار رم', 'حافظه RAM', 'مقدار RAM', 'حافظه داخلی', 'گنجایش باتری', 'ظرفیت باتری', 'دوربین اصلی', 'اندازه صفحه نمایش', 'پردازنده'];
@@ -756,36 +885,12 @@ function enhanceProduct(data) {
 	});
 	const review = summaryLines.join('\n');
 
-	let descriptionHtml = '<div class="shoper-studio-copy">';
-	descriptionHtml += '<h2>معرفی محصول</h2>' + body.split(/\n\n+/).map((p) => '<p>' + escHtml(p) + '</p>').join('');
-	if (highlights.length) {
-		descriptionHtml += '<h2>نکات برجسته</h2><ul>' + highlights.map((h) => '<li>' + escHtml(h) + '</li>').join('') + '</ul>';
-	}
-	if (keys && Object.keys(keys).length) {
-		descriptionHtml += '<h2>مشخصات کلیدی</h2>' + renderSpecTable(keys);
-	}
-	if (data.spec_groups && data.spec_groups.length) {
-		descriptionHtml += '<h2>مشخصات فنی کامل</h2>';
-		data.spec_groups.forEach((g) => {
-			if (!g.specs || !Object.keys(g.specs).length) return;
-			if (g.header) descriptionHtml += '<h3>' + escHtml(g.header) + '</h3>';
-			descriptionHtml += renderSpecTable(g.specs);
-		});
-	} else if (specs && Object.keys(specs).length) {
-		descriptionHtml += '<h2>مشخصات فنی کامل</h2>' + renderSpecTable(specs);
-	}
 	const faq = [];
 	const qmap = { 'حافظه داخلی': 'حافظه داخلی این محصول چقدر است؟', 'مقدار رم': 'رم این محصول چقدر است؟', 'گنجایش باتری': 'ظرفیت باتری چقدر اعلام شده؟', 'برند': 'برند سازنده چیست؟' };
 	Object.keys(qmap).forEach((k) => {
 		if (specs[k] || keys[k]) faq.push({ q: qmap[k], a: String(specs[k] || keys[k]) + ' — طبق مشخصات ثبت‌شده.' });
 	});
-	if (faq.length) {
-		descriptionHtml += '<h2>پرسش‌های پرتکرار</h2>';
-		faq.forEach((item) => {
-			descriptionHtml += '<h3>' + escHtml(item.q) + '</h3><p>' + escHtml(item.a) + '</p>';
-		});
-	}
-	descriptionHtml += '<p class="shoper-source">متن از منبع مرتب شده است — <strong>Shoper Studio</strong> خواجوی.</p></div>';
+	const descriptionHtml = assembleProductHtml(data, body, highlights, faq);
 
 	let seoTitle = 'خرید ' + name;
 	if (seoTitle.length < 50) seoTitle += ' | مشخصات کامل';
@@ -816,7 +921,7 @@ function enhanceProduct(data) {
 		tags: tags.slice(0, 12),
 		faq,
 		provider: 'studio',
-		provider_label: 'ویرایش منبع — استودیو خواجوی',
+		provider_label: 'معرفی و بررسی — استودیو خواجوی',
 		category: cat,
 	};
 }
@@ -837,4 +942,7 @@ module.exports = {
 	enhanceProduct,
 	polishSource,
 	detectCategory,
+	composeArticle,
+	draftArticle,
+	assembleProductHtml,
 };

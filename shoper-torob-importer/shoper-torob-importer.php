@@ -2,8 +2,8 @@
 /**
  * Plugin Name:       Shoper Studio – سازنده هوشمند محصول
  * Plugin URI:        https://github.com/khajavy8056/Shoper
- * Description:       از نام محصول تا صفحه فروش: مشخصات دانه‌دانه، گالری تصاویر، و مرتب‌سازی متن منبع — بدون تولید محتوای ساختگی.
- * Version:           1.5.3
+ * Description:       از نام محصول تا صفحه فروش: معرفی و بررسی، جدول مشخصات، گالری تصاویر و ویژگی‌های دانه‌دانه.
+ * Version:           1.5.4
  * Author:            خواجوی
  * Author URI:        https://github.com/khajavy8056
  * License:           GPL v2 or later
@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // تعریف ثابت‌های افزونه.
-define( 'SHOPER_VERSION', '1.5.3' );
+define( 'SHOPER_VERSION', '1.5.4' );
 define( 'SHOPER_AUTHOR', 'خواجوی' );
 define( 'SHOPER_PLUGIN_FILE', __FILE__ );
 define( 'SHOPER_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
@@ -136,6 +136,7 @@ if ( ! class_exists( 'Shoper_Torob_Importer' ) ) {
 
 			// اعلام سازگاری با HPOS ووکامرس.
 			add_action( 'before_woocommerce_init', array( $this, 'declare_hpos_compatibility' ) );
+			add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_storefront' ) );
 		}
 
 		/**
@@ -160,6 +161,23 @@ if ( ! class_exists( 'Shoper_Torob_Importer' ) ) {
 					true
 				);
 			}
+		}
+
+		/**
+		 * استایل ثابت صفحه محصول در فروشگاه.
+		 *
+		 * @return void
+		 */
+		public function enqueue_storefront() {
+			if ( ! function_exists( 'is_product' ) || ! is_product() ) {
+				return;
+			}
+			wp_enqueue_style(
+				'shoper-storefront',
+				SHOPER_PLUGIN_URL . 'assets/css/storefront.css',
+				array(),
+				SHOPER_VERSION
+			);
 		}
 	}
 }
