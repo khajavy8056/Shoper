@@ -142,9 +142,11 @@ $shoper_debug = get_option( 'shoper_debug', '' );
 
 				<hr>
 
-				<h3>تست اتصال</h3>
-				<button type="button" class="button" id="shoper-test-conn">بررسی اتصال به ترب</button>
+				<h3>تست اتصال و عیب‌یابی</h3>
+				<button type="button" class="button" id="shoper-test-conn">بررسی سریع اتصال</button>
+				<button type="button" class="button" id="shoper-diagnostics-btn">🔍 عیب‌یابی کامل</button>
 				<div id="shoper-conn-result" style="margin-top:10px;"></div>
+				<div id="shoper-diagnostics" style="margin-top:12px;display:none;"></div>
 			</div>
 
 			<div class="shoper-card shoper-help">

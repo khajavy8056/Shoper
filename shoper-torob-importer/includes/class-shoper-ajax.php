@@ -24,6 +24,7 @@ class Shoper_Ajax {
 		add_action( 'wp_ajax_shoper_create', array( $this, 'create' ) );
 		add_action( 'wp_ajax_shoper_fill', array( $this, 'fill' ) );
 		add_action( 'wp_ajax_shoper_test_connection', array( $this, 'test_connection' ) );
+		add_action( 'wp_ajax_shoper_diagnostics', array( $this, 'diagnostics' ) );
 	}
 
 	/**
@@ -399,5 +400,31 @@ class Shoper_Ajax {
 		$message = isset( $result['message'] ) ? $result['message'] : 'اتصال به ترب برقرار نشد.';
 		$error   = new WP_Error( $code, $message );
 		$this->send_error( $error );
+	}
+
+	/**
+	 * عیب‌یابی کامل اتصال — اجرای همه‌ی بررسی‌ها و برگرداندن گزارش قابل کپی.
+	 *
+	 * @return void
+	 */
+	public function diagnostics() {
+		$this->guard();
+
+		if ( ! class_exists( 'Shoper_Diagnostics' ) ) {
+			wp_send_json_error( array( 'code' => 'diagnostics_unavailable', 'message' => 'ماژول عیب‌یابی در دسترس نیست.' ), 500 );
+		}
+
+		$report = Shoper_Diagnostics::run();
+
+		// در صورت فعال بودن لاگ اشکال‌زدایی، خلاصه را هم ثبت کن.
+		Shoper_Debug::log(
+			'diagnostics',
+			array(
+				'verdict' => $report['summary']['verdict'],
+				'counts'  => $report['summary']['counts'],
+			)
+		);
+
+		wp_send_json_success( $report );
 	}
 }

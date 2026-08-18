@@ -105,6 +105,7 @@ if ( ! class_exists( 'Shoper_Torob_Importer' ) ) {
 		 */
 		private function includes() {
 			require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-debug.php';
+			require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-diagnostics.php';
 			require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-torob-client.php';
 			require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-image-handler.php';
 			require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-attribute-handler.php';
