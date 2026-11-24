@@ -587,7 +587,20 @@ function extractDkProducts(data) {
 		if (data.data.products.products) return data.data.products.products;
 	}
 	if (data && Array.isArray(data.products)) return data.products;
-	return [];
+	// discovery v2: data.widgets -> vertical_product_listing -> product widgets.
+	const out = [];
+	if (data && data.data && Array.isArray(data.data.widgets)) {
+		for (const w of data.data.widgets) {
+			if (w && w.type === 'vertical_product_listing' && w.data && Array.isArray(w.data.widgets)) {
+				for (const inner of w.data.widgets) {
+					if (inner && inner.type === 'product' && inner.data) out.push(inner.data);
+				}
+			}
+			if (w && w.type === 'product' && w.data && w.data.id) out.push(w.data);
+			if (w && w.data && Array.isArray(w.data.products)) out.push(...w.data.products);
+		}
+	}
+	return out;
 }
 
 function normalizeDigikalaSearch(data) {
@@ -647,7 +660,17 @@ function normalizeDigikalaDetails(data) {
 		specs['برند'] = product.brand.title_fa;
 		keySpecs['برند'] = product.brand.title_fa;
 	}
-	const rial = (product.default_variant && product.default_variant.price && product.default_variant.price.selling_price) || 0;
+	let rial = (product.default_variant && product.default_variant.price && product.default_variant.price.selling_price) || 0;
+	if (!rial && Array.isArray(product.variants)) {
+		for (const v of product.variants) {
+			if (!v || !v.price || !v.price.selling_price) continue;
+			if (v.status && v.status !== 'marketable') continue;
+			if (!rial || v.price.selling_price < rial) rial = v.price.selling_price;
+		}
+	}
+	if (!rial && product.second_default_variant && product.second_default_variant.price) {
+		rial = product.second_default_variant.price.selling_price || 0;
+	}
 	const price = rial >= 1000 && rial % 10 === 0 ? Math.round(rial / 10) : rial;
 	const uri = (product.url && product.url.uri) || (id ? ('/product/dkp-' + id + '/') : '');
 	return {

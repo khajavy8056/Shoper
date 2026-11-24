@@ -109,6 +109,8 @@ class Shoper_Admin {
 				'detailsPath'=> Shoper_Torob_Client::DETAIL_URL,
 				'catalogSource' => get_option( 'shoper_catalog_source', 'auto' ),
 				'dkApiBase'  => Shoper_Digikala_Client::API_BASE,
+				'dkSearchPath' => Shoper_Digikala_Client::SEARCH_PATH,
+				'dkDetailsPath'=> Shoper_Digikala_Client::DETAIL_PATH,
 				'fetchMode'  => get_option( 'shoper_fetch_mode', 'auto' ),
 				'relayUrl'   => (string) get_option( 'shoper_relay_url', '' ),
 				'gateways'   => Shoper_Torob_Client::active_gateways(),

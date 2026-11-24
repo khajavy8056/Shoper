@@ -207,12 +207,41 @@
 
 		dkSearchUrl: function (query) {
 			var base = this.cfg('dkApiBase', 'https://api.digikala.com');
-			return base + '/v1/search/?q=' + encodeURIComponent(query) + '&page=1';
+			// مسیر زنده از 2026-11-13: /discovery/api/v1/search
+			// (/v1/search/ حذف شده و {"status":404} برمی‌گرداند).
+			var path = this.cfg('dkSearchPath', '/discovery/api/v1/search');
+			return base + path + '?q=' + encodeURIComponent(query) + '&page=1';
+		},
+
+		dkSearchUrls: function (query) {
+			var base = this.cfg('dkApiBase', 'https://api.digikala.com');
+			var primary = this.cfg('dkSearchPath', '/discovery/api/v1/search');
+			var paths = [primary, '/discovery/api/v2/search', '/discovery/api/v1/search'];
+			var out = [];
+			paths.forEach(function (p) {
+				var u = base + p + '?q=' + encodeURIComponent(query) + '&page=1';
+				if (out.indexOf(u) < 0) { out.push(u); }
+			});
+			return out;
 		},
 
 		dkDetailsUrl: function (id) {
 			var base = this.cfg('dkApiBase', 'https://api.digikala.com');
-			return base + '/v2/product/' + encodeURIComponent(id) + '/';
+			// مسیر زنده: /product/v1/products/{id}/ ‏(/v2/product/ حذف شده).
+			var path = this.cfg('dkDetailsPath', '/product/v1/products/');
+			return base + path + encodeURIComponent(id) + '/';
+		},
+
+		dkDetailsUrls: function (id) {
+			var base = this.cfg('dkApiBase', 'https://api.digikala.com');
+			var primary = this.cfg('dkDetailsPath', '/product/v1/products/');
+			var paths = [primary, '/product/v1/products/', '/v2/product/'];
+			var out = [];
+			paths.forEach(function (p) {
+				var u = base + p + encodeURIComponent(id) + '/';
+				if (out.indexOf(u) < 0) { out.push(u); }
+			});
+			return out;
 		},
 
 		torobSearchUrl: function (query, size) {
@@ -263,8 +292,10 @@
 
 		/**
 		 * یک GET و خواندن JSON. در خطا null.
+		 * status عددیِ >=400 داخل بدنه (مثل {"status":404} دیجی‌کالا) هم خطاست،
+		 * حتی اگر HTTP 200 باشد.
 		 */
-		fetchOne: function (target, timeoutMs) {
+		fetchOne: function (target, timeoutMs, credentials) {
 			var dfd = $.Deferred();
 			if (!window.fetch || !target) {
 				return dfd.resolve(null).promise();
@@ -272,11 +303,11 @@
 			var ctrl = window.AbortController ? new AbortController() : null;
 			var timer = setTimeout(function () {
 				if (ctrl) { ctrl.abort(); }
-			}, timeoutMs || 4000);
+			}, timeoutMs || 8000);
 			fetch(target, {
 				method: 'GET',
 				mode: 'cors',
-				credentials: 'omit',
+				credentials: credentials || 'omit',
 				headers: { 'Accept': 'application/json, text/plain, */*' },
 				signal: ctrl ? ctrl.signal : undefined
 			}).then(function (res) {
@@ -290,7 +321,8 @@
 				if (dfd.state() !== 'pending') {
 					return;
 				}
-				if (json && typeof json === 'object' && !json.error && !json.corsfix_error) {
+				if (json && typeof json === 'object' && !json.error && !json.corsfix_error
+					&& !(typeof json.status === 'number' && json.status >= 400)) {
 					dfd.resolve(json);
 				} else {
 					dfd.resolve(null);
@@ -305,7 +337,10 @@
 		},
 
 		/**
-		 * دریافت JSON از مرورگر: مستقیم، رله، بعد درگاه‌های تست‌شده.
+		 * دریافت JSON از مرورگر: مستقیم (اول بدون کوکی، بعد با کوکی‌های همان
+		 * دامنه تا چالش کوکی WAF/CDN رد شود)، رله، بعد درگاه‌های تست‌شده.
+		 * ورودی می‌تواند یک URL یا آرایه‌ای از URLهای کاندید باشد (مثلاً هر دو
+		 * مسیر زنده‌ی جستجوی دیجی‌کالا)؛ کاندیدها به ترتیب امتحان می‌شوند.
 		 */
 		browserFetch: function (url) {
 			var self = this;
@@ -317,17 +352,32 @@
 				return $.Deferred().resolve(null).promise();
 			}
 
-			var targets = [];
+			var urls = Array.isArray(url) ? url.slice() : [url];
+			var targets = []; // {url, credentials}
+			var pushTarget = function (u, credentials) {
+				if (!u) { return; }
+				for (var k = 0; k < targets.length; k++) {
+					if (targets[k].url === u && targets[k].credentials === credentials) { return; }
+				}
+				targets.push({ url: u, credentials: credentials || 'omit' });
+			};
+
 			if (mode === 'relay' || this.cfg('relayUrl', '')) {
-				targets.push(this.wrapRelay(url));
+				urls.forEach(function (u) { pushTarget(self.wrapRelay(u), 'omit'); });
 			}
 			if (mode !== 'relay') {
-				targets.push(url);
-				this.activeGateways().forEach(function (g) {
-					var wrapped = self.wrapGateway(g, url);
-					if (wrapped && targets.indexOf(wrapped) < 0) {
-						targets.push(wrapped);
+				urls.forEach(function (u) { pushTarget(u, 'omit'); });
+				// تلاش دوم با کوکی: اگر WAF/CDN برای این مرورگر کوکی clearance
+				// صادر کرده باشد (بازدید قبلی از همان سایت)، این تلاش رد می‌شود.
+				urls.forEach(function (u) {
+					if (/^https:\/\/api\.(torob|digikala)\.com\//i.test(String(u))) {
+						pushTarget(u, 'include');
 					}
+				});
+				urls.forEach(function (u) {
+					self.activeGateways().forEach(function (g) {
+						pushTarget(self.wrapGateway(g, u), 'omit');
+					});
 				});
 			}
 
@@ -339,9 +389,11 @@
 					return;
 				}
 				var target = targets[i++];
-				var wait = (i === 1) ? 2500 : 5000;
-				self.fetchOne(target, wait).done(function (json) {
-					if (json && (json.results || json.random_key || json.name1 || (json.data && (json.data.products || json.data.product)))) {
+				// پاسخ‌های جستجو بزرگ‌اند؛ ۲۵۰۰ms قبلی روی هاست/اینترنت کند
+				// قبل از رسیدن بدنه abort می‌کرد و مرورگر «ناموفق» گزارش می‌شد.
+				var wait = target.credentials === 'include' ? 8000 : 9000;
+				self.fetchOne(target.url, wait, target.credentials).done(function (json) {
+					if (json && (json.results || json.random_key || json.name1 || (json.data && (json.data.products || json.data.product || json.data.widgets)))) {
 						dfd.resolve(json);
 					} else {
 						next();
@@ -464,7 +516,46 @@
 				});
 			};
 
-			this.browserFetch(this.dkSearchUrl(term)).done(function (raw) {
+			// اگر دیجی‌کالا از مرورگر نیامد، ترب را هم از خود مرورگر بگیر
+			// (IP هاست ممکن است 490 باشد ولی IP مرورگر مدیر معمولاً باز است).
+			var tryTorob = function () {
+				self.browserFetch(self.torobSearchUrl(term, 10)).done(function (traw) {
+					if (!traw || !traw.results) {
+						runServer();
+						return;
+					}
+					self.ingest('search', traw, function (data) {
+						var list = [];
+						var seen = {};
+						(data.results || []).forEach(function (item) {
+							if (item.is_adv || !item.name1 || seen[item.name1]) { return; }
+							seen[item.name1] = true;
+							list.push({
+								label: item.name1,
+								name2: item.name2 || '',
+								random_key: item.random_key || '',
+								search_id: item.search_id || '',
+								image_url: item.image_url || '',
+								price: item.price || 0,
+								price_text: item.price_text || '',
+								shop_text: item.shop_text || '',
+								more_info_url: item.more_info_url || '',
+								gallery: item.gallery || [],
+								page_url: item.page_url || '',
+								provider: 'torob'
+							});
+						});
+						if (list.length) {
+							self.lastResults = data.results || [];
+							self.applySuggestList(term, list.slice(0, 8));
+						} else {
+							runServer();
+						}
+					}, function () { runServer(); });
+				});
+			};
+
+			this.browserFetch(this.dkSearchUrls(term)).done(function (raw) {
 				if (raw && raw.data) {
 					self.ingest('dk_search', raw, function (data) {
 						var list = [];
@@ -492,12 +583,12 @@
 							self.applySuggestList(term, list.slice(0, 8));
 							return;
 						}
-						runServer();
-					}, function () { runServer(); });
+						tryTorob();
+					}, function () { tryTorob(); });
 					return;
 				}
 				if (!raw || !raw.results) {
-					runServer();
+					tryTorob();
 					return;
 				}
 				self.ingest('search', raw, function (data) {
@@ -524,10 +615,10 @@
 						self.lastResults = data.results || [];
 						self.applySuggestList(term, list.slice(0, 8));
 					} else {
-						runServer();
+						tryTorob();
 					}
 				}, function () {
-					runServer();
+					tryTorob();
 				});
 			});
 		},
@@ -872,20 +963,29 @@
 				}
 				self.status(msg, 'error');
 			};
-			this.browserFetch(this.dkSearchUrl(query)).done(function (raw) {
+			var runServerSearch = function () {
+				self.ajax('shoper_search', { query: query }, showSearch, searchFail);
+			};
+			// ترب از مرورگر مدیر: وقتی IP هاست 490 است، لیست ترب از مرورگر می‌آید.
+			var tryTorobSearch = function () {
+				self.browserFetch(self.torobSearchUrl(query, 10)).done(function (traw) {
+					if (traw && traw.results) {
+						self.ingest('search', traw, showSearch, runServerSearch);
+						return;
+					}
+					runServerSearch();
+				});
+			};
+			this.browserFetch(this.dkSearchUrls(query)).done(function (raw) {
 				if (raw && raw.data) {
-					self.ingest('dk_search', raw, showSearch, function () {
-						self.ajax('shoper_search', { query: query }, showSearch, searchFail);
-					});
+					self.ingest('dk_search', raw, showSearch, tryTorobSearch);
 					return;
 				}
 				if (raw && raw.results) {
-					self.ingest('search', raw, showSearch, function () {
-						self.ajax('shoper_search', { query: query }, showSearch, searchFail);
-					});
+					self.ingest('search', raw, showSearch, tryTorobSearch);
 					return;
 				}
-				self.ajax('shoper_search', { query: query }, showSearch, searchFail);
+				tryTorobSearch();
 			});
 		},
 
@@ -977,7 +1077,7 @@
 
 			if (self.isDkp(prk)) {
 				var dkp = self.extractDkp(prk);
-				self.browserFetch(self.dkDetailsUrl(dkp)).done(function (raw) {
+				self.browserFetch(self.dkDetailsUrls(dkp)).done(function (raw) {
 					if (raw && raw.data && raw.data.product) {
 						self.ingest('dk_details', raw, showPreview, runServerPreview);
 						return;
@@ -1470,9 +1570,20 @@
 		testConnection: function () {
 			var self = this;
 			this.$connResult.html('<span class="shoper-loading-inline"></span> در حال تست مرورگر و سرور...');
+			this.browserFetch(this.dkSearchUrls('s25')).done(function (dkRaw) {
+				if (dkRaw && dkRaw.data) {
+					self.$connResult.html('<span style="color:#00a32a;">✓ اتصال دیجی‌کالا از مرورگر شما برقرار است. همین حالا جستجو کنید.</span>');
+					return;
+				}
+				self.testTorobBrowser();
+			});
+		},
+
+		testTorobBrowser: function () {
+			var self = this;
 			this.browserFetch(this.torobSearchUrl('s25', 1)).done(function (raw) {
 				if (raw && raw.results) {
-					self.$connResult.html('<span style="color:#00a32a;">✓ اتصال از مرورگر شما برقرار است. همین حالا جستجو کنید.</span>');
+					self.$connResult.html('<span style="color:#00a32a;">✓ اتصال ترب از مرورگر شما برقرار است. همین حالا جستجو کنید.</span>');
 					return;
 				}
 				self.ajax('shoper_test_connection', {}, function (data) {

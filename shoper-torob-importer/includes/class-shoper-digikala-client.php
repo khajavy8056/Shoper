@@ -17,9 +17,25 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class Shoper_Digikala_Client {
 
-	const API_BASE    = 'https://api.digikala.com';
-	const SEARCH_PATH = '/v1/search/';
-	const DETAIL_PATH = '/v2/product/';
+	const API_BASE = 'https://api.digikala.com';
+
+	/*
+	 * مهاجرت API دیجی‌کالا (2026-11-13 / آبان ۱۴۰۵):
+	 *   - GET /v1/search/ و /v1/autocomplete/ حذف شدند و برای همه
+	 *     {"status":404} برمی‌گردانند (حتی با IP ایران و هدر درست).
+	 *   - GET /v2/product/{id}/ نیز دیگر پاسخ نمی‌دهد.
+	 *   - جستجوی متنی زنده: /discovery/api/v1/search (لیست تخت data.products)
+	 *     و /discovery/api/v2/search (لیست داخل ویجت vertical_product_listing).
+	 *   - جزئیات زنده: /product/v1/products/{id}/ (همان شکل data.product قبلی:
+	 *     specifications ،review ،images ،default_variant/variants).
+	 * مسیرهای قدیمی فقط به‌عنوان آخرین fallback نگه داشته شده‌اند تا اگر
+	 * دیجی‌کالا آن‌ها را برگرداند، افزونه بدون آپدیت دوباره کار کند.
+	 */
+	const SEARCH_PATH        = '/discovery/api/v1/search';
+	const SEARCH_PATH_V2     = '/discovery/api/v2/search';
+	const SEARCH_PATH_LEGACY = '/v1/search/';
+	const DETAIL_PATH        = '/product/v1/products/';
+	const DETAIL_PATH_LEGACY = '/v2/product/';
 
 	/**
 	 * منبع: direct | mock.
@@ -86,7 +102,7 @@ class Shoper_Digikala_Client {
 	}
 
 	/**
-	 * آدرس جستجو.
+	 * آدرس جستجو (مسیر اصلی زنده).
 	 *
 	 * @param string $query عبارت.
 	 * @param int    $page  صفحه از ۱.
@@ -103,13 +119,61 @@ class Shoper_Digikala_Client {
 	}
 
 	/**
-	 * آدرس جزئیات.
+	 * همه‌ی آدرس‌های کاندید جستجو، به ترتیب اولویت.
+	 *
+	 * مسیری که آخرین بار جواب داده (transient) اول می‌آید تا بعد از هر
+	 * مهاجرت بعدیِ دیجی‌کالا، افزونه خودش مسیر زنده را پیدا و حفظ کند.
+	 *
+	 * @param string $query عبارت.
+	 * @param int    $page  صفحه از ۱.
+	 * @return string[]
+	 */
+	public static function build_search_urls( $query, $page = 1 ) {
+		$paths = array( self::SEARCH_PATH, self::SEARCH_PATH_V2, self::SEARCH_PATH_LEGACY );
+		$good  = function_exists( 'get_transient' ) ? get_transient( 'shoper_dk_search_path' ) : '';
+		if ( $good && in_array( $good, $paths, true ) ) {
+			$paths = array_merge( array( $good ), array_diff( $paths, array( $good ) ) );
+		}
+		$urls = array();
+		foreach ( $paths as $path ) {
+			$urls[ $path ] = add_query_arg(
+				array(
+					'q'    => $query,
+					'page' => max( 1, (int) $page ),
+				),
+				self::API_BASE . $path
+			);
+		}
+		return $urls;
+	}
+
+	/**
+	 * آدرس جزئیات (مسیر اصلی زنده).
 	 *
 	 * @param int $id شناسه.
 	 * @return string
 	 */
 	public static function build_details_url( $id ) {
 		return self::API_BASE . self::DETAIL_PATH . absint( $id ) . '/';
+	}
+
+	/**
+	 * همه‌ی آدرس‌های کاندید جزئیات، به ترتیب اولویت.
+	 *
+	 * @param int $id شناسه.
+	 * @return string[]
+	 */
+	public static function build_details_urls( $id ) {
+		$paths = array( self::DETAIL_PATH, self::DETAIL_PATH_LEGACY );
+		$good  = function_exists( 'get_transient' ) ? get_transient( 'shoper_dk_detail_path' ) : '';
+		if ( $good && in_array( $good, $paths, true ) ) {
+			$paths = array_merge( array( $good ), array_diff( $paths, array( $good ) ) );
+		}
+		$urls = array();
+		foreach ( $paths as $path ) {
+			$urls[ $path ] = self::API_BASE . $path . absint( $id ) . '/';
+		}
+		return $urls;
 	}
 
 	/**
@@ -125,12 +189,26 @@ class Shoper_Digikala_Client {
 			return $this->load_mock( 'digikala-search-sample.json' );
 		}
 
-		$url  = self::build_search_url( $query, $page );
-		$data = $this->request( $url );
-		if ( is_wp_error( $data ) ) {
-			return $data;
+		// هر مسیر کاندید را امتحان می‌کنیم؛ 404 یک مسیر (حذف‌شدن endpoint)
+		// نباید کل جستجو را بکشد. اولین پاسخِ دارای محصول برنده است.
+		$last_error = null;
+		foreach ( self::build_search_urls( $query, $page ) as $path => $url ) {
+			$data = $this->request( $url );
+			if ( is_wp_error( $data ) ) {
+				$last_error = $data;
+				continue;
+			}
+			$normalized = $this->normalize_search( $data, $size );
+			if ( is_wp_error( $normalized ) ) {
+				$last_error = $normalized;
+				continue;
+			}
+			if ( function_exists( 'set_transient' ) ) {
+				set_transient( 'shoper_dk_search_path', $path, 6 * HOUR_IN_SECONDS );
+			}
+			return $normalized;
 		}
-		return $this->normalize_search( $data, $size );
+		return $last_error ? $last_error : new WP_Error( 'no_results', 'نتیجه‌ای در دیجی‌کالا یافت نشد.' );
 	}
 
 	/**
@@ -192,11 +270,24 @@ class Shoper_Digikala_Client {
 		if ( $num < 1 ) {
 			return new WP_Error( 'invalid_prk', 'شناسه محصول دیجی‌کالا نامعتبر است.' );
 		}
-		$data = $this->request( self::build_details_url( $num ) );
-		if ( is_wp_error( $data ) ) {
-			return $data;
+		$last_error = null;
+		foreach ( self::build_details_urls( $num ) as $path => $url ) {
+			$data = $this->request( $url );
+			if ( is_wp_error( $data ) ) {
+				$last_error = $data;
+				continue;
+			}
+			$normalized = $this->normalize_details( $data );
+			if ( is_wp_error( $normalized ) ) {
+				$last_error = $normalized;
+				continue;
+			}
+			if ( function_exists( 'set_transient' ) ) {
+				set_transient( 'shoper_dk_detail_path', $path, 6 * HOUR_IN_SECONDS );
+			}
+			return $normalized;
 		}
-		return $this->normalize_details( $data );
+		return $last_error ? $last_error : new WP_Error( 'invalid_response', 'جزئیات دیجی‌کالا دریافت نشد.' );
 	}
 
 	/**
@@ -249,16 +340,23 @@ class Shoper_Digikala_Client {
 				if ( empty( $widget['type'] ) ) {
 					continue;
 				}
-				if ( 'vertical_product_listing' === $widget['type'] && ! empty( $widget['data']['widgets'] ) ) {
+				// شکل discovery v2: ویجت لیست، داخلش ویجت‌های product.
+				if ( 'vertical_product_listing' === $widget['type'] && ! empty( $widget['data']['widgets'] ) && is_array( $widget['data']['widgets'] ) ) {
 					foreach ( $widget['data']['widgets'] as $inner ) {
-						if ( isset( $inner['type'], $inner['data'] ) && 'product' === $inner['type'] ) {
+						if ( isset( $inner['type'], $inner['data'] ) && 'product' === $inner['type'] && is_array( $inner['data'] ) ) {
 							$out[] = $inner['data'];
 						}
 					}
 				}
+				// ویجت product در سطح بالا.
+				if ( 'product' === $widget['type'] && ! empty( $widget['data'] ) && is_array( $widget['data'] ) && isset( $widget['data']['id'] ) ) {
+					$out[] = $widget['data'];
+				}
 				if ( isset( $widget['data']['products'] ) && is_array( $widget['data']['products'] ) ) {
 					foreach ( $widget['data']['products'] as $p ) {
-						$out[] = $p;
+						if ( is_array( $p ) ) {
+							$out[] = $p;
+						}
 					}
 				}
 			}
@@ -522,6 +620,25 @@ class Shoper_Digikala_Client {
 		} elseif ( isset( $item['selling_price'] ) ) {
 			$rial = (int) $item['selling_price'];
 		}
+		// مسیر جزئیات جدید (/product/v1/products/): اگر default_variant قیمت
+		// نداشت، ارزان‌ترین variant قابل‌فروش و بعد second_default_variant.
+		if ( $rial <= 0 && ! empty( $item['variants'] ) && is_array( $item['variants'] ) ) {
+			foreach ( $item['variants'] as $variant ) {
+				if ( ! is_array( $variant ) || ! isset( $variant['price']['selling_price'] ) ) {
+					continue;
+				}
+				if ( isset( $variant['status'] ) && 'marketable' !== $variant['status'] ) {
+					continue;
+				}
+				$candidate = (int) $variant['price']['selling_price'];
+				if ( $candidate > 0 && ( 0 === $rial || $candidate < $rial ) ) {
+					$rial = $candidate;
+				}
+			}
+		}
+		if ( $rial <= 0 && isset( $item['second_default_variant']['price']['selling_price'] ) ) {
+			$rial = (int) $item['second_default_variant']['price']['selling_price'];
+		}
 		if ( $rial <= 0 ) {
 			return 0;
 		}
@@ -533,6 +650,85 @@ class Shoper_Digikala_Client {
 	}
 
 	/**
+	 * فایل کوکی موقت برای چالش کوکی CDN دیجی‌کالا (DigiCDN).
+	 *
+	 * لبه‌ی CDN دیجی‌کالا گاهی اول پاسخ 307 با Set-Cookie: digicdn_cookie
+	 * به همان آدرس می‌دهد؛ بدون نگه‌داشتن کوکی، ریدایرکت لوپ می‌شود یا
+	 * پاسخ چالش برمی‌گردد. cURL با COOKIEJAR/COOKIEFILE همان فایل، کوکی
+	 * را روی ریدایرکت و درخواست‌های بعدی همین کلاینت نگه می‌دارد.
+	 *
+	 * @var string
+	 */
+	private $cookie_file = '';
+
+	/**
+	 * ساخت/گرفتن مسیر فایل کوکی موقت.
+	 *
+	 * @return string
+	 */
+	private function cookie_file() {
+		if ( '' === $this->cookie_file ) {
+			$dir  = function_exists( 'sys_get_temp_dir' ) ? sys_get_temp_dir() : '/tmp';
+			$file = tempnam( $dir, 'shoper_dk_' ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+			$this->cookie_file = $file ? $file : '';
+		}
+		return $this->cookie_file;
+	}
+
+	/**
+	 * پاک‌کردن فایل کوکی موقت.
+	 */
+	public function __destruct() {
+		if ( '' !== $this->cookie_file && file_exists( $this->cookie_file ) ) {
+			@unlink( $this->cookie_file ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		}
+	}
+
+	/**
+	 * هدرهای درخواست به API دیجی‌کالا (همان‌هایی که وب‌اپ خودش می‌فرستد).
+	 *
+	 * @return string[]
+	 */
+	private function api_headers() {
+		return array(
+			'Accept: application/json, text/plain, */*',
+			'Accept-Language: fa-IR,fa;q=0.9,en;q=0.8',
+			'Referer: https://www.digikala.com/',
+			'Origin: https://www.digikala.com',
+			'x-web-client: desktop',
+			'x-web-client-id: web',
+			'Sec-Fetch-Dest: empty',
+			'Sec-Fetch-Mode: cors',
+			'Sec-Fetch-Site: same-site',
+		);
+	}
+
+	/**
+	 * اعتبارسنجی JSON دیجی‌کالا: فیلد status بدنه authoritative است.
+	 *
+	 * دیجی‌کالا برای endpoint حذف‌شده حتی ممکن است HTTP 200 با
+	 * {"status":404} بدهد؛ پس فقط به کد HTTP تکیه نمی‌کنیم.
+	 *
+	 * @param mixed $json داده‌ی decode شده.
+	 * @param int   $code کد HTTP.
+	 * @return array|WP_Error
+	 */
+	private function validate_json( $json, $code ) {
+		if ( ! is_array( $json ) ) {
+			return new WP_Error( 'invalid_json', 'پاسخ دیجی‌کالا JSON نیست.', array( 'status' => $code ) );
+		}
+		if ( isset( $json['status'] ) && is_numeric( $json['status'] ) && (int) $json['status'] >= 400 ) {
+			$status = (int) $json['status'];
+			return new WP_Error(
+				'http_error',
+				sprintf( 'پاسخ غیرمنتظره از دیجی‌کالا (کد %d).', $status ),
+				array( 'status' => $status )
+			);
+		}
+		return $json;
+	}
+
+	/**
 	 * درخواست HTTP ساده.
 	 *
 	 * @param string $url آدرس.
@@ -541,26 +737,28 @@ class Shoper_Digikala_Client {
 	private function request( $url ) {
 		if ( function_exists( 'curl_init' ) ) {
 			$ch = curl_init( $url );
-			curl_setopt_array(
-				$ch,
-				array(
-					CURLOPT_RETURNTRANSFER => true,
-					CURLOPT_FOLLOWLOCATION => true,
-					CURLOPT_MAXREDIRS      => 3,
-					CURLOPT_TIMEOUT        => $this->timeout,
-					CURLOPT_CONNECTTIMEOUT => 10,
-					CURLOPT_USERAGENT      => $this->user_agent,
-					CURLOPT_ENCODING       => 'gzip, deflate',
-					CURLOPT_SSL_VERIFYPEER => true,
-					CURLOPT_SSL_VERIFYHOST => 2,
-					CURLOPT_HTTPHEADER     => array(
-						'Accept: application/json, text/plain, */*',
-						'Accept-Language: fa-IR,fa;q=0.9,en;q=0.8',
-						'Referer: https://www.digikala.com/',
-						'Origin: https://www.digikala.com',
-					),
-				)
+			$options = array(
+				CURLOPT_RETURNTRANSFER => true,
+				CURLOPT_FOLLOWLOCATION => true,
+				CURLOPT_MAXREDIRS      => 5,
+				CURLOPT_TIMEOUT        => $this->timeout,
+				CURLOPT_CONNECTTIMEOUT => 10,
+				CURLOPT_USERAGENT      => $this->user_agent,
+				CURLOPT_ENCODING       => 'gzip, deflate',
+				CURLOPT_SSL_VERIFYPEER => true,
+				CURLOPT_SSL_VERIFYHOST => 2,
+				CURLOPT_HTTPHEADER     => $this->api_headers(),
 			);
+			$cookie = $this->cookie_file();
+			if ( '' !== $cookie ) {
+				// چالش 307 کوکی DigiCDN: کوکی را بگیر و روی ریدایرکت بفرست.
+				$options[ CURLOPT_COOKIEJAR ]  = $cookie;
+				$options[ CURLOPT_COOKIEFILE ] = $cookie;
+			}
+			if ( defined( 'CURLOPT_HTTP_VERSION' ) && defined( 'CURL_HTTP_VERSION_1_1' ) ) {
+				$options[ CURLOPT_HTTP_VERSION ] = CURL_HTTP_VERSION_1_1;
+			}
+			curl_setopt_array( $ch, $options );
 			$body  = curl_exec( $ch );
 			$errno = (int) curl_errno( $ch );
 			$error = curl_error( $ch );
@@ -572,11 +770,7 @@ class Shoper_Digikala_Client {
 			if ( $code < 200 || $code >= 300 ) {
 				return new WP_Error( 'http_error', sprintf( 'پاسخ غیرمنتظره از دیجی‌کالا (کد %d).', $code ), array( 'status' => $code ) );
 			}
-			$json = json_decode( (string) $body, true );
-			if ( ! is_array( $json ) ) {
-				return new WP_Error( 'invalid_json', 'پاسخ دیجی‌کالا JSON نیست.' );
-			}
-			return $json;
+			return $this->validate_json( json_decode( (string) $body, true ), $code );
 		}
 
 		if ( ! function_exists( 'wp_remote_get' ) ) {
@@ -586,13 +780,15 @@ class Shoper_Digikala_Client {
 			$url,
 			array(
 				'timeout'     => $this->timeout,
-				'redirection' => 3,
+				'redirection' => 5,
 				'user-agent'  => $this->user_agent,
 				'headers'     => array(
 					'Accept'          => 'application/json, text/plain, */*',
 					'Accept-Language' => 'fa-IR,fa;q=0.9,en;q=0.8',
 					'Referer'         => 'https://www.digikala.com/',
 					'Origin'          => 'https://www.digikala.com',
+					'x-web-client'    => 'desktop',
+					'x-web-client-id' => 'web',
 				),
 				'sslverify'   => true,
 			)
@@ -605,11 +801,7 @@ class Shoper_Digikala_Client {
 		if ( $code < 200 || $code >= 300 ) {
 			return new WP_Error( 'http_error', sprintf( 'پاسخ غیرمنتظره از دیجی‌کالا (کد %d).', $code ), array( 'status' => $code ) );
 		}
-		$json = json_decode( $body, true );
-		if ( ! is_array( $json ) ) {
-			return new WP_Error( 'invalid_json', 'پاسخ دیجی‌کالا JSON نیست.' );
-		}
-		return $json;
+		return $this->validate_json( json_decode( $body, true ), $code );
 	}
 
 	/**
