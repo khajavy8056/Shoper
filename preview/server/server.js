@@ -749,13 +749,13 @@ const server = http.createServer(async (req, res) => {
 	}
 
 	// --- دانلود آخرین نسخه‌ی افزونه (ZIP) ---
-	if (pathname === '/download/latest' || pathname === '/download/shoper-torob-importer-1.5.7.zip') {
-		const zip = path.join(ROOT, 'dist', 'shoper-torob-importer-1.5.7.zip');
+	if (pathname === '/download/latest' || pathname === '/download/shoper-torob-importer-1.5.8.zip') {
+		const zip = path.join(ROOT, 'dist', 'shoper-torob-importer-1.5.8.zip');
 		try {
 			const data = await fsp.readFile(zip);
 			res.writeHead(200, {
 				'Content-Type': 'application/zip',
-				'Content-Disposition': 'attachment; filename="shoper-torob-importer-1.5.7.zip"',
+				'Content-Disposition': 'attachment; filename="shoper-torob-importer-1.5.8.zip"',
 				'Content-Length': data.length,
 				'Cache-Control': 'no-store',
 			});

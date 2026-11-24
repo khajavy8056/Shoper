@@ -94,10 +94,15 @@ class Shoper_Catalog {
 				return $result;
 			}
 			if ( is_wp_error( $result ) ) {
-				$errors[] = $result;
+				$errors[] = $provider . ': ' . $result->get_error_message();
 			}
 		}
-		return $errors ? $errors[0] : new WP_Error( 'no_results', 'نتیجه‌ای یافت نشد.' );
+		if ( $errors ) {
+			// هر دو منبع خطا داده‌اند؛ پیام هر دو را نشان بده تا معلوم شود
+			// مشکل از کدام منبع است (مثلاً 404 دیجی‌کالا + 490 ترب).
+			return new WP_Error( 'all_providers_failed', implode( ' | ', $errors ) );
+		}
+		return new WP_Error( 'no_results', 'نتیجه‌ای یافت نشد.' );
 	}
 
 	/**
@@ -140,7 +145,8 @@ class Shoper_Catalog {
 	 * @return array|WP_Error
 	 */
 	public function ingest( $kind, $raw ) {
-		if ( 'dk_search' === $kind || ( 'search' === $kind && is_array( $raw ) && ( isset( $raw['data']['products'] ) || isset( $raw['status'] ) ) && ! isset( $raw['results'] ) ) ) {
+		// دیجی‌کالا: discovery v1 ‏(data.products) و discovery v2 ‏(data.widgets).
+		if ( 'dk_search' === $kind || ( 'search' === $kind && is_array( $raw ) && ( isset( $raw['data']['products'] ) || isset( $raw['data']['widgets'] ) || isset( $raw['status'] ) ) && ! isset( $raw['results'] ) ) ) {
 			return $this->digikala->ingest_search( $raw );
 		}
 		if ( 'dk_details' === $kind || ( 'details' === $kind && is_array( $raw ) && ( isset( $raw['data']['product'] ) || ( isset( $raw['product']['specifications'] ) ) ) ) ) {

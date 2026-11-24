@@ -74,6 +74,36 @@ class Shoper_Torob_Client {
 	private $relay;
 
 	/**
+	 * فایل کوکی موقت cURL (نگه‌داشتن کوکی WAF روی ریدایرکت/درخواست بعدی).
+	 *
+	 * @var string
+	 */
+	private $cookie_file = '';
+
+	/**
+	 * ساخت/گرفتن مسیر فایل کوکی موقت.
+	 *
+	 * @return string
+	 */
+	private function cookie_file() {
+		if ( '' === $this->cookie_file ) {
+			$dir  = function_exists( 'sys_get_temp_dir' ) ? sys_get_temp_dir() : '/tmp';
+			$file = tempnam( $dir, 'shoper_tb_' ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+			$this->cookie_file = $file ? $file : '';
+		}
+		return $this->cookie_file;
+	}
+
+	/**
+	 * پاک‌کردن فایل کوکی موقت.
+	 */
+	public function __destruct() {
+		if ( '' !== $this->cookie_file && file_exists( $this->cookie_file ) ) {
+			@unlink( $this->cookie_file ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		}
+	}
+
+	/**
 	 * سازنده.
 	 */
 	public function __construct() {
@@ -685,7 +715,10 @@ class Shoper_Torob_Client {
 				$last_error = $result;
 
 				if ( 'direct' === $candidate['kind'] && 'blocked' === $result->get_error_code() && function_exists( 'set_transient' ) ) {
-					set_transient( 'shoper_direct_blocked', 1, 15 * MINUTE_IN_SECONDS );
+					// فایروال ترب IP پرترافیک را دست‌کم یک ساعت نگه می‌دارد؛
+					// دست‌کم ۳۰ دقیقه دیگر به مسیر مستقیم درخواست نمی‌فرستیم
+					// تا مسدودی تمدید نشود (در این مدت مرورگر/درگاه/رله کار می‌کند).
+					set_transient( 'shoper_direct_blocked', 1, 30 * MINUTE_IN_SECONDS );
 				}
 
 				// پاسخ قطعی سرور (۴۹۰ و مشابه) را با روش انتقال دوم تکرار نکن؛ کاندید بعدی را برو.
@@ -805,6 +838,14 @@ class Shoper_Torob_Client {
 			CURLOPT_SSL_VERIFYPEER => true,
 			CURLOPT_SSL_VERIFYHOST => 2,
 		);
+
+		// کوکی‌های WAF/ArCaptcha (اگر چالش از نوع کوکی باشد) روی همین
+		// درخواست و ریدایرکت‌هایش نگه داشته شوند؛ حل کپچا انجام نمی‌شود.
+		$cookie = $this->cookie_file();
+		if ( '' !== $cookie ) {
+			$options[ CURLOPT_COOKIEJAR ]  = $cookie;
+			$options[ CURLOPT_COOKIEFILE ] = $cookie;
+		}
 
 		if ( defined( 'CURLOPT_HTTP_VERSION' ) && defined( 'CURL_HTTP_VERSION_1_1' ) ) {
 			$options[ CURLOPT_HTTP_VERSION ] = CURL_HTTP_VERSION_1_1;

@@ -77,6 +77,8 @@ class Shoper_Ajax {
 			'invalid_json'     => 502,
 			'invalid_response' => 502,
 			'torob_error'      => 502,
+			'all_providers_failed' => 502,
+			'no_results'       => 404,
 			'mock_missing'     => 500,
 			'mock_invalid'     => 500,
 		);

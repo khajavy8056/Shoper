@@ -23,7 +23,7 @@ const fixtureDir = path.join(__dirname, '../preview/fixtures');
 const searchRaw = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'search-samsung.json'), 'utf8'));
 const detailsRaw = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'details-9bcf3364.json'), 'utf8'));
 
-console.log('\nShoper 1.5.7 node tests\n');
+console.log('\nShoper 1.5.8 node tests\n');
 
 const search = logic.normalizeSearch(searchRaw);
 check('جستجوی fixture نرمال می‌شود', search.results && search.results.length > 0, search.results.length + ' نتیجه');
@@ -81,7 +81,7 @@ check('chooseSuggest لینک more_info را می‌فرستد', /preview\(it\.r
 check('fill هم product_json می‌فرستد', /shoper_fill[\s\S]{0,900}product_json/.test(pluginJs));
 
 const mainPhp = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/shoper-torob-importer.php'), 'utf8');
-check('plugin version 1.5.7', mainPhp.includes("define( 'SHOPER_VERSION', '1.5.7' )"));
+check('plugin version 1.5.8', mainPhp.includes("define( 'SHOPER_VERSION', '1.5.8' )"));
 check('کلاس تجمیع فروشنده بارگذاری می‌شود', mainPhp.includes('class-shoper-seller-aggregator.php'));
 
 check('digikala client required', mainPhp.includes('class-shoper-digikala-client.php') && mainPhp.includes('class-shoper-catalog.php'));
@@ -191,6 +191,41 @@ check('fact_check drops fake review phrases', logic.factCheck('نظر مشتری
 const kept = logic.filterClaims(['جنس: چرم طبیعی', 'باتری ۵۰۰۰ میلی‌آمپر'], gloveFacts).join(' ');
 check('filter_claims keeps grounded highlight', kept.indexOf('چرم طبیعی') >= 0 && kept.indexOf('۵۰۰۰') < 0 && kept.indexOf('5000') < 0);
 check('admin.js three-step prompt', pluginJs.includes('مرحله ۱') && pluginJs.includes('checked') && pluginJs.includes('اینترنت نداری'));
+
+// --- رگرسیون مهاجرت API دیجی‌کالا (1.5.8) ---
+const dkPhp = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/includes/class-shoper-digikala-client.php'), 'utf8');
+check('dk search path is discovery v1', dkPhp.includes("const SEARCH_PATH        = '/discovery/api/v1/search';"));
+check('dk search falls back to discovery v2 + legacy', dkPhp.includes("SEARCH_PATH_V2     = '/discovery/api/v2/search'") && dkPhp.includes("SEARCH_PATH_LEGACY = '/v1/search/'"));
+check('dk detail path is product/v1/products', dkPhp.includes("const DETAIL_PATH        = '/product/v1/products/';") && dkPhp.includes("DETAIL_PATH_LEGACY = '/v2/product/'"));
+check('dk body status is authoritative', dkPhp.includes('function validate_json') && dkPhp.includes("(int) $json['status'] >= 400"));
+check('dk curl keeps DigiCDN cookie', dkPhp.includes('CURLOPT_COOKIEJAR') && dkPhp.includes('digicdn_cookie'));
+check('dk working path is remembered', dkPhp.includes("shoper_dk_search_path") && dkPhp.includes("shoper_dk_detail_path"));
+check('admin.js uses discovery search urls', pluginJs.includes('dkSearchUrls') && pluginJs.includes('/discovery/api/v2/search'));
+check('admin.js uses new dk details urls', pluginJs.includes('dkDetailsUrls') && pluginJs.includes('/product/v1/products/'));
+check('admin.js tries torob from browser', pluginJs.includes('tryTorobSearch') && pluginJs.includes('tryTorob'));
+check('admin.js rejects body status 404', pluginJs.includes("typeof json.status === 'number' && json.status >= 400"));
+const dkV2Search = {
+	status: 200,
+	data: {
+		widgets: [
+			{ type: 'vertical_product_listing', data: { widgets: [
+				{ type: 'product', data: { id: 20135132, title_fa: 'گوشی S25 FE', title_en: 'S25 FE', url: { uri: '/product/dkp-20135132/' }, images: { main: { url: ['https://dkstatics-public.digikala.com/x.jpg'] } }, default_variant: { price: { selling_price: 1930043000 } } } },
+				{ type: 'banner', data: {} },
+			] } },
+		],
+	},
+};
+const dkV2 = logic.normalizeDigikalaSearch(dkV2Search);
+check('dk discovery v2 widgets normalize', dkV2.results.length === 1 && dkV2.results[0].random_key === 'DKP-20135132' && dkV2.results[0].price === 193004300, JSON.stringify(dkV2.results[0] || {}));
+const dkNoDefault = logic.normalizeDigikalaDetails({
+	data: { product: { id: 42, title_fa: 'کالای تست', images: { main: { url: ['https://dkstatics-public.digikala.com/a.jpg'] }, list: [] }, variants: [{ status: 'marketable', price: { selling_price: 500000 } }, { status: 'marketable', price: { selling_price: 400000 } }] } },
+});
+check('dk details price falls back to cheapest variant', dkNoDefault.price === 40000, String(dkNoDefault.price));
+const catalogPhp = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/includes/class-shoper-catalog.php'), 'utf8');
+check('catalog ingest detects dk widgets', catalogPhp.includes("isset( $raw['data']['widgets'] )"));
+check('catalog combines provider errors', catalogPhp.includes('all_providers_failed'));
+const torobPhp = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/includes/class-shoper-torob-client.php'), 'utf8');
+check('torob backs off 30min after 490', torobPhp.includes("set_transient( 'shoper_direct_blocked', 1, 30 * MINUTE_IN_SECONDS )"));
 
 console.log('\nنتیجه:', pass, 'موفق،', fail, 'ناموفق\n');
 process.exit(fail > 0 ? 1 : 0);
