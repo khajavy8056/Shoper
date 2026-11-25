@@ -406,7 +406,7 @@ class Shoper_AI_Client {
 	 * @return string|WP_Error
 	 */
 	private function http( $method, $url, $headers, $body ) {
-		$ua = 'ShoperStudio/1.6.2 (Khajavy)';
+		$ua = 'ShoperStudio/1.6.3 (Khajavy)';
 		if ( function_exists( 'curl_init' ) ) {
 			$ch  = curl_init( $url );
 			$opt = array(
