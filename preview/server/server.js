@@ -226,8 +226,20 @@ async function getDetails(prk, searchId, mode) {
 			try {
 				const searchRaw = await readFixture('dk-search-s25.json');
 				const searchData = logic.normalizeDigikalaSearch(searchRaw);
-				const detected = logic.detectSiblingVariants(data, (searchData && searchData.results) || []);
+				const siblings = (searchData && searchData.results) || [];
+				const nativeGroups = (data.variants || []).length;
+				const detected = logic.detectSiblingVariants(data, siblings);
 				logic.applyDetectedGroups(data, detected);
+				const totalGroups = (data.variants || []).length;
+				data.variant_discovery = {
+					query: logic.siblingSearchQuery(data.name1, data.name2),
+					family: logic.baseTitle(data.name1),
+					results: siblings.length,
+					native_groups: nativeGroups,
+					total_groups: totalGroups,
+					new_groups: Math.max(0, totalGroups - nativeGroups),
+					enriched: (data.variants || []).filter((g) => g.enriched).length,
+				};
 			} catch (e) { /* ignore */ }
 		}
 		return { data, source: 'fixture', note: '' };
@@ -874,13 +886,13 @@ const server = http.createServer(async (req, res) => {
 	}
 
 	// --- دانلود آخرین نسخه‌ی افزونه (ZIP) ---
-	if (pathname === '/download/latest' || pathname === '/download/shoper-torob-importer-1.6.5.zip') {
-		const zip = path.join(ROOT, 'dist', 'shoper-torob-importer-1.6.5.zip');
+	if (pathname === '/download/latest' || pathname === '/download/shoper-torob-importer-1.6.6.zip') {
+		const zip = path.join(ROOT, 'dist', 'shoper-torob-importer-1.6.6.zip');
 		try {
 			const data = await fsp.readFile(zip);
 			res.writeHead(200, {
 				'Content-Type': 'application/zip',
-				'Content-Disposition': 'attachment; filename="shoper-torob-importer-1.6.5.zip"',
+				'Content-Disposition': 'attachment; filename="shoper-torob-importer-1.6.6.zip"',
 				'Content-Length': data.length,
 				'Cache-Control': 'no-store',
 			});

@@ -1211,6 +1211,22 @@
 			html += '<div class="shoper-field-group"><label>توضیحات (قابل ویرایش)</label>';
 			html += '<textarea id="shoper-p-desc">' + this.esc(desc) + '</textarea></div>';
 
+			// گزارش شفاف بررسی هوشمند: کاربر ببیند هم‌خانواده‌ها بررسی شدند
+			// و چه چیزی از آن‌ها آمده است (بُعد تازه / تکمیل بُعد بومی).
+			if (d.variant_discovery) {
+				var vd = d.variant_discovery;
+				html += '<div class="shoper-field-group"><label>بررسی هوشمند متغیرها</label>';
+				html += '<p class="description" style="margin:0;">';
+				if (vd.results) {
+					html += 'با نام خانواده‌ی محصول («' + this.esc(vd.family || vd.query || '') + '»)، ' + this.esc(vd.results) + ' محصول هم‌خانواده بررسی شد؛ ';
+					html += vd.new_groups ? (this.esc(vd.new_groups) + ' بُعد تازه پیدا و در زیر اضافه شد') : 'بُعد تازه‌ای پیدا نشد';
+					html += vd.enriched ? (' و ' + this.esc(vd.enriched) + ' بُعدِ خود صفحه با گزینه‌های «هوشمند» کامل شد.') : '.';
+				} else {
+					html += 'محصول هم‌خانواده‌ای در منبع پیدا نشد؛ فقط متغیرهای خود صفحه (اگر باشد) نمایش داده می‌شود.';
+				}
+				html += '</p></div>';
+			}
+
 			// متغیرها (رنگ/سایز/…) با قیمت جدا — انتخاب کاربر تعیین می‌کند
 			// محصول «متغیر» ساخته شود و کدام گزینه‌ها روی سایت او بیایند.
 			if (d.variants && d.variants.length) {
@@ -1687,6 +1703,13 @@
 			this.$updateResult.html('<span class="shoper-loading-inline"></span> در حال دانلود و نصب بروزرسانی… این کار ممکن است کمی طول بکشد؛ صفحه را نبندید.');
 			this.ajax('shoper_do_update', {}, function (data) {
 				self.$checkUpdate.prop('disabled', false);
+				if (data && data.active === false) {
+					// نصب شده ولی فعال‌سازی خودکار نشد: کاربر را مستقیم به
+					// صفحه‌ی افزونه‌ها هدایت می‌کنیم تا با یک کلیک فعالش کند.
+					var pluginsUrl = (window.ajaxurl || 'admin-ajax.php').replace('admin-ajax.php', 'plugins.php');
+					self.$updateResult.html('<span style="color:#dba617;">⚠ ' + self.esc(data.message || 'بروزرسانی نصب شد، اما افزونه فعال نشد.') + '</span> <a href="' + self.esc(pluginsUrl) + '">رفتن به صفحه‌ی افزونه‌ها برای فعال‌کردن</a>');
+					return;
+				}
 				self.$updateResult.html('<span style="color:#00a32a;">✓ ' + self.esc(data.message || 'بروزرسانی شد.') + '</span> <a href="" onclick="window.location.reload();return false;">تازه‌سازی صفحه</a>');
 			}, function (info) {
 				self.$checkUpdate.prop('disabled', false);

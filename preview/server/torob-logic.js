@@ -854,7 +854,7 @@ function detectSiblingVariants(current, siblings) {
 		if (current.random_key && s.random_key && s.random_key === current.random_key) continue;
 		const sb = baseTitle(s.name1);
 		if (!sb) continue;
-		if (sb === base || (base.length >= 8 && sb.includes(base)) || (sb.length >= 8 && base.includes(sb)) || titleSimilarity(current.name1, s.name1) >= 0.65) pool.push(s);
+		if (sb === base || (base.length >= 8 && sb.includes(base)) || (sb.length >= 8 && base.includes(sb)) || titleSimilarity(base, sb) >= 0.75 || titleSimilarity(current.name1, s.name1) >= 0.65) pool.push(s);
 	}
 	if (pool.length < 2) return [];
 	const groups = [];
@@ -879,6 +879,13 @@ function detectSiblingVariants(current, siblings) {
 		if (generic) groups.push(generic);
 	}
 	return groups;
+}
+
+// عبارتی که برای یافتن هم‌خانواده‌ها جستجو می‌شود: نام خانواده بدون
+// توکن‌های بُعد (عنوان کامل آن‌قدر خاص است که فقط خود محصول برمی‌گردد).
+function siblingSearchQuery(name1, name2) {
+	const family = baseTitle(name1);
+	return family && family !== name1 ? family : name1;
 }
 
 function variantLabelKey(label) {
@@ -1485,6 +1492,7 @@ module.exports = {
 	normalizeDigikalaDetails,
 	detectSiblingVariants,
 	applyDetectedGroups,
+	siblingSearchQuery,
 	titleDimensions,
 	baseTitle,
 	aggregate,
