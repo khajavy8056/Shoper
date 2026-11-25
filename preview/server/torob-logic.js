@@ -241,13 +241,44 @@ function normalizeDetails(data) {
 		shop_text: data.shop_text || '',
 		categories,
 		page_url: data.web_client_absolute_url ? 'https://torob.com' + data.web_client_absolute_url : '',
-		variants: data.variants || [],
+		variants: normalizeTorobVariantGroups(data.variants),
 	};
 }
 
 /* -------------------------------------------------------------------------- */
 /* تجمیع فروشندگان (آینه‌ی Shoper_Seller_Aggregator)                            */
 /* -------------------------------------------------------------------------- */
+
+// آینه‌ی Shoper_Torob_Client::extract_variant_groups
+function normalizeTorobVariantGroups(raw) {
+	if (!Array.isArray(raw) || !raw.length) return [];
+	const groups = [];
+	for (const group of raw) {
+		if (!group || typeof group !== 'object') continue;
+		let g = group;
+		if (group.random_key || (group.title && !Array.isArray(group.items))) {
+			g = { title: 'پیکربندی', items: raw };
+		}
+		if (!Array.isArray(g.items)) continue;
+		const seen = new Set();
+		const items = [];
+		for (const item of g.items) {
+			if (!item || typeof item !== 'object') continue;
+			const title = String(item.title || item.name1 || '').trim();
+			if (!title || seen.has(title)) continue;
+			seen.add(title);
+			items.push({
+				key: item.key || String(item.random_key || '').slice(0, 8) || title.slice(0, 8),
+				title,
+				price: parseInt(item.price, 10) || 0,
+			});
+			if (items.length >= 30) break;
+		}
+		if (items.length >= 2) groups.push({ title: g.title || 'پیکربندی', items, provider: 'torob' });
+		if (raw[0] && raw[0].random_key) break;
+	}
+	return groups;
+}
 
 function sellerWeight(seller, cheapest) {
 	const scoreNorm = Math.min(1, (seller.score || 0) / 5);
@@ -672,6 +703,30 @@ function normalizeDigikalaDetails(data) {
 		rial = product.second_default_variant.price.selling_price || 0;
 	}
 	const price = rial >= 1000 && rial % 10 === 0 ? Math.round(rial / 10) : rial;
+	const variants = (() => {
+		// آینه‌ی Shoper_Digikala_Client::extract_variant_groups — ریال→تومان.
+		const groups = {};
+		if (Array.isArray(product.variants)) {
+			for (const v of product.variants) {
+				if (!v || (v.status && v.status !== 'marketable')) continue;
+				const r = (v.price && v.price.selling_price) || 0;
+				const p = r >= 1000 && r % 10 === 0 ? Math.round(r / 10) : r;
+				for (const [gtitle, keys] of [['رنگ', ['color']], ['سایز', ['size']]]) {
+					for (const k of keys) {
+						const n = v[k];
+						const t = n && typeof n === 'object' ? String(n.title || n.title_fa || '').trim() : String(n || '').trim();
+						if (!t) continue;
+						if (!groups[gtitle]) groups[gtitle] = {};
+						if (!groups[gtitle][t] || (p > 0 && (!groups[gtitle][t].price || p < groups[gtitle][t].price))) {
+							groups[gtitle][t] = { key: 'v' + String((n && n.id) || Math.abs(t.split('').reduce((a, c) => a + c.charCodeAt(0), 0))), title: t, price: p };
+						}
+					}
+				}
+			}
+		}
+		return Object.entries(groups).filter(([, items]) => Object.keys(items).length >= 2)
+			.map(([title, items]) => ({ title, items: Object.values(items), provider: 'digikala' }));
+	})();
 	const uri = (product.url && product.url.uri) || (id ? ('/product/dkp-' + id + '/') : '');
 	return {
 		random_key: id ? ('DKP-' + id) : '',
@@ -689,7 +744,7 @@ function normalizeDigikalaDetails(data) {
 		sellers: [],
 		sellers_count: 0,
 		page_url: uri ? ('https://www.digikala.com' + uri) : '',
-		variants: [],
+		variants,
 		provider: 'digikala',
 	};
 }

@@ -545,7 +545,7 @@ class Shoper_Digikala_Client {
 			'sellers'       => array(),
 			'sellers_count' => 0,
 			'page_url'      => $uri ? ( 'https://www.digikala.com' . $uri ) : '',
-			'variants'      => array(),
+			'variants'      => $this->extract_variant_groups( $product ),
 			'provider'      => 'digikala',
 		);
 	}
@@ -603,6 +603,82 @@ class Shoper_Digikala_Client {
 			}
 		}
 		return '';
+	}
+
+	/**
+	 * استخراج گروه‌های متغیر (رنگ/سایز/…) با قیمت هر گزینه — به تومان.
+	 *
+	 * خروجی هم‌شکل خروجی ترب است: [{title, items: [{key, title, price}]}]
+	 * تا رابط کاربری و سازنده‌ی محصول متغیر برای هر دو منبع یکسان کار کنند.
+	 * قیمت هر گزینه ارزان‌ترین قیمت همان گزینه بین variantهای قابل‌فروش است.
+	 *
+	 * @param array $product محصول.
+	 * @return array
+	 */
+	private function extract_variant_groups( $product ) {
+		$groups = array(); // title => [ itemTitle => ['key'=>, 'title'=>, 'price'=>] ]
+		if ( empty( $product['variants'] ) || ! is_array( $product['variants'] ) ) {
+			return array();
+		}
+		foreach ( $product['variants'] as $variant ) {
+			if ( ! is_array( $variant ) ) {
+				continue;
+			}
+			if ( isset( $variant['status'] ) && 'marketable' !== $variant['status'] ) {
+				continue;
+			}
+			$price = 0;
+			if ( isset( $variant['price']['selling_price'] ) ) {
+				$rial  = (int) $variant['price']['selling_price'];
+				$price = ( $rial >= 1000 && 0 === ( $rial % 10 ) ) ? (int) ( $rial / 10 ) : $rial;
+			}
+			$dimensions = array(
+				'رنگ'  => array( 'color', 'رنگ' ),
+				'سایز' => array( 'size', 'سایز', 'اندازه' ),
+			);
+			foreach ( $dimensions as $group_title => $keys ) {
+				foreach ( $keys as $key ) {
+					if ( empty( $variant[ $key ] ) ) {
+						continue;
+					}
+					$node  = $variant[ $key ];
+					$title = '';
+					$id    = '';
+					if ( is_array( $node ) ) {
+						$title = isset( $node['title'] ) ? (string) $node['title'] : ( isset( $node['title_fa'] ) ? (string) $node['title_fa'] : '' );
+						$id    = isset( $node['id'] ) ? (string) $node['id'] : '';
+					} elseif ( is_scalar( $node ) ) {
+						$title = (string) $node;
+					}
+					$title = trim( $title );
+					if ( '' === $title ) {
+						continue;
+					}
+					if ( ! isset( $groups[ $group_title ][ $title ] ) ) {
+						$groups[ $group_title ][ $title ] = array(
+							'key'   => '' !== $id ? ( 'v' . $id ) : ( 'v' . substr( md5( $group_title . '|' . $title ), 0, 10 ) ),
+							'title' => $title,
+							'price' => $price,
+						);
+					} elseif ( $price > 0 && ( 0 === $groups[ $group_title ][ $title ]['price'] || $price < $groups[ $group_title ][ $title ]['price'] ) ) {
+						$groups[ $group_title ][ $title ]['price'] = $price;
+					}
+				}
+			}
+		}
+		$out = array();
+		foreach ( $groups as $title => $items ) {
+			// گروه تک‌گزینه‌ای متغیر محسوب نمی‌شود.
+			if ( count( $items ) < 2 ) {
+				continue;
+			}
+			$out[] = array(
+				'title'    => $title,
+				'items'    => array_values( $items ),
+				'provider' => 'digikala',
+			);
+		}
+		return $out;
 	}
 
 	/**

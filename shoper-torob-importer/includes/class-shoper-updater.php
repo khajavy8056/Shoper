@@ -86,7 +86,7 @@ class Shoper_Updater {
 	 * نشانی بسته‌ی نصب داخل درخت برچسب انتشار (fallback وقتی فایل پیوست
 	 * انتشار موجود نیست).
 	 *
-	 * @param string $tag     برچسب انتشار مثل v1.5.9.
+	 * @param string $tag     برچسب انتشار مثل v1.6.0.
 	 * @param string $version نسخه بدون v.
 	 * @return string
 	 */
@@ -424,6 +424,13 @@ class Shoper_Updater {
 			return new WP_Error( 'filesystem', 'دسترسی نوشتن مستقیم روی فایل‌های افزونه فعال نیست (FS_METHOD). بروزرسانی از صفحه‌ی «افزونه‌ها» ثبت شد؛ از همان‌جا هم می‌توانید انجامش بدهید.' );
 		}
 
+		// قبل از نصب نسخه‌ی جدید، از نسخه‌ی فعلی نسخه‌ی پشتیبان نگه می‌داریم
+		// تا دکمه‌ی «برگشت به نسخه‌ی قبلی» همیشه یک راه بازگشت داشته باشد.
+		$backup = self::backup_current();
+		if ( is_wp_error( $backup ) ) {
+			return new WP_Error( 'backup_failed', 'نسخه‌ی پشتیبان از نسخه‌ی فعلی ساخته نشد؛ بروزرسانی برای امنیت متوقف شد. (' . $backup->get_error_message() . ')' );
+		}
+
 		$skin     = new Automatic_Upgrader_Skin();
 		$upgrader = new Plugin_Upgrader( $skin );
 		$result   = $upgrader->upgrade( SHOPER_PLUGIN_BASENAME );
@@ -438,6 +445,204 @@ class Shoper_Updater {
 			return new WP_Error( 'upgrade_failed', 'بروزرسانی کامل نشد.' . ( $feedback ? ' ' . $feedback : ' از صفحه‌ی «افزونه‌ها» دوباره تلاش کنید.' ) );
 		}
 		return $release['version'];
+	}
+
+	/* ------------------------------------------------------------------ */
+	/* نسخه‌ی پشتیبان و برگشت به نسخه‌ی قبلی (Rollback)                     */
+	/* ------------------------------------------------------------------ */
+
+	/**
+	 * مسیر پوشه‌ی پشتیبان‌ها (داخل uploads، بیرون از پوشه‌ی افزونه).
+	 *
+	 * @return string
+	 */
+	private static function backups_base() {
+		$uploads = function_exists( 'wp_upload_dir' ) ? wp_upload_dir() : null;
+		$base    = ( $uploads && ! empty( $uploads['basedir'] ) ) ? $uploads['basedir'] : WP_CONTENT_DIR . '/uploads';
+		return rtrim( $base, '/' ) . '/shoper-backups';
+	}
+
+	/**
+	 * کپی بازگشتی یک پوشه.
+	 *
+	 * @param string $src مبدأ.
+	 * @param string $dst مقصد.
+	 * @return bool
+	 */
+	private static function copy_dir_recursive( $src, $dst ) {
+		if ( ! is_dir( $src ) ) {
+			return false;
+		}
+		if ( ! wp_mkdir_p( $dst ) ) {
+			return false;
+		}
+		$items = scandir( $src );
+		if ( false === $items ) {
+			return false;
+		}
+		foreach ( $items as $item ) {
+			if ( '.' === $item || '..' === $item ) {
+				continue;
+			}
+			$s = $src . '/' . $item;
+			$d = $dst . '/' . $item;
+			if ( is_dir( $s ) ) {
+				if ( ! self::copy_dir_recursive( $s, $d ) ) {
+					return false;
+				}
+			} elseif ( ! copy( $s, $d ) ) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * حذف بازگشتی یک پوشه.
+	 *
+	 * @param string $dir پوشه.
+	 * @return void
+	 */
+	private static function delete_dir_recursive( $dir ) {
+		if ( ! is_dir( $dir ) ) {
+			return;
+		}
+		$items = scandir( $dir );
+		if ( false === $items ) {
+			return;
+		}
+		foreach ( $items as $item ) {
+			if ( '.' === $item || '..' === $item ) {
+				continue;
+			}
+			$path = $dir . '/' . $item;
+			if ( is_dir( $path ) ) {
+				self::delete_dir_recursive( $path );
+			} else {
+				// phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+				unlink( $path );
+			}
+		}
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir
+		rmdir( $dir );
+	}
+
+	/**
+	 * ساخت نسخه‌ی پشتیبان از نسخه‌ی فعلی افزونه (فقط آخرین پشتیبان نگه داشته می‌شود).
+	 *
+	 * @return true|WP_Error
+	 */
+	public static function backup_current() {
+		$version = defined( 'SHOPER_VERSION' ) ? SHOPER_VERSION : 'unknown';
+		$base    = self::backups_base();
+		if ( ! wp_mkdir_p( $base ) ) {
+			return new WP_Error( 'backup_mkdir', 'ساخت پوشه‌ی پشتیبان ممکن نشد.' );
+		}
+		// جلوگیری از دسترسی مستقیم وب به پشتیبان‌ها.
+		if ( ! file_exists( $base . '/index.php' ) ) {
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+			file_put_contents( $base . '/index.php', "<?php // Silence is golden.\n" );
+		}
+		// پشتیبان قبلی پاک می‌شود؛ فقط یک نسخه‌ی قبلی نگه می‌داریم.
+		$prev = get_option( 'shoper_last_backup' );
+		if ( is_array( $prev ) && ! empty( $prev['path'] ) && 0 === strpos( (string) $prev['path'], $base ) ) {
+			self::delete_dir_recursive( (string) $prev['path'] );
+		}
+		$dest = $base . '/' . self::SLUG . '-' . $version;
+		self::delete_dir_recursive( $dest );
+		$src = defined( 'SHOPER_PLUGIN_DIR' ) ? rtrim( SHOPER_PLUGIN_DIR, '/' ) : '';
+		if ( '' === $src || ! self::copy_dir_recursive( $src, $dest ) ) {
+			return new WP_Error( 'backup_copy', 'کپی فایل‌های نسخه‌ی فعلی ناموفق بود.' );
+		}
+		if ( ! file_exists( $dest . '/' . self::SLUG . '.php' ) ) {
+			return new WP_Error( 'backup_verify', 'پشتیبان ساخته‌شده کامل نیست.' );
+		}
+		update_option( 'shoper_last_backup', array(
+			'version' => $version,
+			'path'    => $dest,
+			'created' => time(),
+		) );
+		return true;
+	}
+
+	/**
+	 * اطلاعات پشتیبان موجود برای نمایش دکمه‌ی برگشت.
+	 *
+	 * @return array { available: bool, version: string, created: int }
+	 */
+	public static function rollback_info() {
+		$info = get_option( 'shoper_last_backup' );
+		if ( ! is_array( $info ) || empty( $info['path'] ) || empty( $info['version'] ) ) {
+			return array( 'available' => false, 'version' => '', 'created' => 0 );
+		}
+		$ok = is_dir( $info['path'] ) && file_exists( rtrim( $info['path'], '/' ) . '/' . self::SLUG . '.php' );
+		return array(
+			'available' => (bool) $ok,
+			'version'   => $ok ? (string) $info['version'] : '',
+			'created'   => $ok ? (int) ( isset( $info['created'] ) ? $info['created'] : 0 ) : 0,
+		);
+	}
+
+	/**
+	 * برگشت به نسخه‌ی قبلی از روی پشتیبان.
+	 *
+	 * پوشه‌ی فعلی کنار گذاشته می‌شود، پشتیبان سر جایش کپی و افزونه دوباره
+	 * فعال می‌شود؛ اگر کپی ناموفق بود پوشه‌ی فعلی برگردانده می‌شود.
+	 *
+	 * @return string|WP_Error نسخه‌ی برگردانده‌شده.
+	 */
+	public static function perform_rollback() {
+		if ( ! current_user_can( 'update_plugins' ) ) {
+			return new WP_Error( 'forbidden', 'دسترسی بروزرسانی افزونه‌ها را ندارید.' );
+		}
+		$info = self::rollback_info();
+		if ( ! $info['available'] ) {
+			return new WP_Error( 'no_backup', 'نسخه‌ی پشتیبانی برای برگشت وجود ندارد. پشتیبان به‌صورت خودکار قبل از هر بروزرسانی ساخته می‌شود.' );
+		}
+		$backup_dir = rtrim( (string) get_option( 'shoper_last_backup' )['path'], '/' );
+		$plugin_dir = defined( 'SHOPER_PLUGIN_DIR' ) ? rtrim( SHOPER_PLUGIN_DIR, '/' ) : '';
+		if ( '' === $plugin_dir || ! is_dir( $plugin_dir ) ) {
+			return new WP_Error( 'plugin_dir', 'پوشه‌ی افزونه پیدا نشد.' );
+		}
+		if ( ! function_exists( 'deactivate_plugins' ) || ! function_exists( 'activate_plugin' ) ) {
+			$path = ABSPATH . 'wp-admin/includes/plugin.php';
+			if ( file_exists( $path ) ) {
+				require_once $path; // phpcs:ignore WordPressVIPMinimum.Files.IncludingFile
+			}
+		}
+		$was_active = function_exists( 'is_plugin_active' ) && is_plugin_active( SHOPER_PLUGIN_BASENAME );
+		if ( $was_active && function_exists( 'deactivate_plugins' ) ) {
+			deactivate_plugins( SHOPER_PLUGIN_BASENAME, true );
+		}
+		$trash = $plugin_dir . '-rollback-trash';
+		self::delete_dir_recursive( $trash );
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename
+		if ( ! rename( $plugin_dir, $trash ) ) {
+			if ( $was_active && function_exists( 'activate_plugin' ) ) {
+				activate_plugin( SHOPER_PLUGIN_BASENAME, '', false, true );
+			}
+			return new WP_Error( 'rollback_move', 'جابه‌جایی نسخه‌ی فعلی ممکن نشد؛ برگشت انجام نشد.' );
+		}
+		if ( ! self::copy_dir_recursive( $backup_dir, $plugin_dir ) || ! file_exists( $plugin_dir . '/' . self::SLUG . '.php' ) ) {
+			// برگرداندن وضعیت قبل.
+			self::delete_dir_recursive( $plugin_dir );
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename
+			rename( $trash, $plugin_dir );
+			if ( $was_active && function_exists( 'activate_plugin' ) ) {
+				activate_plugin( SHOPER_PLUGIN_BASENAME, '', false, true );
+			}
+			return new WP_Error( 'rollback_copy', 'کپی نسخه‌ی قبلی ناموفق بود؛ نسخه‌ی فعلی سر جایش برگشت.' );
+		}
+		self::delete_dir_recursive( $trash );
+		self::clear_cache_static();
+		delete_option( 'shoper_last_backup' );
+		if ( $was_active && function_exists( 'activate_plugin' ) ) {
+			$activated = activate_plugin( SHOPER_PLUGIN_BASENAME, '', false, true );
+			if ( is_wp_error( $activated ) ) {
+				return new WP_Error( 'rollback_activate', 'نسخه‌ی ' . $info['version'] . ' برگردانده شد ولی فعال‌سازی خودکار ناموفق بود؛ از صفحه‌ی «افزونه‌ها» فعالش کنید.' );
+			}
+		}
+		return $info['version'];
 	}
 
 	/**

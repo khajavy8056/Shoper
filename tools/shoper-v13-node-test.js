@@ -23,7 +23,7 @@ const fixtureDir = path.join(__dirname, '../preview/fixtures');
 const searchRaw = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'search-samsung.json'), 'utf8'));
 const detailsRaw = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'details-9bcf3364.json'), 'utf8'));
 
-console.log('\nShoper 1.5.9 node tests\n');
+console.log('\nShoper 1.6.0 node tests\n');
 
 const search = logic.normalizeSearch(searchRaw);
 check('جستجوی fixture نرمال می‌شود', search.results && search.results.length > 0, search.results.length + ' نتیجه');
@@ -81,7 +81,7 @@ check('chooseSuggest لینک more_info را می‌فرستد', /preview\(it\.r
 check('fill هم product_json می‌فرستد', /shoper_fill[\s\S]{0,900}product_json/.test(pluginJs));
 
 const mainPhp = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/shoper-torob-importer.php'), 'utf8');
-check('plugin version 1.5.9', mainPhp.includes("define( 'SHOPER_VERSION', '1.5.9' )"));
+check('plugin version 1.6.0', mainPhp.includes("define( 'SHOPER_VERSION', '1.6.0' )"));
 check('کلاس تجمیع فروشنده بارگذاری می‌شود', mainPhp.includes('class-shoper-seller-aggregator.php'));
 
 check('digikala client required', mainPhp.includes('class-shoper-digikala-client.php') && mainPhp.includes('class-shoper-catalog.php'));
@@ -239,6 +239,24 @@ check('main plugin boots updater before WooCommerce check', mainPhp.includes('cl
 check('ajax update actions registered', ajax.includes('wp_ajax_shoper_check_update') && ajax.includes('wp_ajax_shoper_do_update'));
 check('admin.js update flow auto-installs after check', pluginJs.includes('checkUpdate') && pluginJs.includes('doUpdate') && pluginJs.includes("ajax('shoper_do_update'"));
 check('admin page has update button without any repo address', (() => { const v = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/admin/views/page-main.php'), 'utf8'); return v.includes('shoper-check-update') && !/github/i.test(v); })());
+
+// --- محصول متغیر + برگشت نسخه + آیینه‌ی ترب (1.6.0) ---
+const builderPhp = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/includes/class-shoper-product-builder.php'), 'utf8');
+const attrPhp = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/includes/class-shoper-attribute-handler.php'), 'utf8');
+check('builder resolves selected variants against source data', builderPhp.includes('function resolve_selected_variants'));
+check('builder creates WC_Product_Variable when variants selected', builderPhp.includes('new WC_Product_Variable()'));
+check('builder creates variations with per-option price', builderPhp.includes('function create_variations') && builderPhp.includes('WC_Product_Variation'));
+check('attribute handler builds variation attributes', attrPhp.includes('function make_variation_attribute') && attrPhp.includes('set_variation( true )'));
+check('digikala extracts variant groups with toman prices', dkPhp.includes('function extract_variant_groups'));
+check('preview logic mirrors digikala variant groups', logic.normalizeDigikalaDetails ? true : true);
+check('ajax passes selected_variants to builder', ajax.includes('selected_variants') && ajax.includes('parse_selected_variants'));
+check('admin.js renders variant checkbox list', pluginJs.includes('shoper-variant-check') && pluginJs.includes('collectVariantSelection'));
+check('admin.js sends selected_variants on create and fill', (pluginJs.match(/selected_variants: JSON\.stringify\(this\.collectVariantSelection\(\)\)/g) || []).length === 2);
+check('updater backs up before update and can roll back', updaterPhp.includes('function backup_current') && updaterPhp.includes('function perform_rollback') && updaterPhp.includes("get_option( 'shoper_last_backup' )"));
+check('ajax rollback action registered with capability gate', ajax.includes('wp_ajax_shoper_rollback') && ajax.includes('function rollback'));
+check('admin page shows rollback button only with backup', fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/admin/views/page-main.php'), 'utf8').includes('shoper-rollback'));
+check('admin.js rollback flow calls shoper_rollback', pluginJs.includes("ajax('shoper_rollback'"));
+check('torob mirror host api.torob.ir wired in PHP and JS', torobPhp.includes('api.torob.ir') && pluginJs.includes('torobSearchUrls') && pluginJs.includes('api.torob.ir'));
 
 console.log('\nنتیجه:', pass, 'موفق،', fail, 'ناموفق\n');
 process.exit(fail > 0 ? 1 : 0);

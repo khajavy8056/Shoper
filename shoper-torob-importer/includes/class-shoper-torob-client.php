@@ -26,6 +26,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Shoper_Torob_Client {
 
 	const API_BASE          = 'https://api.torob.com';
+	// دامنه‌ی آیینه‌ی همان API؛ وقتی فایروال روی دامنه‌ی اصلی 490 می‌دهد،
+	// این مسیر جداگانه امتحان می‌شود (ترتیب و ساختار پاسخ یکسان است).
+	const API_BASE_ALT      = 'https://api.torob.ir';
 	const SEARCH_URL        = '/v4/base-product/search/';
 	const DETAIL_URL        = '/v4/base-product/details/';
 	const DETAIL_CLICK_URL  = '/v4/base-product/details-log-click/';
@@ -304,6 +307,14 @@ class Shoper_Torob_Client {
 				'url'  => $url,
 				'kind' => 'direct',
 			);
+			// دامنه‌ی آیینه‌ی api.torob.ir هم امتحان می‌شود؛
+			// فایروال ممکن است روی یکی از دو دامنه ۴۹۰ بدهد و روی دیگری نه.
+			if ( count( $out ) && 0 === strpos( $url, self::API_BASE . '/' ) ) {
+				$out[] = array(
+					'url'  => self::API_BASE_ALT . substr( $url, strlen( self::API_BASE ) ),
+					'kind' => 'direct_alt',
+				);
+			}
 		}
 
 		foreach ( $gateways as $g ) {
@@ -1238,8 +1249,85 @@ class Shoper_Torob_Client {
 			'sellers'       => $sellers,
 			'sellers_count' => isset( $data['products_info']['result'] ) ? count( $data['products_info']['result'] ) : count( $sellers ),
 			'page_url'      => ! empty( $data['web_client_absolute_url'] ) ? 'https://torob.com' . $data['web_client_absolute_url'] : '',
-			'variants'      => isset( $data['variants'] ) ? $data['variants'] : array(),
+			'variants'      => $this->extract_variant_groups( $data ),
 		);
+	}
+
+	/**
+	 * نرمال‌سازی گروه‌های متغیر ترب.
+	 *
+	 * پاسخ خام ترب: [{title: "حافظه و رم", items: [محصول هم‌خانواده با
+	 * title و price و random_key جدا]}]. خروجی هم‌شکل دیجی‌کالا می‌شود:
+	 * [{title, items: [{key, title, price}]}]. اگر داده از قبل نرمال باشد
+	 * (آیتم‌ها key دارند) فقط پاک‌سازی می‌شود.
+	 *
+	 * @param array $data پاسخ خام جزئیات.
+	 * @return array
+	 */
+	private function extract_variant_groups( $data ) {
+		if ( empty( $data['variants'] ) || ! is_array( $data['variants'] ) ) {
+			return array();
+		}
+		$groups = array();
+		foreach ( $data['variants'] as $group ) {
+			if ( ! is_array( $group ) ) {
+				continue;
+			}
+			// فهرست تختِ محصولات هم‌خانواده بدون گروه‌بندی.
+			if ( isset( $group['random_key'] ) || ( isset( $group['title'] ) && ! isset( $group['items'] ) ) ) {
+				$group = array( 'title' => 'پیکربندی', 'items' => $data['variants'] );
+			}
+			$gtitle = ! empty( $group['title'] ) ? (string) $group['title'] : 'پیکربندی';
+			if ( empty( $group['items'] ) || ! is_array( $group['items'] ) ) {
+				continue;
+			}
+			$items = array();
+			$seen  = array();
+			foreach ( $group['items'] as $item ) {
+				if ( ! is_array( $item ) ) {
+					continue;
+				}
+				$title = '';
+				if ( ! empty( $item['title'] ) ) {
+					$title = (string) $item['title'];
+				} elseif ( ! empty( $item['name1'] ) ) {
+					$title = (string) $item['name1'];
+				}
+				$title = trim( $title );
+				if ( '' === $title || isset( $seen[ $title ] ) ) {
+					continue;
+				}
+				$seen[ $title ] = true;
+				$key = '';
+				if ( ! empty( $item['key'] ) ) {
+					$key = (string) $item['key'];
+				} elseif ( ! empty( $item['random_key'] ) ) {
+					$key = substr( (string) $item['random_key'], 0, 8 );
+				} else {
+					$key = substr( md5( $title ), 0, 8 );
+				}
+				$items[] = array(
+					'key'   => $key,
+					'title' => $title,
+					'price' => isset( $item['price'] ) ? (int) $item['price'] : 0,
+				);
+				if ( count( $items ) >= 30 ) {
+					break;
+				}
+			}
+			if ( count( $items ) >= 2 ) {
+				$groups[] = array(
+					'title'    => $gtitle,
+					'items'    => $items,
+					'provider' => 'torob',
+				);
+			}
+			// اگر ورودی فهرست تخت بود همان یک گروه کافی است.
+			if ( isset( $data['variants'][0] ) && is_array( $data['variants'][0] ) && isset( $data['variants'][0]['random_key'] ) ) {
+				break;
+			}
+		}
+		return $groups;
 	}
 
 	/* --------------------------------------------------------------------- */

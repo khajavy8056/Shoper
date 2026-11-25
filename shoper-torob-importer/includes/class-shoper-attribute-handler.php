@@ -179,6 +179,59 @@ class Shoper_Attribute_Handler {
 	}
 
 	/**
+	 * ساخت ویژگی متغیر (variation) برای یک گروه متغیر مثل «رنگ».
+	 *
+	 * برای هر عنوانِ گزینه یک term می‌سازد و WC_Product_Attribute با
+	 * variation=true برمی‌گرداند تا ووکامرس برای آن variation بسازد.
+	 *
+	 * @param string $name     نام فارسی گروه (رنگ، سایز، …).
+	 * @param array  $titles   عنوان گزینه‌ها.
+	 * @param int    $position موقعیت.
+	 * @return array { attribute: WC_Product_Attribute|null, taxonomy: string,
+	 *                 term_ids: array<string,int>, errors: string[] }
+	 */
+	public function make_variation_attribute( $name, $titles, $position = 0 ) {
+		$out = array(
+			'attribute' => null,
+			'taxonomy'  => '',
+			'term_ids'  => array(),
+			'errors'    => array(),
+		);
+		$taxonomy_name = $this->ensure_taxonomy( $name );
+		if ( is_wp_error( $taxonomy_name ) ) {
+			$out['errors'][] = $name . ': ' . $taxonomy_name->get_error_message();
+			return $out;
+		}
+		$out['taxonomy'] = $taxonomy_name;
+		$ids = array();
+		foreach ( (array) $titles as $title ) {
+			$title = trim( (string) $title );
+			if ( '' === $title ) {
+				continue;
+			}
+			$term = $this->ensure_term( $taxonomy_name, $title );
+			if ( is_wp_error( $term ) ) {
+				$out['errors'][] = $title . ': ' . $term->get_error_message();
+				continue;
+			}
+			$out['term_ids'][ $title ] = (int) $term['term_id'];
+			$ids[] = (int) $term['term_id'];
+		}
+		if ( empty( $ids ) ) {
+			return $out;
+		}
+		$attribute = new WC_Product_Attribute();
+		$attribute->set_id( wc_attribute_taxonomy_id_by_name( $taxonomy_name ) );
+		$attribute->set_name( $taxonomy_name );
+		$attribute->set_options( $ids );
+		$attribute->set_position( (int) $position );
+		$attribute->set_visible( true );
+		$attribute->set_variation( true );
+		$out['attribute'] = $attribute;
+		return $out;
+	}
+
+	/**
 	 * اطمینان از وجود taxonomy سراسری برای یک نام ویژگی.
 	 *
 	 * @param string $name نام فارسی.
