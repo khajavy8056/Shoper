@@ -44,6 +44,9 @@
 			this.$postId      = $('#shoper-post-id');
 			this.$testConn    = $('#shoper-test-conn');
 			this.$connResult  = $('#shoper-conn-result');
+			this.$checkUpdate = $('#shoper-check-update');
+			this.$doUpdate    = $('#shoper-do-update');
+			this.$updateResult= $('#shoper-update-result');
 			this.$diagBtn     = $('#shoper-diagnostics-btn');
 			this.$diag        = $('#shoper-diagnostics');
 			this.$createStatus= $('#shoper-create-status');
@@ -162,6 +165,16 @@
 			this.$testConn.on('click', function (e) {
 				e.preventDefault();
 				self.testConnection();
+			});
+
+			this.$checkUpdate.on('click', function (e) {
+				e.preventDefault();
+				self.checkUpdate();
+			});
+
+			this.$doUpdate.on('click', function (e) {
+				e.preventDefault();
+				self.doUpdate();
 			});
 
 			this.$diagBtn.on('click', function (e) {
@@ -1564,6 +1577,49 @@
 			}).fail(function () {
 				self.$fillBtn.prop('disabled', false);
 				self.$preview.find('#shoper-progress').hide();
+			});
+		},
+
+		/**
+		 * بررسی بروزرسانی: اگر نسخه‌ی بالاتری باشد، بدون کلیک اضافه همان‌جا
+		 * دانلود و نصب می‌شود (درخواست کاربر). هیچ نشانی‌ای نمایش داده نمی‌شود.
+		 */
+		checkUpdate: function () {
+			var self = this;
+			if (!this.$updateResult.length) { return; }
+			this.$checkUpdate.prop('disabled', true);
+			this.$doUpdate.hide();
+			this.$updateResult.html('<span class="shoper-loading-inline"></span> در حال بررسی آخرین نسخه…');
+			this.ajax('shoper_check_update', {}, function (data) {
+				self.$checkUpdate.prop('disabled', false);
+				if (data.update_available) {
+					self.$updateResult.html('<span style="color:#dba617;">⬆ نسخه‌ی ' + self.esc(data.latest_version) + ' آماده است — در حال دانلود و نصب…</span>');
+					self.doUpdate();
+					return;
+				}
+				self.$updateResult.html('<span style="color:#00a32a;">✓ ' + self.esc(data.message || 'افزونه به‌روز است.') + '</span>');
+			}, function (info) {
+				self.$checkUpdate.prop('disabled', false);
+				self.$updateResult.html('<span style="color:#d63638;">✗ ' + self.esc((info && info.message) || 'بررسی بروزرسانی انجام نشد.') + '</span>');
+			});
+		},
+
+		/**
+		 * نصب بروزرسانی پیدا شده (دکمه‌ی تلاش دوباره هم همین را صدا می‌زند).
+		 */
+		doUpdate: function () {
+			var self = this;
+			if (!this.$updateResult.length) { return; }
+			this.$checkUpdate.prop('disabled', true);
+			this.$doUpdate.prop('disabled', true).hide();
+			this.$updateResult.html('<span class="shoper-loading-inline"></span> در حال دانلود و نصب بروزرسانی… این کار ممکن است کمی طول بکشد؛ صفحه را نبندید.');
+			this.ajax('shoper_do_update', {}, function (data) {
+				self.$checkUpdate.prop('disabled', false);
+				self.$updateResult.html('<span style="color:#00a32a;">✓ ' + self.esc(data.message || 'بروزرسانی شد.') + '</span> <a href="" onclick="window.location.reload();return false;">تازه‌سازی صفحه</a>');
+			}, function (info) {
+				self.$checkUpdate.prop('disabled', false);
+				self.$doUpdate.prop('disabled', false).show();
+				self.$updateResult.html('<span style="color:#d63638;">✗ ' + self.esc((info && info.message) || 'بروزرسانی کامل نشد.') + '</span> می‌توانید با دکمه‌ی «نصب بروزرسانی» دوباره تلاش کنید، یا از صفحه‌ی «افزونه‌ها»ی وردپرس بروزرسانی کنید.');
 			});
 		},
 

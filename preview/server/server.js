@@ -636,6 +636,22 @@ const handlers = {
 		}
 	},
 
+	async shoper_check_update(params, res) {
+		// شبیه‌سازی محیط پیش‌نمایش: نسخه‌ی جاری همان آخرین نسخه است.
+		const version = require(path.join(ROOT, 'package.json')).version;
+		return ok(res, {
+			ok: true,
+			current_version: version,
+			latest_version: version,
+			update_available: false,
+			message: 'افزونه به‌روز است. نسخه‌ی فعلی: ' + version,
+		});
+	},
+
+	async shoper_do_update(params, res) {
+		return fail(res, 'بروزرسانی واقعی فقط داخل وردپرس انجام می‌شود؛ در پیش‌نمایش نسخه‌ای برای نصب نیست.');
+	},
+
 	async shoper_test_connection(params, res) {
 		const mode = params.get('data_mode') || 'auto';
 		if (mode === 'fixture') {
@@ -749,13 +765,13 @@ const server = http.createServer(async (req, res) => {
 	}
 
 	// --- دانلود آخرین نسخه‌ی افزونه (ZIP) ---
-	if (pathname === '/download/latest' || pathname === '/download/shoper-torob-importer-1.5.8.zip') {
-		const zip = path.join(ROOT, 'dist', 'shoper-torob-importer-1.5.8.zip');
+	if (pathname === '/download/latest' || pathname === '/download/shoper-torob-importer-1.5.9.zip') {
+		const zip = path.join(ROOT, 'dist', 'shoper-torob-importer-1.5.9.zip');
 		try {
 			const data = await fsp.readFile(zip);
 			res.writeHead(200, {
 				'Content-Type': 'application/zip',
-				'Content-Disposition': 'attachment; filename="shoper-torob-importer-1.5.8.zip"',
+				'Content-Disposition': 'attachment; filename="shoper-torob-importer-1.5.9.zip"',
 				'Content-Length': data.length,
 				'Cache-Control': 'no-store',
 			});

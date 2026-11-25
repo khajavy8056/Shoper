@@ -1,9 +1,8 @@
 <?php
 /**
  * Plugin Name:       Shoper Studio – سازنده هوشمند محصول
- * Plugin URI:        https://github.com/khajavy8056/Shoper
  * Description:       از نام محصول تا صفحه فروش: معرفی و بررسی، جدول مشخصات، گالری تصاویر و ویژگی‌های دانه‌دانه.
- * Version:           1.5.8
+ * Version:           1.5.9
  * Author:            خواجوی
  * Author URI:        https://github.com/khajavy8056
  * License:           GPL v2 or later
@@ -22,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // تعریف ثابت‌های افزونه.
-define( 'SHOPER_VERSION', '1.5.8' );
+define( 'SHOPER_VERSION', '1.5.9' );
 define( 'SHOPER_AUTHOR', 'خواجوی' );
 define( 'SHOPER_PLUGIN_FILE', __FILE__ );
 define( 'SHOPER_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
@@ -60,6 +59,11 @@ if ( ! class_exists( 'Shoper_Torob_Importer' ) ) {
 		 * سازنده‌ی کلاس.
 		 */
 		private function __construct() {
+			// بروزرسانی خودکار مستقل از ووکامرس است تا حتی هنگام غیرفعال بودن
+			// آن هم اعلان و نصب نسخه‌ی جدید کار کند.
+			require_once SHOPER_PLUGIN_DIR . 'includes/class-shoper-updater.php';
+			new Shoper_Updater();
+
 			// بررسی فعال بودن ووکامرس.
 			if ( ! $this->is_woocommerce_active() ) {
 				add_action( 'admin_notices', array( $this, 'notice_wc_missing' ) );
