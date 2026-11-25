@@ -1565,6 +1565,9 @@
 				if (data.product_type === 'variable') {
 					html += 'نوع محصول: <strong>متغیر</strong> — تعداد متغیرهای ساخته‌شده: ' + (data.variations_count || 0) + '<br>';
 				}
+				if (data.variant_warning) {
+					html += '<span style="color:#b32d2e;">⚠️ ' + self.esc(data.variant_warning) + '</span><br>';
+				}
 				html += 'تصاویر دانلودشده: ' + ((data.image_info && data.image_info.gallery_ids) ? data.image_info.gallery_ids.length + 1 : 0) + '<br>';
 				if (data.filenames && data.filenames.length) {
 					html += 'نام فایل تصاویر: <code>' + self.esc(data.filenames.join('، ')) + '</code><br>';
