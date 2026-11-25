@@ -749,6 +749,87 @@ function normalizeDigikalaDetails(data) {
 	};
 }
 
+/* -------------------------------------------------------------------------- */
+/* کشف هوشمند متغیر از محصولات هم‌نام (آینه‌ی Shoper_Digikala_Client)          */
+/* -------------------------------------------------------------------------- */
+
+function latinDigitsFa(s) {
+	const map = { '۰': '0', '۱': '1', '۲': '2', '۳': '3', '۴': '4', '۵': '5', '۶': '6', '۷': '7', '۸': '8', '۹': '9', '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4', '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9' };
+	return String(s || '').replace(/[۰-۹٠-٩]/g, (c) => map[c] || c);
+}
+
+function capacityLabel(num, unit) {
+	const n = String(num).replace(/\.?0+$/, '') || '0';
+	return n + ' ' + ((String(unit).toLowerCase() === 'tb' || unit === 'ترابایت') ? 'ترابایت' : 'گیگابایت');
+}
+
+function titleDimensions(titleFa, titleEn) {
+	const fa = latinDigitsFa(titleFa);
+	const en = String(titleEn || '');
+	const out = {};
+	let m = fa.match(/ظرفیت\s*(\d+(?:\.\d+)?)\s*(ترابایت|گیگابایت|tb|gb)/i) || fa.match(/حافظه(?:\s*داخلی)?\s*(\d+(?:\.\d+)?)\s*(ترابایت|گیگابایت|tb|gb)/i);
+	if (m) out['حافظه داخلی'] = capacityLabel(m[1], m[2]);
+	else if ((m = en.match(/(\d+(?:\.\d+)?)\s*(tb|gb)\s*\/\s*\d+\s*gb/i))) out['حافظه داخلی'] = capacityLabel(m[1], m[2]);
+	if ((m = fa.match(/رم\s*(\d+(?:\.\d+)?)\s*(گیگابایت|gb)/i))) out['رم'] = capacityLabel(m[1], 'gb');
+	else if ((m = en.match(/\d+\s*(?:tb|gb)\s*\/\s*(\d+(?:\.\d+)?)\s*gb/i))) out['رم'] = capacityLabel(m[1], 'gb');
+	const regions = 'ویتنام|کره جنوبی|کره|هند|چین|گلوبال|امارات|سنگاپور|مالزی|اندونزی|تایوان';
+	if ((m = fa.match(new RegExp('پک\\s*(' + regions + ')', 'u')))
+		|| (m = fa.match(new RegExp('\\(\\s*(' + regions + ')\\s*\\)', 'u')))
+		|| (m = fa.match(new RegExp('(?:^|[\\s\\-\\|])(' + regions + ')(?=$|[\\s\\-\\|\\))])', 'u')))) {
+		out['ریجن'] = m[1];
+	} else if ((m = en.match(/\b(vietnam|korea|india|china|global|uae|singapore|malaysia|indonesia|taiwan)\b/i))) {
+		const map = { vietnam: 'ویتنام', korea: 'کره', india: 'هند', china: 'چین', global: 'گلوبال', uae: 'امارات', singapore: 'سنگاپور', malaysia: 'مالزی', indonesia: 'اندونزی', taiwan: 'تایوان' };
+		out['ریجن'] = map[m[1].toLowerCase()];
+	}
+	return out;
+}
+
+function baseTitle(titleFa) {
+	let t = latinDigitsFa(titleFa);
+	const regions = 'ویتنام|کره جنوبی|کره|هند|چین|گلوبال|امارات|سنگاپور|مالزی|اندونزی|تایوان';
+	t = t.replace(/ظرفیت\s*\d+(?:\.\d+)?\s*(ترابایت|گیگابایت|tb|gb)/gi, ' ');
+	t = t.replace(/حافظه(?:\s*داخلی)?\s*\d+(?:\.\d+)?\s*(ترابایت|گیگابایت|tb|gb)/gi, ' ');
+	t = t.replace(/و?\s*رم\s*\d+(?:\.\d+)?\s*(گیگابایت|gb)/gi, ' ');
+	t = t.replace(new RegExp('پک\\s*(' + regions + ')', 'gu'), ' ');
+	t = t.replace(new RegExp('\\(\\s*(' + regions + ')\\s*\\)', 'gu'), ' ');
+	t = t.replace(new RegExp('(?:^|[\\s\\-\\|])(' + regions + ')(?=$|[\\s\\-\\|])', 'gu'), ' ');
+	t = t.replace(/[|\-–—،,/()]/g, ' ');
+	return t.replace(/\s+/g, ' ').trim();
+}
+
+function detectSiblingVariants(current, siblings) {
+	if (!current || !current.name1 || !Array.isArray(siblings)) return [];
+	const base = baseTitle(current.name1);
+	if (!base) return [];
+	const pool = [current];
+	for (const s of siblings) {
+		if (!s || !s.name1) continue;
+		if (current.random_key && s.random_key && s.random_key === current.random_key) continue;
+		const sb = baseTitle(s.name1);
+		if (!sb) continue;
+		if (sb === base || (base.length >= 8 && sb.includes(base)) || (sb.length >= 8 && base.includes(sb))) pool.push(s);
+	}
+	if (pool.length < 2) return [];
+	const groups = [];
+	for (const dim of ['حافظه داخلی', 'رم', 'ریجن']) {
+		const values = {};
+		for (const item of pool) {
+			const dims = titleDimensions(item.name1, item.name2);
+			const label = dims[dim];
+			if (!label) continue;
+			const price = parseInt(item.price, 10) || 0;
+			if (!values[label] || (price > 0 && (!values[label].price || price < values[label].price))) {
+				values[label] = { key: item.random_key || label.slice(0, 8), title: label, price };
+			}
+		}
+		const items = Object.values(values);
+		if (items.length < 2) continue;
+		items.sort((a, b) => (a.price || Infinity) - (b.price || Infinity));
+		groups.push({ title: dim, items, provider: 'digikala', detected: true });
+	}
+	return groups;
+}
+
 function detectCategory(hay, specs) {
 	const t = String(hay || '').toLowerCase();
 	if (/گوشی|موبایل|galaxy|iphone|redmi|poco|xiaomi|سامسونگ/.test(t)) return 'phone';
@@ -1310,6 +1391,9 @@ module.exports = {
 	normalizeDetails,
 	normalizeDigikalaSearch,
 	normalizeDigikalaDetails,
+	detectSiblingVariants,
+	titleDimensions,
+	baseTitle,
 	aggregate,
 	buildDescriptionHtml,
 	buildShortDescription,

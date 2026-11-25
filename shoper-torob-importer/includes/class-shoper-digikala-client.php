@@ -285,9 +285,259 @@ class Shoper_Digikala_Client {
 			if ( function_exists( 'set_transient' ) ) {
 				set_transient( 'shoper_dk_detail_path', $path, 6 * HOUR_IN_SECONDS );
 			}
-			return $normalized;
+			return $this->enrich_sibling_variants( $normalized );
 		}
 		return $last_error ? $last_error : new WP_Error( 'invalid_response', 'جزئیات دیجی‌کالا دریافت نشد.' );
+	}
+
+	/* --------------------------------------------------------------------- */
+	/* کشف هوشمند متغیر از محصولات هم‌نام                                      */
+	/* --------------------------------------------------------------------- */
+
+	/**
+	 * تبدیل ارقام فارسی/عربی به لاتین برای پارس مطمئن عنوان‌ها.
+	 *
+	 * @param string $s رشته.
+	 * @return string
+	 */
+	private static function latin_digits( $s ) {
+		return strtr( (string) $s, array(
+			'۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4',
+			'۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9',
+			'٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4',
+			'٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
+		) );
+	}
+
+	/**
+	 * استخراج بُعدهای متغیر از عنوان محصول: حافظه داخلی، رم، ریجن.
+	 *
+	 * مثلاً «... ظرفیت 512 گیگابایت و رم 12 گیگابایت - پک ویتنام» →
+	 * ['حافظه داخلی' => '512 گیگابایت', 'رم' => '12 گیگابایت', 'ریجن' => 'ویتنام']
+	 *
+	 * @param string $title_fa عنوان فارسی.
+	 * @param string $title_en عنوان انگلیسی.
+	 * @return array
+	 */
+	public static function title_dimensions( $title_fa, $title_en = '' ) {
+		$fa  = self::latin_digits( $title_fa );
+		$en  = (string) $title_en;
+		$out = array();
+
+		// حافظه داخلی: «ظرفیت 512 گیگابایت» / «حافظه 1 ترابایت» / انگلیسی «512/12 GB».
+		if ( preg_match( '/ظرفیت\s*(\d+(?:\.\d+)?)\s*(ترابایت|گیگابایت|tb|gb)/iu', $fa, $m )
+			|| preg_match( '/حافظه(?:\s*داخلی)?\s*(\d+(?:\.\d+)?)\s*(ترابایت|گیگابایت|tb|gb)/iu', $fa, $m ) ) {
+			$out['حافظه داخلی'] = self::capacity_label( $m[1], $m[2] );
+		} elseif ( preg_match( '/(\d+(?:\.\d+)?)\s*(tb|gb)\s*\/\s*\d+\s*gb/iu', $en, $m ) ) {
+			$out['حافظه داخلی'] = self::capacity_label( $m[1], $m[2] );
+		}
+
+		// رم: «رم 12 گیگابایت» / بخش دوم «512/12».
+		if ( preg_match( '/رم\s*(\d+(?:\.\d+)?)\s*(گیگابایت|gb)/iu', $fa, $m ) ) {
+			$out['رم'] = self::capacity_label( $m[1], 'gb' );
+		} elseif ( ! isset( $out['رم'] ) && preg_match( '/\d+\s*(?:tb|gb)\s*\/\s*(\d+(?:\.\d+)?)\s*gb/iu', $en, $m ) ) {
+			$out['رم'] = self::capacity_label( $m[1], 'gb' );
+		}
+
+		// ریجن: «پک ویتنام»، «(کره)»، یا نام کشور/منطقه در عنوان.
+		$regions_fa = 'ویتنام|کره جنوبی|کره|هند|چین|گلوبال|امارات|سنگاپور|مالزی|اندونزی|تایوان';
+		if ( preg_match( '/پک\s*(' . $regions_fa . ')/u', $fa, $m )
+			|| preg_match( '/\(\s*(' . $regions_fa . ')\s*\)/u', $fa, $m )
+			|| preg_match( '/(?:^|[\s\-\|])(' . $regions_fa . ')(?=$|[\s\-\|\)])/u', $fa, $m ) ) {
+			$out['ریجن'] = $m[1];
+		} elseif ( preg_match( '/\b(vietnam|korea|india|china|global|uae|singapore|malaysia|indonesia|taiwan)\b/i', $en, $m ) ) {
+			$map = array(
+				'vietnam' => 'ویتنام', 'korea' => 'کره', 'india' => 'هند', 'china' => 'چین',
+				'global' => 'گلوبال', 'uae' => 'امارات', 'singapore' => 'سنگاپور',
+				'malaysia' => 'مالزی', 'indonesia' => 'اندونزی', 'taiwan' => 'تایوان',
+			);
+			$key = strtolower( $m[1] );
+			if ( isset( $map[ $key ] ) ) {
+				$out['ریجن'] = $map[ $key ];
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * برچسب نمایشی ظرفیت: «512 گیگابایت» / «1 ترابایت».
+	 *
+	 * @param string $num عدد.
+	 * @param string $unit واحد.
+	 * @return string
+	 */
+	private static function capacity_label( $num, $unit ) {
+		$num = rtrim( rtrim( (string) $num, '0' ), '.' );
+		if ( '' === $num ) {
+			$num = '0';
+		}
+		$u = strtolower( (string) $unit );
+		return $num . ' ' . ( ( 'tb' === $u || 'ترابایت' === $unit ) ? 'ترابایت' : 'گیگابایت' );
+	}
+
+	/**
+	 * نام پایه‌ی محصول بدون توکن‌های متغیر (برای تشخیص هم‌نام بودن).
+	 *
+	 * @param string $title_fa عنوان فارسی.
+	 * @param string $title_en عنوان انگلیسی.
+	 * @return string
+	 */
+	public static function base_title( $title_fa, $title_en = '' ) {
+		$t = self::latin_digits( $title_fa );
+		// حذف عبارت‌های بُعد متغیر.
+		$t = preg_replace( '/ظرفیت\s*\d+(?:\.\d+)?\s*(ترابایت|گیگابایت|tb|gb)/iu', ' ', $t );
+		$t = preg_replace( '/حافظه(?:\s*داخلی)?\s*\d+(?:\.\d+)?\s*(ترابایت|گیگابایت|tb|gb)/iu', ' ', $t );
+		$t = preg_replace( '/و?\s*رم\s*\d+(?:\.\d+)?\s*(گیگابایت|gb)/iu', ' ', $t );
+		$t = preg_replace( '/پک\s*(ویتنام|کره جنوبی|کره|هند|چین|گلوبال|امارات|سنگاپور|مالزی|اندونزی|تایوان)/u', ' ', $t );
+		$t = preg_replace( '/\(\s*(ویتنام|کره جنوبی|کره|هند|چین|گلوبال|امارات|سنگاپور|مالزی|اندونزی|تایوان)\s*\)/u', ' ', $t );
+		$t = preg_replace( '/(?:^|[\s\-\|])(ویتنام|کره جنوبی|کره|هند|چین|گلوبال|امارات|سنگاپور|مالزی|اندونزی|تایوان)(?=$|[\s\-\|])/u', ' ', $t );
+		$t = preg_replace( '/[\|\-–—،,\(\)\/]/u', ' ', $t );
+		$t = trim( preg_replace( '/\s+/u', ' ', $t ) );
+		return $t;
+	}
+
+	/**
+	 * ساخت گروه‌های متغیر از روی محصولات هم‌نام در نتایج جستجو (خالص و قابل تست).
+	 *
+	 * وقتی صفحه‌ی محصول دیجی‌کالا متغیرها را کامل نمی‌دهد (مثلاً حافظه و ریجن
+	 * هر کدام محصول جدا هستند)، از روی هم‌نام‌ها بُعدهایی که واقعاً بین آن‌ها
+	 * فرق می‌کند (حافظه داخلی/رم/ریجن) با ارزان‌ترین قیمت هر مقدار ساخته می‌شود.
+	 *
+	 * @param array $current  محصول نرمال فعلی (name1, name2, price, random_key).
+	 * @param array $siblings نتایج نرمال جستجو.
+	 * @return array گروه‌ها با detected=true.
+	 */
+	public static function detect_sibling_variants( $current, $siblings ) {
+		if ( empty( $current['name1'] ) || ! is_array( $siblings ) ) {
+			return array();
+		}
+		$base = self::base_title( $current['name1'], isset( $current['name2'] ) ? $current['name2'] : '' );
+		if ( '' === $base ) {
+			return array();
+		}
+		$pool   = array();
+		$pool[] = $current;
+		foreach ( $siblings as $s ) {
+			if ( ! is_array( $s ) || empty( $s['name1'] ) ) {
+				continue;
+			}
+			if ( ! empty( $current['random_key'] ) && ! empty( $s['random_key'] ) && $s['random_key'] === $current['random_key'] ) {
+				continue;
+			}
+			$sb = self::base_title( $s['name1'], isset( $s['name2'] ) ? $s['name2'] : '' );
+			if ( '' === $sb ) {
+				continue;
+			}
+			$same = ( $sb === $base )
+				|| ( mb_strlen( $base ) >= 8 && false !== mb_strpos( $sb, $base ) )
+				|| ( mb_strlen( $sb ) >= 8 && false !== mb_strpos( $base, $sb ) );
+			if ( $same ) {
+				$pool[] = $s;
+			}
+		}
+		if ( count( $pool ) < 2 ) {
+			return array();
+		}
+		$groups = array();
+		foreach ( array( 'حافظه داخلی', 'رم', 'ریجن' ) as $dim ) {
+			$values = array(); // label => ['key'=>, 'title'=>, 'price'=>]
+			foreach ( $pool as $item ) {
+				$dims = self::title_dimensions( $item['name1'], isset( $item['name2'] ) ? $item['name2'] : '' );
+				if ( empty( $dims[ $dim ] ) ) {
+					continue;
+				}
+				$label = $dims[ $dim ];
+				$price = isset( $item['price'] ) ? (int) $item['price'] : 0;
+				if ( ! isset( $values[ $label ] )
+					|| ( $price > 0 && ( 0 === $values[ $label ]['price'] || $price < $values[ $label ]['price'] ) ) ) {
+					$values[ $label ] = array(
+						'key'   => ! empty( $item['random_key'] ) ? (string) $item['random_key'] : substr( md5( $label ), 0, 8 ),
+						'title' => $label,
+						'price' => $price,
+					);
+				}
+			}
+			if ( count( $values ) < 2 ) {
+				continue;
+			}
+			$items = array_values( $values );
+			usort( $items, function ( $a, $b ) {
+				$pa = $a['price'] > 0 ? $a['price'] : PHP_INT_MAX;
+				$pb = $b['price'] > 0 ? $b['price'] : PHP_INT_MAX;
+				return $pa <=> $pb;
+			} );
+			$groups[] = array(
+				'title'    => $dim,
+				'items'    => $items,
+				'provider' => 'digikala',
+				'detected' => true,
+			);
+		}
+		return $groups;
+	}
+
+	/**
+	 * اگر متغیرهای صفحه‌ی محصول کافی نبود، از هم‌نام‌های جستجو کاملشان کن.
+	 *
+	 * @param array $normalized داده‌ی نرمال جزئیات.
+	 * @return array
+	 */
+	public function enrich_sibling_variants( $normalized ) {
+		if ( ! is_array( $normalized ) || empty( $normalized['name1'] ) || 'mock' === $this->source ) {
+			return $normalized;
+		}
+		$items = 0;
+		$titles = array();
+		foreach ( (array) ( isset( $normalized['variants'] ) ? $normalized['variants'] : array() ) as $g ) {
+			$items += isset( $g['items'] ) && is_array( $g['items'] ) ? count( $g['items'] ) : 0;
+			if ( ! empty( $g['title'] ) ) {
+				$titles[] = $g['title'];
+			}
+		}
+		if ( $items >= 2 ) {
+			return $normalized;
+		}
+		// از خود مشخصات فنی هم بُعدهای فعلی را می‌خوانیم تا با همان برچسب‌ها مقایسه شود.
+		$cache_key = 'shoper_dk_sib_' . md5( isset( $normalized['random_key'] ) ? $normalized['random_key'] : $normalized['name1'] );
+		if ( function_exists( 'get_transient' ) ) {
+			$cached = get_transient( $cache_key );
+			if ( is_array( $cached ) && isset( $cached['groups'] ) ) {
+				return $this->apply_detected_groups( $normalized, $cached['groups'], $titles );
+			}
+		}
+		$search = $this->search( $normalized['name1'], 1, 20 );
+		if ( is_wp_error( $search ) || empty( $search['results'] ) ) {
+			return $normalized;
+		}
+		$groups = self::detect_sibling_variants( $normalized, $search['results'] );
+		if ( function_exists( 'set_transient' ) ) {
+			set_transient( $cache_key, array( 'groups' => $groups ), 30 * MINUTE_IN_SECONDS );
+		}
+		return $this->apply_detected_groups( $normalized, $groups, $titles );
+	}
+
+	/**
+	 * افزودن گروه‌های کشف‌شده به variants بدون تکرار عنوان گروه بومی.
+	 *
+	 * @param array $normalized داده.
+	 * @param array $groups     گروه‌های کشف‌شده.
+	 * @param array $titles     عنوان‌های موجود.
+	 * @return array
+	 */
+	private function apply_detected_groups( $normalized, $groups, $titles ) {
+		if ( empty( $groups ) ) {
+			return $normalized;
+		}
+		if ( empty( $normalized['variants'] ) || ! is_array( $normalized['variants'] ) ) {
+			$normalized['variants'] = array();
+		}
+		foreach ( $groups as $g ) {
+			if ( ! in_array( $g['title'], $titles, true ) ) {
+				$normalized['variants'][] = $g;
+			}
+		}
+		return $normalized;
 	}
 
 	/**

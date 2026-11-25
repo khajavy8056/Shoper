@@ -150,7 +150,12 @@ class Shoper_Catalog {
 			return $this->digikala->ingest_search( $raw );
 		}
 		if ( 'dk_details' === $kind || ( 'details' === $kind && is_array( $raw ) && ( isset( $raw['data']['product'] ) || ( isset( $raw['product']['specifications'] ) ) ) ) ) {
-			return $this->digikala->ingest_details( $raw );
+			$normalized = $this->digikala->ingest_details( $raw );
+			if ( is_array( $normalized ) ) {
+				// متغیرهای صفحه کافی نبود؟ از هم‌نام‌های جستجو کشفشان کن.
+				$normalized = $this->digikala->enrich_sibling_variants( $normalized );
+			}
+			return $normalized;
 		}
 		if ( 'search' === $kind ) {
 			return $this->torob->ingest_search( $raw );

@@ -369,6 +369,7 @@ class Shoper_Product_Builder {
 				continue;
 			}
 			$variation->set_attributes( $attrs );
+			$variation->set_stock_status( 'instock' );
 			if ( 0 === $price ) {
 				$price = (int) $base_price;
 			}
@@ -385,7 +386,74 @@ class Shoper_Product_Builder {
 		if ( $count && class_exists( 'WC_Product_Variable' ) ) {
 			WC_Product_Variable::sync( $product_id );
 		}
+		if ( $count && function_exists( 'wc_delete_product_transients' ) ) {
+			wc_delete_product_transients( $product_id );
+		}
 		return $count;
+	}
+
+	/**
+	 * ادغام ویژگی‌های متغیر داخل فهرست ویژگی‌های محصول.
+	 *
+	 * نکته‌ی کلیدی ووکامرس: برای هر taxonomy فقط یک WC_Product_Attribute
+	 * می‌تواند روی محصول باشد. پس اگر مشخصه‌ای (مثل «رنگ» یا «حافظه داخلی»)
+	 * هم در مشخصات فنی هست و هم بُعد متغیر شده، نباید حذف یا دوتا شود؛
+	 * همان ویژگی با variation=true و اجتماع همه‌ی مقدارها (مقدار مشخصه +
+	 * گزینه‌های متغیر) باقی می‌ماند تا هم ویژگی‌ها کامل بمانند و هم
+	 * variationها درست ساخته شوند.
+	 *
+	 * @param array $current_attrs ویژگی‌های فعلی/مشخصات.
+	 * @param array $var_attrs     ویژگی‌های متغیر ساخته‌شده.
+	 * @return array
+	 */
+	private function merge_variation_into_attributes( $current_attrs, $var_attrs ) {
+		$out = is_array( $current_attrs ) ? array_values( $current_attrs ) : array();
+		foreach ( (array) $var_attrs as $va ) {
+			$merged = false;
+			foreach ( $out as $i => $sa ) {
+				if ( $sa->get_name() === $va->get_name() ) {
+					$options = array_map( 'intval', (array) $sa->get_options() );
+					foreach ( (array) $va->get_options() as $opt ) {
+						if ( ! in_array( (int) $opt, $options, true ) ) {
+							$options[] = (int) $opt;
+						}
+					}
+					$va->set_options( $options );
+					$va->set_visible( true );
+					$va->set_variation( true );
+					$out[ $i ] = $va;
+					$merged    = true;
+					break;
+				}
+			}
+			if ( ! $merged ) {
+				$out[] = $va;
+			}
+		}
+		return $out;
+	}
+
+	/**
+	 * اتصال صریح termهای ویژگی‌های متغیر به محصول والد.
+	 *
+	 * ذخیره‌ی CRUD ووکامرس معمولاً خودش این کار را می‌کند، ولی اتصال صریح
+	 * تضمین می‌کند منوی انتخاب متغیر در فرانت‌اند و ویرایشگر محصول حتماً
+	 * مقدارها را ببیند (مطابق الگوی رسمی ساخت محصول متغیر).
+	 *
+	 * @param int   $product_id شناسه.
+	 * @param array $attrs      ویژگی‌های نهایی محصول.
+	 * @return void
+	 */
+	private function attach_variation_terms( $product_id, $attrs ) {
+		foreach ( (array) $attrs as $attr ) {
+			if ( ! is_object( $attr ) || ! $attr->get_variation() || 0 !== strpos( (string) $attr->get_name(), 'pa_' ) ) {
+				continue;
+			}
+			$options = array_map( 'intval', (array) $attr->get_options() );
+			if ( $options ) {
+				wp_set_object_terms( $product_id, $options, $attr->get_name(), false );
+			}
+		}
 	}
 
 	public function create_product( $data, $args = array() ) {
@@ -472,15 +540,9 @@ class Shoper_Product_Builder {
 			if ( ! empty( $var_built['errors'] ) ) {
 				$attr_errors = array_merge( $attr_errors, $var_built['errors'] );
 			}
-			// مشخصه‌ای که خودش ویژگی متغیر شده (مثل «رنگ») دوباره ساده ثبت نمی‌شود.
-			$var_taxonomies = array();
-			foreach ( $var_tax_map as $info ) {
-				$var_taxonomies[] = $info['taxonomy'];
-			}
-			$all_attrs = array_values( array_filter( $all_attrs, function ( $attr ) use ( $var_taxonomies ) {
-				return ! in_array( $attr->get_name(), $var_taxonomies, true );
-			} ) );
-			$all_attrs = array_merge( $all_attrs, $var_built['attrs'] );
+			// مشخصه‌ای که خودش بُعد متغیر شده (مثل «رنگ») حذف نمی‌شود؛ همان
+			// ویژگی با همه‌ی مقدارهایش می‌ماند و فقط variation=true می‌شود.
+			$all_attrs = $this->merge_variation_into_attributes( $all_attrs, $var_built['attrs'] );
 		}
 		if ( ! empty( $all_attrs ) ) {
 			$product->set_attributes( $all_attrs );
@@ -496,6 +558,7 @@ class Shoper_Product_Builder {
 		// ساخت variationها با قیمت هر گزینه.
 		$variations_count = 0;
 		if ( $is_variable ) {
+			$this->attach_variation_terms( $product_id, $all_attrs );
 			$base_sku = '';
 			if ( ! empty( $data['random_key'] ) ) {
 				$key      = (string) $data['random_key'];
@@ -638,13 +701,16 @@ class Shoper_Product_Builder {
 				$attr_errors = array_merge( $attr_errors, $var_built['errors'] );
 			}
 			if ( ! empty( $var_built['attrs'] ) ) {
-				$product->set_attributes( $this->attributes->merge_attributes( $current, $var_built['attrs'] ) );
+				// merge_attributes ساده ویژگی متغیرِ هم‌taxonomy را کنار می‌زد؛
+				// اینجا همان ویژگی موجود به variation=true ارتقا پیدا می‌کند.
+				$product->set_attributes( $this->merge_variation_into_attributes( $current, $var_built['attrs'] ) );
 			}
 		}
 
 		$product->save();
 
 		if ( $is_variable ) {
+			$this->attach_variation_terms( $post_id, $product->get_attributes() );
 			// variationهای قبلیِ ساخته‌شده با همین ویژگی‌ها جایگزین می‌شوند.
 			$children = get_children( array( 'post_parent' => $post_id, 'post_type' => 'product_variation', 'numberposts' => -1, 'fields' => 'ids' ) );
 			if ( is_array( $children ) ) {
