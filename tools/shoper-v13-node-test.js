@@ -23,7 +23,7 @@ const fixtureDir = path.join(__dirname, '../preview/fixtures');
 const searchRaw = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'search-samsung.json'), 'utf8'));
 const detailsRaw = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'details-9bcf3364.json'), 'utf8'));
 
-console.log('\nShoper 1.6.3 node tests\n');
+console.log('\nShoper 1.6.4 node tests\n');
 
 const search = logic.normalizeSearch(searchRaw);
 check('جستجوی fixture نرمال می‌شود', search.results && search.results.length > 0, search.results.length + ' نتیجه');
@@ -81,7 +81,7 @@ check('chooseSuggest لینک more_info را می‌فرستد', /preview\(it\.r
 check('fill هم product_json می‌فرستد', /shoper_fill[\s\S]{0,900}product_json/.test(pluginJs));
 
 const mainPhp = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/shoper-torob-importer.php'), 'utf8');
-check('plugin version 1.6.3', mainPhp.includes("define( 'SHOPER_VERSION', '1.6.3' )"));
+check('plugin version 1.6.4', mainPhp.includes("define( 'SHOPER_VERSION', '1.6.4' )"));
 check('کلاس تجمیع فروشنده بارگذاری می‌شود', mainPhp.includes('class-shoper-seller-aggregator.php'));
 
 check('digikala client required', mainPhp.includes('class-shoper-digikala-client.php') && mainPhp.includes('class-shoper-catalog.php'));
@@ -317,6 +317,14 @@ check('updater intercepts downloads with upgrader_pre_download', updaterPhp.incl
 check('resilient download uses long timeout and validates the ZIP', updaterPhp.includes('download_url( $url, 300 )') && updaterPhp.includes('function is_valid_zip'));
 check('download failure message is Persian and address-free', updaterPhp.includes('shoper_download_failed') && !/shoper_download_failed[\s\S]{0,400}https?:\/\//.test(updaterPhp.split('shoper_download_failed')[1] || ''));
 check('source selection finds the plugin inside a repo archive', updaterPhp.includes('function source_selection') && updaterPhp.includes('GLOB_ONLYDIR'));
+
+// --- فعال ماندن افزونه بعد از بروزرسانی (1.6.4) ---
+check('updater remembers active state before any update', updaterPhp.includes('function remember_active_state') && updaterPhp.includes("'upgrader_pre_install'"));
+check('updater safety-net reactivates after upgrader completes', updaterPhp.includes('function ensure_reactivated') && updaterPhp.includes("'upgrader_process_complete'"));
+check('reactivation only happens when the plugin was active', updaterPhp.includes('function reactivate_if_needed') && updaterPhp.includes('activate_plugin( SHOPER_PLUGIN_BASENAME'));
+check('perform_update captures state before upgrade and reactivates after', updaterPhp.indexOf('وضعیت فعال بودن قبل از آپدیت') < updaterPhp.indexOf('$upgrader->upgrade( SHOPER_PLUGIN_BASENAME )') && updaterPhp.indexOf('وضعیت فعال بودن قبل از آپدیت') > updaterPhp.indexOf('function perform_update') && updaterPhp.indexOf('$active = self::reactivate_if_needed( $was_active') > updaterPhp.indexOf('$upgrader->upgrade( SHOPER_PLUGIN_BASENAME )'));
+check('perform_update reports version + active flag', updaterPhp.includes("'active'  => $active"));
+check('ajax reports activation state honestly to the user', ajax.includes("'active'          => $is_active") && ajax.includes('فعال‌سازی خودکار انجام نشد'));
 
 console.log('\nنتیجه:', pass, 'موفق،', fail, 'ناموفق\n');
 process.exit(fail > 0 ? 1 : 0);

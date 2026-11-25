@@ -57,6 +57,11 @@ class Shoper_Updater {
 		// دانلود مقاوم بسته‌ی خودمان (چند مسیر + مهلت بالا) — هم برای دکمه‌ی
 		// داخل افزونه و هم برای بروزرسانی از صفحه‌ی «افزونه‌ها»ی وردپرس.
 		add_filter( 'upgrader_pre_download', array( $this, 'pre_download' ), 10, 2 );
+		// Plugin_Upgrader::upgrade() افزونه‌ی فعال را قبل از تعویض فایل‌ها
+		// غیرفعال می‌کند و در مسیر برنامه‌نویسی‌شده هیچ‌وقت دوباره فعالش
+		// نمی‌کند؛ وضعیت قبلی را نگه می‌داریم و بعد از آپدیت برمی‌گردانیم.
+		add_filter( 'upgrader_pre_install', array( $this, 'remember_active_state' ), 10, 2 );
+		add_action( 'upgrader_process_complete', array( $this, 'ensure_reactivated' ), 20, 2 );
 		add_action( 'upgrader_process_complete', array( $this, 'clear_cache' ), 10, 0 );
 		add_action( 'delete_site_transient_update_plugins', array( $this, 'clear_cache' ), 10, 0 );
 	}
@@ -199,7 +204,7 @@ class Shoper_Updater {
 	 * نشانی بسته‌ی نصب داخل درخت برچسب انتشار (fallback وقتی فایل پیوست
 	 * انتشار موجود نیست).
 	 *
-	 * @param string $tag     برچسب انتشار مثل v1.6.3.
+	 * @param string $tag     برچسب انتشار مثل v1.6.4.
 	 * @param string $version نسخه بدون v.
 	 * @return string
 	 */
@@ -482,6 +487,82 @@ class Shoper_Updater {
 	}
 
 	/**
+	 * یادداشت وضعیت فعال بودن افزونه درست قبل از شروع آپدیت.
+	 *
+	 * @param mixed $return     پاسخ قبلی فیلتر.
+	 * @param array $hook_extra اطلاعات آپدیت.
+	 * @return mixed
+	 */
+	public function remember_active_state( $return, $hook_extra ) {
+		if ( is_array( $hook_extra ) && ! empty( $hook_extra['plugin'] ) && SHOPER_PLUGIN_BASENAME === $hook_extra['plugin'] ) {
+			if ( function_exists( 'is_plugin_active' ) ) {
+				update_option( 'shoper_active_before_update', is_plugin_active( SHOPER_PLUGIN_BASENAME ) ? 1 : 0 );
+			}
+		}
+		return $return;
+	}
+
+	/**
+	 * شبکه‌ی اطمینان: اگر افزونه قبل از آپدیت فعال بود و بعدش نیست، فعالش کن.
+	 *
+	 * برای همه‌ی مسیرهای آپدیت وردپرس (دکمه‌ی داخل افزونه، صفحه‌ی افزونه‌ها،
+	 * update.php) کار می‌کند چون همه از همین قلاب‌ها رد می‌شوند.
+	 *
+	 * @param mixed $upgrader   آپگریدر.
+	 * @param array $hook_extra اطلاعات آپدیت.
+	 * @return void
+	 */
+	public function ensure_reactivated( $upgrader, $hook_extra ) {
+		if ( ! is_array( $hook_extra ) || empty( $hook_extra['plugin'] ) || SHOPER_PLUGIN_BASENAME !== $hook_extra['plugin'] ) {
+			return;
+		}
+		if ( isset( $hook_extra['action'] ) && 'update' !== $hook_extra['action'] ) {
+			return;
+		}
+		$was_active = get_option( 'shoper_active_before_update' );
+		delete_option( 'shoper_active_before_update' );
+		if ( false === $was_active ) {
+			return;
+		}
+		self::reactivate_if_needed( (bool) $was_active, false );
+	}
+
+	/**
+	 * فعال‌سازی دوباره‌ی افزونه اگر قبل از آپدیت فعال بوده و حالا نیست.
+	 *
+	 * @param bool $was_active        قبل از آپدیت فعال بود؟
+	 * @param bool $was_network_active فعال شبکه‌ای بود؟ (چندسایتی)
+	 * @return bool در پایان فعال هست یا نه.
+	 */
+	public static function reactivate_if_needed( $was_active, $was_network_active = false ) {
+		if ( ! function_exists( 'is_plugin_active' ) || ! function_exists( 'activate_plugin' ) ) {
+			$path = ABSPATH . 'wp-admin/includes/plugin.php';
+			if ( file_exists( $path ) ) {
+				require_once $path; // phpcs:ignore WordPressVIPMinimum.Files.IncludingFile
+			}
+		}
+		if ( ! function_exists( 'is_plugin_active' ) || ! function_exists( 'activate_plugin' ) ) {
+			return false;
+		}
+		if ( is_plugin_active( SHOPER_PLUGIN_BASENAME ) ) {
+			return true;
+		}
+		if ( $was_network_active && function_exists( 'is_plugin_active_for_network' ) && is_plugin_active_for_network( SHOPER_PLUGIN_BASENAME ) ) {
+			return true;
+		}
+		if ( ! $was_active && ! $was_network_active ) {
+			// قبل از آپدیت عمداً غیرفعال بوده؛ دست نمی‌زنیم.
+			return false;
+		}
+		$result = activate_plugin( SHOPER_PLUGIN_BASENAME, '', (bool) $was_network_active, false );
+		if ( is_wp_error( $result ) ) {
+			return false;
+		}
+		return is_plugin_active( SHOPER_PLUGIN_BASENAME )
+			|| ( $was_network_active && function_exists( 'is_plugin_active_for_network' ) && is_plugin_active_for_network( SHOPER_PLUGIN_BASENAME ) );
+	}
+
+	/**
 	 * پاک‌کردن کش انتشار بعد از هر بروزرسانی.
 	 *
 	 * @return void
@@ -497,7 +578,7 @@ class Shoper_Updater {
 	/**
 	 * دانلود و نصب آخرین نسخه با آپگریدر استاندارد وردپرس.
 	 *
-	 * @return string|WP_Error شماره‌ی نسخه‌ی نصب‌شده در موفقیت.
+	 * @return array|WP_Error {version, active} در موفقیت.
 	 */
 	public static function perform_update() {
 		if ( ! current_user_can( 'update_plugins' ) ) {
@@ -544,6 +625,18 @@ class Shoper_Updater {
 			return new WP_Error( 'backup_failed', 'نسخه‌ی پشتیبان از نسخه‌ی فعلی ساخته نشد؛ بروزرسانی برای امنیت متوقف شد. (' . $backup->get_error_message() . ')' );
 		}
 
+		// وضعیت فعال بودن قبل از آپدیت: Plugin_Upgrader::upgrade() افزونه‌ی
+		// فعال را قبل از تعویض فایل‌ها غیرفعال می‌کند و در این مسیر هیچ‌وقت
+		// دوباره فعالش نمی‌کند؛ خودمان بعد از نصب برش می‌گردانیم.
+		$was_active         = false;
+		$was_network_active = false;
+		if ( function_exists( 'is_plugin_active' ) ) {
+			$was_active = is_plugin_active( SHOPER_PLUGIN_BASENAME );
+		}
+		if ( $was_active && function_exists( 'is_multisite' ) && is_multisite() && function_exists( 'is_plugin_active_for_network' ) ) {
+			$was_network_active = is_plugin_active_for_network( SHOPER_PLUGIN_BASENAME );
+		}
+
 		$skin     = new Automatic_Upgrader_Skin();
 		$upgrader = new Plugin_Upgrader( $skin );
 		$result   = $upgrader->upgrade( SHOPER_PLUGIN_BASENAME );
@@ -557,7 +650,15 @@ class Shoper_Updater {
 			$feedback = method_exists( $skin, 'get_upgrade_messages' ) ? implode( ' ', (array) $skin->get_upgrade_messages() ) : '';
 			return new WP_Error( 'upgrade_failed', 'بروزرسانی کامل نشد.' . ( $feedback ? ' ' . $feedback : ' از صفحه‌ی «افزونه‌ها» دوباره تلاش کنید.' ) );
 		}
-		return $release['version'];
+
+		// فعال‌سازی دوباره (اگر قبلش فعال بوده)؛ اگر نشد، نصب موفق است ولی
+		// به کاربر شفاف می‌گوییم یک کلیک روی «فعال‌کردن» لازم است.
+		$active = self::reactivate_if_needed( $was_active, $was_network_active );
+
+		return array(
+			'version' => $release['version'],
+			'active'  => $active || ( ! $was_active && ! $was_network_active ),
+		);
 	}
 
 	/* ------------------------------------------------------------------ */
