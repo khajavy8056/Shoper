@@ -1222,6 +1222,9 @@
 					if (group.detected) {
 						html += '<p class="description" style="margin:0 0 6px;"><span class="shoper-badge">تشخیص خودکار</span> این بُعد از روی محصولات هم‌نام در منبع پیدا شده (مثل نسخه‌های دیگر همین گوشی با حافظه/ریجن متفاوت)؛ قیمت هر گزینه از ارزان‌ترین نسخه‌ی خودش است.</p>';
 					}
+					if (group.enriched) {
+						html += '<p class="description" style="margin:0 0 6px;"><span class="shoper-badge">تشخیص خودکار</span> این بُعد مال خود صفحه است، اما چند گزینه‌ی دیگر هم از محصولات هم‌نام پیدا و با برچسب «هوشمند» اضافه شده؛ هرکدام را که می‌خواهید تیک بزنید.</p>';
+					}
 					html += '<p class="description" style="margin:0 0 6px;">هر گزینه‌ای را که تیک بزنید، روی سایت شما با <strong>قیمت خودش</strong> ساخته می‌شود. اگر هیچ گزینه‌ای از یک گروه تیک نخورد، آن گروه ساخته نمی‌شود؛ اگر از همه‌ی گروه‌ها هیچ گزینه‌ای انتخاب نشود، محصول <strong>ساده</strong> ساخته می‌شود.</p>';
 					html += '<div class="shoper-specs-list">';
 					for (var ii = 0; ii < group.items.length; ii++) {
@@ -1229,7 +1232,7 @@
 						html += '<div class="shoper-spec-item">';
 						html += '<label style="display:flex;align-items:center;width:100%;margin:0;">';
 						html += '<input type="checkbox" class="shoper-variant-check" data-group="' + this.esc(group.title) + '" data-key="' + this.esc(item.key || '') + '" value="' + this.esc(item.title) + '" checked>';
-						html += '<span class="shoper-spec-key">' + this.esc(item.title) + '</span>';
+						html += '<span class="shoper-spec-key">' + this.esc(item.title) + (item.detected ? ' <span class="shoper-badge">هوشمند</span>' : '') + '</span>';
 						html += '<span class="shoper-spec-val">' + (item.price ? this.esc(this.numberFormat(item.price)) + ' تومان' : 'بدون قیمت جدا') + '</span>';
 						html += '</label></div>';
 					}

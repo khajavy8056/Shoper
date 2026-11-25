@@ -590,7 +590,13 @@ class Shoper_Digikala_Client {
 	}
 
 	/**
-	 * اگر متغیرهای صفحه‌ی محصول کافی نبود، از هم‌نام‌های جستجو کاملشان کن.
+	 * کامل‌کردن متغیرها از هم‌نام‌های جستجو — همیشه بعد از متغیرهای بومی.
+	 *
+	 * ترتیب موردنظر: اول متغیرهای خود صفحه‌ی دیجی‌کالا، بعد بررسی هوشمند
+	 * هم‌نام‌ها — حتی وقتی صفحه متغیر دارد. هرچه کشف هوشمند پیدا کند به
+	 * کاربر می‌رسد تا اگر خواست انتخابش کند: بُعد تازه به‌صورت گروه جدا
+	 * بعد از گروه‌های بومی، و مقدار تازه در بُعد موجود داخل همان گروه
+	 * بومی ادغام می‌شود. اگر چیزی پیدا نشد، فقط همان بومی‌ها می‌مانند.
 	 *
 	 * @param array $normalized داده‌ی نرمال جزئیات.
 	 * @return array
@@ -599,8 +605,6 @@ class Shoper_Digikala_Client {
 		if ( ! is_array( $normalized ) || empty( $normalized['name1'] ) || 'mock' === $this->source ) {
 			return $normalized;
 		}
-		// اولویت همیشه با متغیرهای بومی خود صفحه است؛ کشف از هم‌نام‌ها فقط
-		// بُعدهایی را اضافه می‌کند که صفحه ندارد (عنوان تکراری ساخته نمی‌شود).
 		$titles = array();
 		foreach ( (array) ( isset( $normalized['variants'] ) ? $normalized['variants'] : array() ) as $g ) {
 			if ( ! empty( $g['title'] ) ) {
@@ -626,26 +630,91 @@ class Shoper_Digikala_Client {
 	}
 
 	/**
-	 * افزودن گروه‌های کشف‌شده به variants بدون تکرار عنوان گروه بومی.
+	 * افزودن یافته‌های کشف هوشمند به variants، بعد از گروه‌های بومی.
+	 *
+	 * بُعد تازه → گروه جدا در انتها (با همان پرچم detected). بُعدی که صفحه
+	 * از قبل دارد → دور ریخته نمی‌شود: مقدارهایی که صفحه ندارد به همان
+	 * گروه بومی اضافه می‌شوند (با پرچم detected روی خود آیتم و enriched
+	 * روی گروه) تا کاربر همه‌ی گزینه‌ها را با تیک انتخاب کند؛ مقدار تکراری
+	 * دوباره ساخته نمی‌شود و اگر مقدار بومی قیمت نداشت، قیمتِ یافته‌ی
+	 * هم‌نام روی آن می‌نشیند.
 	 *
 	 * @param array $normalized داده.
 	 * @param array $groups     گروه‌های کشف‌شده.
-	 * @param array $titles     عنوان‌های موجود.
+	 * @param array $titles     عنوان‌های موجود (سازگاری امضا؛ داخل بازسازی می‌شود).
 	 * @return array
 	 */
-	private function apply_detected_groups( $normalized, $groups, $titles ) {
-		if ( empty( $groups ) ) {
+	private function apply_detected_groups( $normalized, $groups, $titles = array() ) {
+		if ( empty( $groups ) || ! is_array( $groups ) ) {
 			return $normalized;
 		}
 		if ( empty( $normalized['variants'] ) || ! is_array( $normalized['variants'] ) ) {
 			$normalized['variants'] = array();
 		}
+		$index = array(); // عنوان گروه => اندیس در variants
+		foreach ( $normalized['variants'] as $i => $g ) {
+			if ( is_array( $g ) && ! empty( $g['title'] ) && ! isset( $index[ (string) $g['title'] ] ) ) {
+				$index[ (string) $g['title'] ] = $i;
+			}
+		}
 		foreach ( $groups as $g ) {
-			if ( ! in_array( $g['title'], $titles, true ) ) {
+			if ( ! is_array( $g ) || empty( $g['title'] ) || empty( $g['items'] ) || ! is_array( $g['items'] ) ) {
+				continue;
+			}
+			$title = (string) $g['title'];
+			if ( ! isset( $index[ $title ] ) ) {
 				$normalized['variants'][] = $g;
+				$index[ $title ]         = count( $normalized['variants'] ) - 1;
+				continue;
+			}
+			// همان بُعد در صفحه هست: فقط مقدارهای تازه ادغام می‌شوند.
+			$gi    = $index[ $title ];
+			$seen  = array(); // کلید مقدار => اندیس آیتم
+			$items = isset( $normalized['variants'][ $gi ]['items'] ) && is_array( $normalized['variants'][ $gi ]['items'] )
+				? $normalized['variants'][ $gi ]['items'] : array();
+			foreach ( $items as $ii => $item ) {
+				if ( is_array( $item ) && ! empty( $item['title'] ) ) {
+					$seen[ self::variant_label_key( $item['title'] ) ] = $ii;
+				}
+			}
+			$added = false;
+			foreach ( $g['items'] as $item ) {
+				if ( ! is_array( $item ) || empty( $item['title'] ) ) {
+					continue;
+				}
+				$key   = self::variant_label_key( $item['title'] );
+				$price = isset( $item['price'] ) ? (int) $item['price'] : 0;
+				if ( isset( $seen[ $key ] ) ) {
+					$ii = $seen[ $key ];
+					if ( $price > 0 && empty( $items[ $ii ]['price'] ) ) {
+						$items[ $ii ]['price'] = $price;
+					}
+					continue;
+				}
+				$item['detected'] = true;
+				$items[]          = $item;
+				$seen[ $key ]     = count( $items ) - 1;
+				$added            = true;
+			}
+			if ( $added ) {
+				$normalized['variants'][ $gi ]['items']    = $items;
+				$normalized['variants'][ $gi ]['enriched'] = true;
 			}
 		}
 		return $normalized;
+	}
+
+	/**
+	 * کلید مقایسه‌ی یک مقدار متغیر (ارقام لاتین + فاصله‌ی یکدست) تا مقدار
+	 * یکسان با رقم فارسی/انگلیسی یا فاصله‌ی اضافه، تکراری حساب نشود.
+	 *
+	 * @param string $label عنوان مقدار.
+	 * @return string
+	 */
+	private static function variant_label_key( $label ) {
+		$k = self::latin_digits( (string) $label );
+		$k = trim( preg_replace( '/\s+/u', ' ', $k ) );
+		return function_exists( 'mb_strtolower' ) ? mb_strtolower( $k ) : strtolower( $k );
 	}
 
 	/**
