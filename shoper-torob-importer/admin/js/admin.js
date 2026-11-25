@@ -1219,6 +1219,9 @@
 					if (!group || !group.items || !group.items.length) continue;
 					html += '<div class="shoper-field-group shoper-variants-group" data-group="' + this.esc(group.title) + '">';
 					html += '<label>متغیرهای محصول — ' + this.esc(group.title) + ' (' + group.items.length + ' گزینه)</label>';
+					if (group.detected) {
+						html += '<p class="description" style="margin:0 0 6px;"><span class="shoper-badge">تشخیص خودکار</span> این بُعد از روی محصولات هم‌نام در منبع پیدا شده (مثل نسخه‌های دیگر همین گوشی با حافظه/ریجن متفاوت)؛ قیمت هر گزینه از ارزان‌ترین نسخه‌ی خودش است.</p>';
+					}
 					html += '<p class="description" style="margin:0 0 6px;">هر گزینه‌ای را که تیک بزنید، روی سایت شما با <strong>قیمت خودش</strong> ساخته می‌شود. اگر هیچ گزینه‌ای از یک گروه تیک نخورد، آن گروه ساخته نمی‌شود؛ اگر از همه‌ی گروه‌ها هیچ گزینه‌ای انتخاب نشود، محصول <strong>ساده</strong> ساخته می‌شود.</p>';
 					html += '<div class="shoper-specs-list">';
 					for (var ii = 0; ii < group.items.length; ii++) {

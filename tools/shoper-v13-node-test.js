@@ -23,7 +23,7 @@ const fixtureDir = path.join(__dirname, '../preview/fixtures');
 const searchRaw = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'search-samsung.json'), 'utf8'));
 const detailsRaw = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'details-9bcf3364.json'), 'utf8'));
 
-console.log('\nShoper 1.6.0 node tests\n');
+console.log('\nShoper 1.6.1 node tests\n');
 
 const search = logic.normalizeSearch(searchRaw);
 check('جستجوی fixture نرمال می‌شود', search.results && search.results.length > 0, search.results.length + ' نتیجه');
@@ -81,7 +81,7 @@ check('chooseSuggest لینک more_info را می‌فرستد', /preview\(it\.r
 check('fill هم product_json می‌فرستد', /shoper_fill[\s\S]{0,900}product_json/.test(pluginJs));
 
 const mainPhp = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/shoper-torob-importer.php'), 'utf8');
-check('plugin version 1.6.0', mainPhp.includes("define( 'SHOPER_VERSION', '1.6.0' )"));
+check('plugin version 1.6.1', mainPhp.includes("define( 'SHOPER_VERSION', '1.6.1' )"));
 check('کلاس تجمیع فروشنده بارگذاری می‌شود', mainPhp.includes('class-shoper-seller-aggregator.php'));
 
 check('digikala client required', mainPhp.includes('class-shoper-digikala-client.php') && mainPhp.includes('class-shoper-catalog.php'));
@@ -240,7 +240,7 @@ check('ajax update actions registered', ajax.includes('wp_ajax_shoper_check_upda
 check('admin.js update flow auto-installs after check', pluginJs.includes('checkUpdate') && pluginJs.includes('doUpdate') && pluginJs.includes("ajax('shoper_do_update'"));
 check('admin page has update button without any repo address', (() => { const v = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/admin/views/page-main.php'), 'utf8'); return v.includes('shoper-check-update') && !/github/i.test(v); })());
 
-// --- محصول متغیر + برگشت نسخه + آیینه‌ی ترب (1.6.0) ---
+// --- محصول متغیر + برگشت نسخه + آیینه‌ی ترب (1.6.1) ---
 const builderPhp = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/includes/class-shoper-product-builder.php'), 'utf8');
 const attrPhp = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/includes/class-shoper-attribute-handler.php'), 'utf8');
 check('builder resolves selected variants against source data', builderPhp.includes('function resolve_selected_variants'));
@@ -257,6 +257,28 @@ check('ajax rollback action registered with capability gate', ajax.includes('wp_
 check('admin page shows rollback button only with backup', fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/admin/views/page-main.php'), 'utf8').includes('shoper-rollback'));
 check('admin.js rollback flow calls shoper_rollback', pluginJs.includes("ajax('shoper_rollback'"));
 check('torob mirror host api.torob.ir wired in PHP and JS', torobPhp.includes('api.torob.ir') && pluginJs.includes('torobSearchUrls') && pluginJs.includes('api.torob.ir'));
+
+// --- ممیزی ۱.۶.۱: ویژگی کامل ≠ متغیر + کشف از هم‌نام‌ها + آپدیت مستقیم ---
+const dkSibSearch = logic.normalizeDigikalaSearch(JSON.parse(fs.readFileSync(path.join(fixtureDir, 'dk-search-s25.json'), 'utf8')));
+const dkSibCurrent = logic.normalizeDigikalaDetails(JSON.parse(fs.readFileSync(path.join(fixtureDir, 'dk-details-17918956.json'), 'utf8')));
+check('dk fixture search has S25 Ultra siblings', dkSibSearch.results.filter((r) => /S25 Ultra/.test(r.name1)).length >= 4, dkSibSearch.results.length + ' نتیجه');
+const detected = logic.detectSiblingVariants(dkSibCurrent, dkSibSearch.results);
+const storageGroup = detected.find((g) => g.title === 'حافظه داخلی');
+const regionGroup = detected.find((g) => g.title === 'ریجن');
+check('sibling detection finds storage dimension', !!storageGroup && storageGroup.items.length >= 3, storageGroup ? storageGroup.items.map((i) => i.title).join('، ') : 'یافت نشد');
+check('sibling detection finds region dimension (ویتنام/کره)', !!regionGroup && regionGroup.items.some((i) => i.title === 'ویتنام') && regionGroup.items.some((i) => i.title === 'کره'));
+check('detected groups are flagged for UI badge', detected.length > 0 && detected.every((g) => g.detected === true));
+check('sibling prices are cheapest per value and in toman', !!storageGroup && storageGroup.items.every((i) => i.price > 1000000 && i.price < 300000000), storageGroup ? storageGroup.items.map((i) => i.price).join(',') : '');
+check('FE sibling (different base) is excluded', detected.every((g) => g.items.every((i) => !/FE/.test(i.key || ''))) && logic.baseTitle(dkSibSearch.results.find((r) => /FE/.test(r.name1)).name1) !== logic.baseTitle(dkSibCurrent.name1));
+check('php digikala has sibling detection (pure + enrich)', dkPhp.includes('function detect_sibling_variants') && dkPhp.includes('function enrich_sibling_variants') && dkPhp.includes('title_dimensions'));
+check('catalog enriches browser dk payloads with siblings', catalogPhp.includes('enrich_sibling_variants'));
+check('builder merges variation into same-taxonomy spec attribute (no spec dropped)', builderPhp.includes('function merge_variation_into_attributes') && !builderPhp.includes('array_filter( $all_attrs'));
+check('fill upgrades existing attribute to variation instead of dropping it', builderPhp.includes('merge_variation_into_attributes( $current, $var_built'));
+check('builder attaches variation terms to parent product', builderPhp.includes('function attach_variation_terms') && builderPhp.includes('wp_set_object_terms( $product_id, $options'));
+check('variations are instock and parent transients cleared', builderPhp.includes("set_stock_status( 'instock' )") && builderPhp.includes('wc_delete_product_transients'));
+check('attribute slugs exist for region/storage-ram/configuration', attrPhp.includes("'ریجن'") && attrPhp.includes("'region'") && attrPhp.includes("'storage-ram'"));
+check('ui marks auto-detected variant groups', pluginJs.includes('group.detected') && pluginJs.includes('تشخیص خودکار'));
+check('updater always targets the LATEST release (direct jump, no stepping)', updaterPhp.includes('/releases/latest') && updaterPhp.includes('function perform_update') && updaterPhp.includes('is_newer( $release )'));
 
 console.log('\nنتیجه:', pass, 'موفق،', fail, 'ناموفق\n');
 process.exit(fail > 0 ? 1 : 0);
