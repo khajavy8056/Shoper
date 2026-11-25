@@ -54,8 +54,121 @@ class Shoper_Updater {
 		add_filter( 'pre_set_site_transient_update_plugins', array( $this, 'inject_update' ) );
 		add_filter( 'plugins_api', array( $this, 'plugin_info' ), 20, 3 );
 		add_filter( 'upgrader_source_selection', array( $this, 'source_selection' ), 10, 4 );
+		// دانلود مقاوم بسته‌ی خودمان (چند مسیر + مهلت بالا) — هم برای دکمه‌ی
+		// داخل افزونه و هم برای بروزرسانی از صفحه‌ی «افزونه‌ها»ی وردپرس.
+		add_filter( 'upgrader_pre_download', array( $this, 'pre_download' ), 10, 2 );
 		add_action( 'upgrader_process_complete', array( $this, 'clear_cache' ), 10, 0 );
 		add_action( 'delete_site_transient_update_plugins', array( $this, 'clear_cache' ), 10, 0 );
+	}
+
+	/**
+	 * همه‌ی مسیرهای دریافت بسته‌ی یک انتشار، به‌ترتیب اولویت.
+	 *
+	 * تجربه‌ی میدانی: روی بعضی هاست‌ها (مخصوصاً ایران) raw.githubusercontent
+	 * اصلاً جواب نمی‌دهد و دانلود با تایم‌اوت صفر بایت می‌میرد؛ برای همین
+	 * بسته از چند آینه‌ی مستقل خوانده می‌شود تا یکی حتماً برسد.
+	 *
+	 * @param array $release خروجی fetch_release.
+	 * @return string[]
+	 */
+	public static function package_candidates( $release ) {
+		$out = array();
+		if ( ! is_array( $release ) || empty( $release['version'] ) ) {
+			return $out;
+		}
+		$version = (string) $release['version'];
+		$tag     = ! empty( $release['tag'] ) ? (string) $release['tag'] : ( 'v' . $version );
+		$file    = self::SLUG . '-' . $version . '.zip';
+		if ( ! empty( $release['package'] ) ) {
+			$out[] = (string) $release['package'];
+		}
+		// آینه‌ی CDN همان فایل داخل درخت برچسب.
+		$out[] = 'https://cdn.' . 'jsdelivr' . '.net/gh/' . self::channel() . '@' . $tag . '/dist/' . $file;
+		$out[] = self::fallback_package( $tag, $version );
+		// آرشیو کل درخت برچسب (source_selection پوشه‌ی افزونه را پیدا می‌کند).
+		$out[] = 'https://codeload.' . 'git' . 'hub' . '.com/' . self::channel() . '/zip/refs/tags/' . $tag;
+		return array_values( array_unique( $out ) );
+	}
+
+	/**
+	 * دانلود مقاوم بسته‌ی بروزرسانی خودمان قبل از دانلود پیش‌فرض وردپرس.
+	 *
+	 * هر مسیر با مهلت ۳۰۰ ثانیه و اعتبارسنجی ZIP امتحان می‌شود؛ اولین فایل
+	 * سالم برنده است. پیام خطای نهایی هیچ نشانی‌ای ندارد.
+	 *
+	 * @param mixed  $reply   پاسخ قبلی فیلتر (معمولاً false).
+	 * @param string $package نشانی بسته‌ای که وردپرس می‌خواهد بگیرد.
+	 * @return mixed مسیر فایل محلی | WP_Error | mixed
+	 */
+	public function pre_download( $reply, $package ) {
+		if ( false !== $reply ) {
+			return $reply;
+		}
+		if ( ! is_string( $package ) || false === strpos( $package, self::SLUG ) ) {
+			return $reply;
+		}
+		$release = self::fetch_release( false );
+		if ( ! $release ) {
+			return $reply;
+		}
+		$candidates = self::package_candidates( $release );
+		if ( empty( $candidates ) ) {
+			return $reply;
+		}
+		// نشانی‌ای که خود وردپرس خواسته همیشه اول است (کش ممکن است قدیمی باشد).
+		if ( ! in_array( $package, $candidates, true ) ) {
+			array_unshift( $candidates, $package );
+		}
+		if ( ! function_exists( 'download_url' ) ) {
+			$path = ABSPATH . 'wp-admin/includes/file.php';
+			if ( file_exists( $path ) ) {
+				require_once $path; // phpcs:ignore WordPressVIPMinimum.Files.IncludingFile
+			}
+		}
+		if ( ! function_exists( 'download_url' ) ) {
+			return $reply;
+		}
+		foreach ( $candidates as $url ) {
+			// هر مسیر حداکثر دو تلاش.
+			for ( $attempt = 0; $attempt < 2; $attempt++ ) {
+				$tmp = download_url( $url, 300 );
+				if ( is_wp_error( $tmp ) ) {
+					continue;
+				}
+				if ( self::is_valid_zip( $tmp ) ) {
+					return $tmp;
+				}
+				// phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+				unlink( $tmp );
+				break;
+			}
+		}
+		return new WP_Error(
+			'shoper_download_failed',
+			'دریافت بسته‌ی بروزرسانی از هیچ‌کدام از مسیرها کامل نشد. معمولاً یعنی خروجی اینترنت هاست به مخزن بسته نمی‌رسد یا خیلی کند است؛ چند دقیقه بعد دوباره تلاش کنید، یا فایل نصب نسخه‌ی جدید را یک بار به‌صورت دستی از بخش «افزونه‌ها ← افزودن ← بارگذاری» نصب کنید (از این به بعد بروزرسانی‌ها از داخل افزونه انجام می‌شود).'
+		);
+	}
+
+	/**
+	 * سالم بودن فایل ZIP دانلودشده (امضای PK و حجم حداقلی).
+	 *
+	 * @param string $file مسیر فایل.
+	 * @return bool
+	 */
+	private static function is_valid_zip( $file ) {
+		if ( ! is_string( $file ) || ! file_exists( $file ) ) {
+			return false;
+		}
+		if ( filesize( $file ) < 10000 ) {
+			return false;
+		}
+		$fh = fopen( $file, 'rb' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
+		if ( ! $fh ) {
+			return false;
+		}
+		$head = fread( $fh, 2 ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fread
+		fclose( $fh ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
+		return 'PK' === $head;
 	}
 
 	/* ------------------------------------------------------------------ */
@@ -86,7 +199,7 @@ class Shoper_Updater {
 	 * نشانی بسته‌ی نصب داخل درخت برچسب انتشار (fallback وقتی فایل پیوست
 	 * انتشار موجود نیست).
 	 *
-	 * @param string $tag     برچسب انتشار مثل v1.6.2.
+	 * @param string $tag     برچسب انتشار مثل v1.6.3.
 	 * @param string $version نسخه بدون v.
 	 * @return string
 	 */

@@ -23,7 +23,7 @@ const fixtureDir = path.join(__dirname, '../preview/fixtures');
 const searchRaw = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'search-samsung.json'), 'utf8'));
 const detailsRaw = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'details-9bcf3364.json'), 'utf8'));
 
-console.log('\nShoper 1.6.2 node tests\n');
+console.log('\nShoper 1.6.3 node tests\n');
 
 const search = logic.normalizeSearch(searchRaw);
 check('جستجوی fixture نرمال می‌شود', search.results && search.results.length > 0, search.results.length + ' نتیجه');
@@ -81,7 +81,7 @@ check('chooseSuggest لینک more_info را می‌فرستد', /preview\(it\.r
 check('fill هم product_json می‌فرستد', /shoper_fill[\s\S]{0,900}product_json/.test(pluginJs));
 
 const mainPhp = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/shoper-torob-importer.php'), 'utf8');
-check('plugin version 1.6.2', mainPhp.includes("define( 'SHOPER_VERSION', '1.6.2' )"));
+check('plugin version 1.6.3', mainPhp.includes("define( 'SHOPER_VERSION', '1.6.3' )"));
 check('کلاس تجمیع فروشنده بارگذاری می‌شود', mainPhp.includes('class-shoper-seller-aggregator.php'));
 
 check('digikala client required', mainPhp.includes('class-shoper-digikala-client.php') && mainPhp.includes('class-shoper-catalog.php'));
@@ -309,6 +309,14 @@ const nativeGeneric = logic.normalizeDigikalaDetails({ data: { product: { id: 77
 check('native digikala variants are read generically (volume, toman)', nativeGeneric.variants.length === 1 && nativeGeneric.variants[0].title === 'حجم' && nativeGeneric.variants[0].items[0].price === 500000, JSON.stringify(nativeGeneric.variants));
 check('ajax surfaces variant fallback warnings to the user', ajax.includes("variant_warning"));
 check('ui displays variant fallback warnings', pluginJs.includes('data.variant_warning'));
+
+// --- دانلود مقاوم بروزرسانی (1.6.3) ---
+check('updater builds multiple package candidates', updaterPhp.includes('function package_candidates'));
+check('package candidates include CDN mirror and tag archive', updaterPhp.includes('jsdelivr') && updaterPhp.includes('codeload.') && updaterPhp.includes('fallback_package( $tag, $version )'));
+check('updater intercepts downloads with upgrader_pre_download', updaterPhp.includes("'upgrader_pre_download'") && updaterPhp.includes('function pre_download'));
+check('resilient download uses long timeout and validates the ZIP', updaterPhp.includes('download_url( $url, 300 )') && updaterPhp.includes('function is_valid_zip'));
+check('download failure message is Persian and address-free', updaterPhp.includes('shoper_download_failed') && !/shoper_download_failed[\s\S]{0,400}https?:\/\//.test(updaterPhp.split('shoper_download_failed')[1] || ''));
+check('source selection finds the plugin inside a repo archive', updaterPhp.includes('function source_selection') && updaterPhp.includes('GLOB_ONLYDIR'));
 
 console.log('\nنتیجه:', pass, 'موفق،', fail, 'ناموفق\n');
 process.exit(fail > 0 ? 1 : 0);
