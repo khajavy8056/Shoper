@@ -673,13 +673,24 @@ class Shoper_Ajax {
 			$this->send_error( $result, 502 );
 		}
 
+		// خروجی جدید {version, active} است؛ رشته‌ی ساده هم برای سازگاری پذیرفته می‌شود.
+		$new_version = is_array( $result ) ? ( isset( $result['version'] ) ? $result['version'] : '' ) : (string) $result;
+		$is_active   = is_array( $result ) ? ! empty( $result['active'] ) : true;
+		$message     = 'افزونه به نسخه‌ی ' . $new_version . ' بروزرسانی شد.';
+		if ( $is_active ) {
+			$message .= ' افزونه فعال است؛ برای بارگذاری نسخه‌ی جدید، صفحه را تازه‌سازی کنید.';
+		} else {
+			$message .= ' اما فعال‌سازی خودکار انجام نشد؛ از صفحه‌ی «افزونه‌ها» یک بار روی «فعال‌کردن» بزنید.';
+		}
+
 		wp_send_json_success(
 			array(
 				'updated'         => true,
+				'active'          => $is_active,
 				// ثابت نسخه در همین درخواست هنوز نسخه‌ی قبلی است؛ نسخه‌ی نصب‌شده از خود انتشار خوانده شده.
-				'new_version'     => $result,
+				'new_version'     => $new_version,
 				'current_version' => SHOPER_VERSION,
-				'message'         => 'افزونه به نسخه‌ی ' . $result . ' بروزرسانی شد. برای بارگذاری نسخه‌ی جدید، صفحه را تازه‌سازی کنید.',
+				'message'         => $message,
 			)
 		);
 	}
