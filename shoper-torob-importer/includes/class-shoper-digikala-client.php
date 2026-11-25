@@ -432,6 +432,11 @@ class Shoper_Digikala_Client {
 			$same = ( $sb === $base )
 				|| ( mb_strlen( $base ) >= 8 && false !== mb_strpos( $sb, $base ) )
 				|| ( mb_strlen( $sb ) >= 8 && false !== mb_strpos( $base, $sb ) );
+			// شباهت نام‌های پایه (بعد از حذف توکن‌های بُعد) نشانه‌ی قوی‌تری
+			// از هم‌خانواده بودن است؛ اختلاف جزئی در نوشتن مدل را می‌گیرد.
+			if ( ! $same && '' !== $base && '' !== $sb && self::title_similarity( $base, $sb ) >= 0.75 ) {
+				$same = true;
+			}
 			// برای دسته‌هایی که توکن متغیرشان را نمی‌شناسیم (آرایشی، مواد غذایی…)
 			// شباهت واژگانی عنوان‌ها هم نشانه‌ی هم‌خانواده بودن است.
 			if ( ! $same && self::title_similarity( $current['name1'], $s['name1'] ) >= 0.65 ) {
@@ -611,22 +616,94 @@ class Shoper_Digikala_Client {
 				$titles[] = $g['title'];
 			}
 		}
-		$cache_key = 'shoper_dk_sib_' . md5( isset( $normalized['random_key'] ) ? $normalized['random_key'] : $normalized['name1'] );
+		$cache_key = 'shoper_dk_sib2_' . md5( isset( $normalized['random_key'] ) ? $normalized['random_key'] : $normalized['name1'] );
 		if ( function_exists( 'get_transient' ) ) {
 			$cached = get_transient( $cache_key );
 			if ( is_array( $cached ) && isset( $cached['groups'] ) ) {
-				return $this->apply_detected_groups( $normalized, $cached['groups'], $titles );
+				$normalized = $this->apply_detected_groups( $normalized, $cached['groups'], $titles );
+				if ( isset( $cached['discovery'] ) && is_array( $cached['discovery'] ) ) {
+					$normalized['variant_discovery'] = $cached['discovery'];
+				}
+				return $normalized;
 			}
 		}
-		$search = $this->search( $normalized['name1'], 1, 20 );
-		if ( is_wp_error( $search ) || empty( $search['results'] ) ) {
-			return $normalized;
+
+		// نکته‌ی کلیدی: با «نام خانواده» (بدون توکن‌های بُعد مثل ظرفیت/ریجن)
+		// جستجو می‌کنیم، نه با عنوان کامل محصول. عنوان کامل آن‌قدر خاص است
+		// که جستجوی دیجی‌کالا معمولاً فقط خود محصول را برمی‌گرداند و
+		// هم‌خانواده‌ها (حافظه/ریجن/حجم دیگر) اصلاً وارد نتایج نمی‌شوند؛
+		// برای همین کشف هوشمند در عمل چیزی پیدا نمی‌کرد.
+		$family  = self::base_title( $normalized['name1'], isset( $normalized['name2'] ) ? $normalized['name2'] : '' );
+		$queries = array();
+		if ( '' !== $family && $family !== $normalized['name1'] ) {
+			$queries[] = $family;
 		}
-		$groups = self::detect_sibling_variants( $normalized, $search['results'] );
-		if ( function_exists( 'set_transient' ) ) {
+		$queries[] = $normalized['name1'];
+
+		$siblings   = array();
+		$seen_keys  = array();
+		$used_query = '';
+		$groups     = array();
+		foreach ( $queries as $q ) {
+			$search = $this->search( $q, 1, 20 );
+			if ( is_wp_error( $search ) || empty( $search['results'] ) ) {
+				continue;
+			}
+			if ( '' === $used_query ) {
+				$used_query = $q;
+			}
+			foreach ( $search['results'] as $row ) {
+				if ( ! is_array( $row ) || empty( $row['name1'] ) ) {
+					continue;
+				}
+				$k = ! empty( $row['random_key'] ) ? (string) $row['random_key'] : md5( $row['name1'] );
+				if ( isset( $seen_keys[ $k ] ) ) {
+					continue;
+				}
+				$seen_keys[ $k ] = true;
+				$siblings[]      = $row;
+			}
+			$groups = self::detect_sibling_variants( $normalized, $siblings );
+			if ( ! empty( $groups ) ) {
+				break;
+			}
+		}
+
+		// نتیجه‌ی خالی کش نمی‌شود تا دفعه‌ی بعد دوباره تلاش شود.
+		if ( ! empty( $groups ) && function_exists( 'set_transient' ) ) {
 			set_transient( $cache_key, array( 'groups' => $groups ), 30 * MINUTE_IN_SECONDS );
 		}
-		return $this->apply_detected_groups( $normalized, $groups, $titles );
+
+		$native_count  = count( (array) ( isset( $normalized['variants'] ) ? $normalized['variants'] : array() ) );
+		$normalized    = $this->apply_detected_groups( $normalized, $groups, $titles );
+		$total_groups  = count( (array) ( isset( $normalized['variants'] ) ? $normalized['variants'] : array() ) );
+		$enriched      = 0;
+		foreach ( (array) ( isset( $normalized['variants'] ) ? $normalized['variants'] : array() ) as $g ) {
+			if ( ! empty( $g['enriched'] ) ) {
+				$enriched++;
+			}
+		}
+		// گزارش شفاف برای کاربر/پشتیبانی: بررسی هوشمند دقیقاً چه کرده است.
+		$normalized['variant_discovery'] = array(
+			'query'         => $used_query,
+			'family'        => $family,
+			'results'       => count( $siblings ),
+			'native_groups' => $native_count,
+			'total_groups'  => $total_groups,
+			'new_groups'    => max( 0, $total_groups - $native_count ),
+			'enriched'      => $enriched,
+		);
+		if ( ! empty( $groups ) && function_exists( 'set_transient' ) ) {
+			set_transient(
+				$cache_key,
+				array(
+					'groups'    => $groups,
+					'discovery' => $normalized['variant_discovery'],
+				),
+				30 * MINUTE_IN_SECONDS
+			);
+		}
+		return $normalized;
 	}
 
 	/**

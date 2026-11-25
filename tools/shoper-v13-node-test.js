@@ -23,7 +23,7 @@ const fixtureDir = path.join(__dirname, '../preview/fixtures');
 const searchRaw = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'search-samsung.json'), 'utf8'));
 const detailsRaw = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'details-9bcf3364.json'), 'utf8'));
 
-console.log('\nShoper 1.6.5 node tests\n');
+console.log('\nShoper 1.6.6 node tests\n');
 
 const search = logic.normalizeSearch(searchRaw);
 check('جستجوی fixture نرمال می‌شود', search.results && search.results.length > 0, search.results.length + ' نتیجه');
@@ -81,7 +81,7 @@ check('chooseSuggest لینک more_info را می‌فرستد', /preview\(it\.r
 check('fill هم product_json می‌فرستد', /shoper_fill[\s\S]{0,900}product_json/.test(pluginJs));
 
 const mainPhp = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/shoper-torob-importer.php'), 'utf8');
-check('plugin version 1.6.5', mainPhp.includes("define( 'SHOPER_VERSION', '1.6.5' )"));
+check('plugin version 1.6.6', mainPhp.includes("define( 'SHOPER_VERSION', '1.6.6' )"));
 check('کلاس تجمیع فروشنده بارگذاری می‌شود', mainPhp.includes('class-shoper-seller-aggregator.php'));
 
 check('digikala client required', mainPhp.includes('class-shoper-digikala-client.php') && mainPhp.includes('class-shoper-catalog.php'));
@@ -273,7 +273,7 @@ check('FE sibling (different base) is excluded', detected.every((g) => g.items.e
 check('php digikala has sibling detection (pure + enrich)', dkPhp.includes('function detect_sibling_variants') && dkPhp.includes('function enrich_sibling_variants') && dkPhp.includes('title_dimensions'));
 check('catalog enriches browser dk payloads with siblings', catalogPhp.includes('enrich_sibling_variants'));
 
-// --- ترتیب بومی ← هوشمند: هر دو همیشه (1.6.5) ---
+// --- ترتیب بومی ← هوشمند: هر دو همیشه (1.6.6) ---
 // بومی اول می‌ماند، یافته‌ی هوشمند در همان بُعد ادغام و بُعد تازه اضافه می‌شود.
 const mergedData = {
 	name1: 'تست',
@@ -293,6 +293,18 @@ check('new smart dimension is appended AFTER native groups', mergedData.variants
 check('no smart findings => native variants untouched', (() => { const d = { variants: [{ title: 'رنگ', items: [{ key: 'c', title: 'مشکی', price: 1 }] }] }; logic.applyDetectedGroups(d, []); return d.variants.length === 1 && !d.variants[0].enriched; })());
 check('php merges detected values into native groups instead of dropping them', dkPhp.includes('function apply_detected_groups') && dkPhp.includes("['enriched'] = true") && dkPhp.includes('function variant_label_key') && !dkPhp.includes('! in_array( $g[\'title\'], $titles, true )'));
 check('ui badges merged smart options so the user can choose', pluginJs.includes('group.enriched') && pluginJs.includes('item.detected'));
+
+// --- چرا هوشمند چیزی نمی‌آورد: جستجو با نام خانواده (1.6.6) ---
+const familyQuery = logic.siblingSearchQuery('گوشی موبایل سامسونگ مدل Galaxy S25 Ultra دو سیم کارت ظرفیت 256 گیگابایت و رم 12 گیگابایت - ویتنام', '');
+check('smart search uses the FAMILY name (dimension tokens stripped), not the exact title', familyQuery !== '' && !/256|ظرفیت|ویتنام/.test(familyQuery) && /S25 Ultra/.test(familyQuery), familyQuery);
+check('exact-title-only results yield nothing, family results yield groups (the live bug)', logic.detectSiblingVariants(dkSibCurrent, [dkSibCurrent]).length === 0 && logic.detectSiblingVariants(dkSibCurrent, dkSibSearch.results).length >= 2);
+check('php enrich searches by family name first, then falls back to full title', dkPhp.includes("self::base_title( $normalized['name1']") && dkPhp.includes("$queries[] = $normalized['name1'];"));
+check('php no longer caches empty sibling results (retries next preview)', dkPhp.includes('نتیجه‌ی خالی کش نمی‌شود') && dkPhp.includes('shoper_dk_sib2_'));
+check('php pool also matches on base-title similarity', dkPhp.includes('self::title_similarity( $base, $sb ) >= 0.75'));
+check('php reports variant_discovery for a transparent smart-search report', dkPhp.includes("'variant_discovery'") && dkPhp.includes("'native_groups'") && dkPhp.includes("'new_groups'"));
+check('ui shows the smart-search report in preview', pluginJs.includes('d.variant_discovery') && pluginJs.includes('بررسی هوشمند متغیرها'));
+check('builder warns instead of silently dropping dimensions beyond the safe 3', builderPhp.includes('dropped_variant_groups') && builderPhp.includes('حداکثر ۳ بُعد متغیر ساخته می‌شود'));
+check('update failure guides the user to the plugins page to activate', pluginJs.includes("data.active === false") && pluginJs.includes('plugins.php'));
 check('builder merges variation into same-taxonomy spec attribute (no spec dropped)', builderPhp.includes('function merge_variation_into_attributes') && !builderPhp.includes('array_filter( $all_attrs'));
 check('fill upgrades existing attribute to variation instead of dropping it', builderPhp.includes('merge_variation_into_attributes( $current, $var_built'));
 check('builder attaches variation terms to parent product', builderPhp.includes('function attach_variation_terms') && builderPhp.includes('wp_set_object_terms( $product_id, $options'));
@@ -339,7 +351,7 @@ check('resilient download uses long timeout and validates the ZIP', updaterPhp.i
 check('download failure message is Persian and address-free', updaterPhp.includes('shoper_download_failed') && !/shoper_download_failed[\s\S]{0,400}https?:\/\//.test(updaterPhp.split('shoper_download_failed')[1] || ''));
 check('source selection finds the plugin inside a repo archive', updaterPhp.includes('function source_selection') && updaterPhp.includes('GLOB_ONLYDIR'));
 
-// --- فعال ماندن افزونه بعد از بروزرسانی (1.6.5) ---
+// --- فعال ماندن افزونه بعد از بروزرسانی (1.6.6) ---
 check('updater remembers active state before any update', updaterPhp.includes('function remember_active_state') && updaterPhp.includes("'upgrader_pre_install'"));
 check('updater safety-net reactivates after upgrader completes', updaterPhp.includes('function ensure_reactivated') && updaterPhp.includes("'upgrader_process_complete'"));
 check('reactivation only happens when the plugin was active', updaterPhp.includes('function reactivate_if_needed') && updaterPhp.includes('activate_plugin( SHOPER_PLUGIN_BASENAME'));

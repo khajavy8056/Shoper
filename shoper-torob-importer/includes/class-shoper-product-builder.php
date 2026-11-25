@@ -50,6 +50,14 @@ class Shoper_Product_Builder {
 	private $aggregator;
 
 	/**
+	 * چند گروه از انتخاب کاربر به‌خاطر سقف امن ۳ بُعد کنار گذاشته شد
+	 * (در resolve_selected_variants پر می‌شود تا هشدار شفاف داده شود).
+	 *
+	 * @var int
+	 */
+	private $dropped_variant_groups = 0;
+
+	/**
 	 * سازنده.
 	 */
 	public function __construct() {
@@ -759,6 +767,9 @@ class Shoper_Product_Builder {
 				$variant_warning = 'متغیرها به‌صورت کامل و هماهنگ ساخته نشدند (' . implode( ' ', $variant_plan['errors'] ) . ')؛ برای جلوگیری از محصول خراب، محصول به‌صورت ساده ساخته شد.';
 			}
 		}
+		if ( ! empty( $selected_variants ) && $this->dropped_variant_groups > 0 ) {
+			$variant_warning = trim( $variant_warning . ' توجه: برای ساخت امن، حداکثر ۳ بُعد متغیر ساخته می‌شود؛ ' . $this->dropped_variant_groups . ' بُعد انتخاب‌شده‌ی دیگر ساخته نشد.' );
+		}
 
 		$product = $is_variable ? new WC_Product_Variable() : new WC_Product_Simple();
 		$product->set_name( sanitize_text_field( $data['name1'] ) );
@@ -969,6 +980,9 @@ class Shoper_Product_Builder {
 			} else {
 				$variant_warning = 'متغیرها کامل و هماهنگ نبودند (' . implode( ' ', $variant_plan['errors'] ) . ')؛ محصول بدون تغییر در بخش متغیرها پر شد.';
 			}
+		}
+		if ( ! empty( $selected_variants ) && $this->dropped_variant_groups > 0 ) {
+			$variant_warning = trim( $variant_warning . ' توجه: برای ساخت امن، حداکثر ۳ بُعد متغیر ساخته می‌شود؛ ' . $this->dropped_variant_groups . ' بُعد انتخاب‌شده‌ی دیگر ساخته نشد.' );
 		}
 		$is_variable       = $want_variable;
 		$variations_count  = 0;
