@@ -177,6 +177,11 @@
 				self.doUpdate();
 			});
 
+			$(document).on('click', '#shoper-rollback', function (e) {
+				e.preventDefault();
+				self.doRollback();
+			});
+
 			this.$diagBtn.on('click', function (e) {
 				e.preventDefault();
 				self.diagnostics();
@@ -263,6 +268,15 @@
 			return base + path + '?page=0&size=' + (size || 10) + '&q=' + encodeURIComponent(query) + '&source=next_desktop';
 		},
 
+		// هر دو دامنه‌ی ترب امتحان می‌شوند: api.torob.com و آیینه‌ی api.torob.ir
+		// (همان API؛ گاهی فایروال روی یکی ۴۹۰ می‌دهد و روی دیگری نه).
+		torobSearchUrls: function (query, size) {
+			var out = [this.torobSearchUrl(query, size)];
+			var alt = out[0].replace('https://api.torob.com/', 'https://api.torob.ir/');
+			if (alt !== out[0]) { out.push(alt); }
+			return out;
+		},
+
 		torobDetailsUrl: function (prk, moreInfo) {
 			if (moreInfo && /torob\.(com|ir)/i.test(String(moreInfo))) {
 				return moreInfo;
@@ -270,6 +284,14 @@
 			var base = this.cfg('apiBase', 'https://api.torob.com');
 			var path = this.cfg('detailsPath', '/v4/base-product/details/');
 			return base + path + '?prk=' + encodeURIComponent(prk) + '&source=next_desktop';
+		},
+
+		torobDetailsUrls: function (prk, moreInfo) {
+			var primary = this.torobDetailsUrl(prk, moreInfo);
+			var out = [primary];
+			var alt = String(primary).replace('https://api.torob.com/', 'https://api.torob.ir/');
+			if (alt !== primary) { out.push(alt); }
+			return out;
 		},
 
 		wrapRelay: function (url) {
@@ -532,7 +554,7 @@
 			// اگر دیجی‌کالا از مرورگر نیامد، ترب را هم از خود مرورگر بگیر
 			// (IP هاست ممکن است 490 باشد ولی IP مرورگر مدیر معمولاً باز است).
 			var tryTorob = function () {
-				self.browserFetch(self.torobSearchUrl(term, 10)).done(function (traw) {
+				self.browserFetch(self.torobSearchUrls(term, 10)).done(function (traw) {
 					if (!traw || !traw.results) {
 						runServer();
 						return;
@@ -981,7 +1003,7 @@
 			};
 			// ترب از مرورگر مدیر: وقتی IP هاست 490 است، لیست ترب از مرورگر می‌آید.
 			var tryTorobSearch = function () {
-				self.browserFetch(self.torobSearchUrl(query, 10)).done(function (traw) {
+				self.browserFetch(self.torobSearchUrls(query, 10)).done(function (traw) {
 					if (traw && traw.results) {
 						self.ingest('search', traw, showSearch, runServerSearch);
 						return;
@@ -1100,7 +1122,7 @@
 				return;
 			}
 
-			this.browserFetch(this.torobDetailsUrl(prk, moreInfo)).done(function (raw) {
+			this.browserFetch(this.torobDetailsUrls(prk, moreInfo)).done(function (raw) {
 				if (raw && (raw.random_key || raw.name1)) {
 					self.ingest('details', raw, showPreview, runServerPreview);
 					return;
@@ -1188,6 +1210,29 @@
 			var desc = d.description_html || '';
 			html += '<div class="shoper-field-group"><label>توضیحات (قابل ویرایش)</label>';
 			html += '<textarea id="shoper-p-desc">' + this.esc(desc) + '</textarea></div>';
+
+			// متغیرها (رنگ/سایز/…) با قیمت جدا — انتخاب کاربر تعیین می‌کند
+			// محصول «متغیر» ساخته شود و کدام گزینه‌ها روی سایت او بیایند.
+			if (d.variants && d.variants.length) {
+				for (var vi = 0; vi < d.variants.length; vi++) {
+					var group = d.variants[vi];
+					if (!group || !group.items || !group.items.length) continue;
+					html += '<div class="shoper-field-group shoper-variants-group" data-group="' + this.esc(group.title) + '">';
+					html += '<label>متغیرهای محصول — ' + this.esc(group.title) + ' (' + group.items.length + ' گزینه)</label>';
+					html += '<p class="description" style="margin:0 0 6px;">هر گزینه‌ای را که تیک بزنید، روی سایت شما با <strong>قیمت خودش</strong> ساخته می‌شود. اگر هیچ گزینه‌ای از یک گروه تیک نخورد، آن گروه ساخته نمی‌شود؛ اگر از همه‌ی گروه‌ها هیچ گزینه‌ای انتخاب نشود، محصول <strong>ساده</strong> ساخته می‌شود.</p>';
+					html += '<div class="shoper-specs-list">';
+					for (var ii = 0; ii < group.items.length; ii++) {
+						var item = group.items[ii];
+						html += '<div class="shoper-spec-item">';
+						html += '<label style="display:flex;align-items:center;width:100%;margin:0;">';
+						html += '<input type="checkbox" class="shoper-variant-check" data-group="' + this.esc(group.title) + '" data-key="' + this.esc(item.key || '') + '" value="' + this.esc(item.title) + '" checked>';
+						html += '<span class="shoper-spec-key">' + this.esc(item.title) + '</span>';
+						html += '<span class="shoper-spec-val">' + (item.price ? this.esc(this.numberFormat(item.price)) + ' تومان' : 'بدون قیمت جدا') + '</span>';
+						html += '</label></div>';
+					}
+					html += '</div></div>';
+				}
+			}
 
 			// مشخصات فنی.
 			if (d.specs) {
@@ -1362,6 +1407,19 @@
 			return { selected: kept, featured: featured };
 		},
 
+		// متغیرهای تیک‌خورده: [{group, key, title}]
+		collectVariantSelection: function () {
+			var out = [];
+			this.$preview.find('.shoper-variant-check:checked').each(function () {
+				out.push({
+					group: $(this).data('group') || '',
+					key: $(this).data('key') || '',
+					title: $(this).val() || ''
+				});
+			});
+			return out;
+		},
+
 		/**
 		 * ساخت اطلاعات سئو (آینه‌ی Shoper_Product_Builder::build_seo).
 		 *
@@ -1478,6 +1536,7 @@
 				status: $('#shoper-create-status').val() || $('select#shoper-create-status').val() || 'draft',
 				selected_images: JSON.stringify(imgSel.selected || []),
 				featured_image: imgSel.featured || 0,
+				selected_variants: JSON.stringify(this.collectVariantSelection()),
 				seo_title: seoTitle,
 				seo_desc: seoDesc,
 				tags: JSON.stringify(tags),
@@ -1500,6 +1559,9 @@
 				var html = '<div class="shoper-success-box">';
 				html += '<p><strong>✓ محصول ساخته شد!</strong></p>';
 				html += '<p>تعداد ویژگی‌های ثبت‌شده: ' + (data.specs_count || 0) + '<br>';
+				if (data.product_type === 'variable') {
+					html += 'نوع محصول: <strong>متغیر</strong> — تعداد متغیرهای ساخته‌شده: ' + (data.variations_count || 0) + '<br>';
+				}
 				html += 'تصاویر دانلودشده: ' + ((data.image_info && data.image_info.gallery_ids) ? data.image_info.gallery_ids.length + 1 : 0) + '<br>';
 				if (data.filenames && data.filenames.length) {
 					html += 'نام فایل تصاویر: <code>' + self.esc(data.filenames.join('، ')) + '</code><br>';
@@ -1559,6 +1621,7 @@
 				more_info_url: moreInfo,
 				selected_images: JSON.stringify(imgSel.selected || []),
 				featured_image: imgSel.featured || 0,
+				selected_variants: JSON.stringify(this.collectVariantSelection()),
 				seo_title: seoTitle,
 				seo_desc: seoDesc,
 				focus_keyword: $('#shoper-p-focus').val() || '',
@@ -1623,6 +1686,26 @@
 			});
 		},
 
+		/**
+		 * برگشت به نسخه‌ی قبلی از پشتیبان خودکار.
+		 */
+		doRollback: function () {
+			var self = this;
+			var $btn = $('#shoper-rollback');
+			var $out = $('#shoper-rollback-result');
+			if (!$btn.length) { return; }
+			if (!window.confirm('افزونه به نسخه‌ی قبلی برگردد؟ نسخه‌ی فعلی کنار گذاشته می‌شود.')) { return; }
+			$btn.prop('disabled', true);
+			$out.html('<span class="shoper-loading-inline"></span> در حال برگرداندن نسخه‌ی قبلی… صفحه را نبندید.');
+			this.ajax('shoper_rollback', {}, function (data) {
+				$btn.prop('disabled', false);
+				$out.html('<span style="color:#00a32a;">✓ ' + self.esc(data.message || 'برگشت انجام شد.') + '</span> <a href="" onclick="window.location.reload();return false;">تازه‌سازی صفحه</a>');
+			}, function (info) {
+				$btn.prop('disabled', false);
+				$out.html('<span style="color:#d63638;">✗ ' + self.esc((info && info.message) || 'برگشت انجام نشد.') + '</span>');
+			});
+		},
+
 		testConnection: function () {
 			var self = this;
 			this.$connResult.html('<span class="shoper-loading-inline"></span> در حال تست مرورگر و سرور...');
@@ -1637,7 +1720,7 @@
 
 		testTorobBrowser: function () {
 			var self = this;
-			this.browserFetch(this.torobSearchUrl('s25', 1)).done(function (raw) {
+			this.browserFetch(this.torobSearchUrls('s25', 1)).done(function (raw) {
 				if (raw && raw.results) {
 					self.$connResult.html('<span style="color:#00a32a;">✓ اتصال ترب از مرورگر شما برقرار است. همین حالا جستجو کنید.</span>');
 					return;
@@ -1665,7 +1748,7 @@
 			this.$diag.show().html('<div class="shoper-diag-loading"><span class="shoper-loading-inline"></span> در حال اجرای عیب‌یابی کامل… این کار چند ده ثانیه طول می‌کشد.</div>');
 
 			this.ajax('shoper_diagnostics', {}, function (data) {
-				self.browserFetch(self.torobSearchUrl('s25', 2)).done(function (raw) {
+				self.browserFetch(self.torobSearchUrls('s25', 2)).done(function (raw) {
 					self.$diagBtn.prop('disabled', false);
 					self.mergeBrowserDiag(data, raw);
 					self.renderDiagnostics(data);

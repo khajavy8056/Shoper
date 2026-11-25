@@ -36,6 +36,44 @@ const PORT = parseInt(process.env.PORT, 10) || 3000;
 const HOST = '0.0.0.0';
 
 const TOROB_BASE = 'https://api.torob.com';
+const TOROB_BASE_ALT = 'https://api.torob.ir';
+
+// آینه‌ی Shoper_Product_Builder::resolve_selected_variants + create_variations
+function resolveVariantsSim(data, selected) {
+	if (!data || !Array.isArray(data.variants) || !Array.isArray(selected) || !selected.length) {
+		return { groups: [], variations: [], product_type: 'simple' };
+	}
+	const wanted = {};
+	for (const sel of selected) {
+		if (!sel || !sel.group) continue;
+		const mark = sel.key || sel.title || '';
+		if (!mark) continue;
+		(wanted[sel.group] = wanted[sel.group] || {})[mark] = true;
+	}
+	const groups = [];
+	for (const g of data.variants) {
+		if (!g || !g.title || !Array.isArray(g.items) || !wanted[g.title]) continue;
+		const items = g.items.filter((it) => it && (wanted[g.title][it.key] || wanted[g.title][it.title]));
+		if (items.length) groups.push({ title: g.title, items });
+	}
+	if (!groups.length) return { groups: [], variations: [], product_type: 'simple' };
+	let combos = [{}];
+	for (const g of groups) {
+		const next = [];
+		for (const c of combos) for (const it of g.items) next.push({ ...c, [g.title]: it });
+		combos = next;
+	}
+	const variations = combos.map((combo) => {
+		let price = 0;
+		const attrs = {};
+		for (const [g, it] of Object.entries(combo)) {
+			attrs[g] = it.title;
+			if (!price && it.price > 0) price = it.price;
+		}
+		return { attributes: attrs, regular_price: price || data.price || 0 };
+	});
+	return { groups, variations, product_type: 'variable' };
+}
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
 /** وضعیت دسترسی به شبکه — یک‌بار تشخیص داده می‌شود. */
@@ -71,6 +109,26 @@ async function torobFetch(pathname, params) {
 			throw new Error(json.error.message || 'خطای ترب.');
 		}
 		return json;
+	} catch (e) {
+		// آیینه‌ی api.torob.ir — همان API؛ اگر دامنه‌ی اصلی خطا/۴۹۰ داد.
+		clearTimeout(timer);
+		const alt = new URL(TOROB_BASE_ALT + pathname);
+		for (const [k, v] of Object.entries(params)) {
+			if (v !== undefined && v !== '') alt.searchParams.set(k, v);
+		}
+		const res2 = await fetch(alt.toString(), {
+			headers: {
+				Accept: 'application/json, text/plain, */*',
+				'Accept-Language': 'fa-IR,fa;q=0.9,en;q=0.8',
+				'User-Agent': UA,
+				Referer: 'https://torob.com/',
+				Origin: 'https://torob.com',
+			},
+		});
+		if (!res2.ok) throw new Error(`پاسخ غیرمنتظره از ترب (کد ${res2.status}).`);
+		const json2 = await res2.json();
+		if (json2 && json2.error) throw new Error(json2.error.message || 'خطای ترب.');
+		return json2;
 	} finally {
 		clearTimeout(timer);
 	}
@@ -499,10 +557,21 @@ const handlers = {
 			const filenames = indices.map((_, idx) => fileBase + '-' + (idx + 1));
 			const keptUrls = indices.map((i) => data.gallery[i]);
 
+			let selectedVariants = null;
+			try {
+				const rawV = params.get('selected_variants');
+				if (rawV) selectedVariants = JSON.parse(rawV);
+			} catch (e) { /* ignore */ }
+			const varSim = resolveVariantsSim(data, selectedVariants);
+
 			ok(res, {
 				simulated: true,
+				product_type: varSim.product_type,
+				variations_count: varSim.variations.length,
 				product: {
 					name: data.name1,
+					type: varSim.product_type,
+					variations: varSim.variations,
 					status,
 					sku: (String(data.random_key || '').indexOf('DKP-') === 0 || String(data.random_key || '').indexOf('TRB-') === 0) ? data.random_key : ('TRB-' + data.random_key),
 					regular_price: data.price,
@@ -605,10 +674,19 @@ const handlers = {
 			const filenames = indices.map((_, idx) => fileBase + '-' + (idx + 1));
 			const keptUrls = indices.map((i) => data.gallery[i]);
 
+			let selectedVariantsFill = null;
+			try {
+				const rawV = params.get('selected_variants');
+				if (rawV) selectedVariantsFill = JSON.parse(rawV);
+			} catch (e) { /* ignore */ }
+			const varSimFill = resolveVariantsSim(data, selectedVariantsFill);
+
 			ok(res, {
 				simulated: true,
 				message: 'محصول با موفقیت از ترب پر شد. برای ذخیره‌ی نهایی دکمه‌ی «به‌روزرسانی» را بزنید.',
 				post_id: postId,
+				product_type: varSimFill.product_type,
+				variations_count: varSimFill.variations.length,
 				specs_count: Object.keys(data.specs).length,
 				attr_errors: built.errors,
 				reload: true,
@@ -621,6 +699,8 @@ const handlers = {
 					regular_price: data.price,                          // ← فیلد قیمت عادی (General)
 					sku: (String(data.random_key || '').indexOf('DKP-') === 0 || String(data.random_key || '').indexOf('TRB-') === 0) ? data.random_key : ('TRB-' + data.random_key),
 					attributes: built.attrs,                            // ← تب «ویژگی‌ها»
+					product_type: varSimFill.product_type,              // ← نوع محصول (ساده/متغیر)
+					variations: varSimFill.variations,                  // ← variationها با قیمت هر گزینه
 					images: {
 						featured: keptUrls[0] || '',                     // ← تصویر شاخص
 						gallery: keptUrls.slice(1),                      // ← گالری
@@ -650,6 +730,10 @@ const handlers = {
 
 	async shoper_do_update(params, res) {
 		return fail(res, 'بروزرسانی واقعی فقط داخل وردپرس انجام می‌شود؛ در پیش‌نمایش نسخه‌ای برای نصب نیست.');
+	},
+
+	async shoper_rollback(params, res) {
+		return fail(res, 'برگشت به نسخه‌ی قبلی فقط داخل وردپرس انجام می‌شود؛ در پیش‌نمایش پشتیبانی وجود ندارد.');
 	},
 
 	async shoper_test_connection(params, res) {
@@ -765,13 +849,13 @@ const server = http.createServer(async (req, res) => {
 	}
 
 	// --- دانلود آخرین نسخه‌ی افزونه (ZIP) ---
-	if (pathname === '/download/latest' || pathname === '/download/shoper-torob-importer-1.5.9.zip') {
-		const zip = path.join(ROOT, 'dist', 'shoper-torob-importer-1.5.9.zip');
+	if (pathname === '/download/latest' || pathname === '/download/shoper-torob-importer-1.6.0.zip') {
+		const zip = path.join(ROOT, 'dist', 'shoper-torob-importer-1.6.0.zip');
 		try {
 			const data = await fsp.readFile(zip);
 			res.writeHead(200, {
 				'Content-Type': 'application/zip',
-				'Content-Disposition': 'attachment; filename="shoper-torob-importer-1.5.9.zip"',
+				'Content-Disposition': 'attachment; filename="shoper-torob-importer-1.6.0.zip"',
 				'Content-Length': data.length,
 				'Cache-Control': 'no-store',
 			});

@@ -207,6 +207,187 @@ class Shoper_Product_Builder {
 	 * @param array $args آرگومان‌ها.
 	 * @return array|WP_Error
 	 */
+	/**
+	 * حل‌کردن انتخاب متغیرهای کاربر در برابر داده‌ی منبع.
+	 *
+	 * $args['selected_variants']: فهرست انتخاب‌ها [{group, key}] یا [{group, title}].
+	 * فقط گروه‌هایی برمی‌گردند که دست‌کم یک گزینه‌ی انتخاب‌شده دارند.
+	 *
+	 * @param array $data داده‌ی نرمال‌شده (شامل variants).
+	 * @param array $args آرگومان‌ها.
+	 * @return array [{title, items: [{key, title, price}]}]
+	 */
+	private function resolve_selected_variants( $data, $args ) {
+		if ( empty( $data['variants'] ) || ! is_array( $data['variants'] ) ) {
+			return array();
+		}
+		if ( empty( $args['selected_variants'] ) || ! is_array( $args['selected_variants'] ) ) {
+			return array();
+		}
+		$wanted = array(); // groupTitle => [keyOrTitle => true]
+		foreach ( $args['selected_variants'] as $sel ) {
+			if ( ! is_array( $sel ) || empty( $sel['group'] ) ) {
+				continue;
+			}
+			$mark = '';
+			if ( ! empty( $sel['key'] ) ) {
+				$mark = (string) $sel['key'];
+			} elseif ( ! empty( $sel['title'] ) ) {
+				$mark = (string) $sel['title'];
+			}
+			if ( '' === $mark ) {
+				continue;
+			}
+			$wanted[ (string) $sel['group'] ][ $mark ] = true;
+		}
+		if ( empty( $wanted ) ) {
+			return array();
+		}
+		$out = array();
+		foreach ( $data['variants'] as $group ) {
+			if ( empty( $group['title'] ) || empty( $group['items'] ) || ! is_array( $group['items'] ) ) {
+				continue;
+			}
+			$gtitle = (string) $group['title'];
+			if ( empty( $wanted[ $gtitle ] ) ) {
+				continue;
+			}
+			$items = array();
+			foreach ( $group['items'] as $item ) {
+				if ( ! is_array( $item ) || empty( $item['title'] ) ) {
+					continue;
+				}
+				$key   = isset( $item['key'] ) ? (string) $item['key'] : '';
+				$title = (string) $item['title'];
+				if ( ! isset( $wanted[ $gtitle ][ $key ] ) && ! isset( $wanted[ $gtitle ][ $title ] ) ) {
+					continue;
+				}
+				$items[] = array(
+					'key'   => '' !== $key ? $key : substr( md5( $title ), 0, 8 ),
+					'title' => $title,
+					'price' => isset( $item['price'] ) ? (int) $item['price'] : 0,
+				);
+			}
+			if ( ! empty( $items ) ) {
+				$out[] = array( 'title' => $gtitle, 'items' => $items );
+			}
+		}
+		return $out;
+	}
+
+	/**
+	 * ساخت ویژگی‌های متغیر و خودِ variationها روی یک محصول ذخیره‌شده.
+	 *
+	 * @param WC_Product $product       محصول (هنوز ذخیره نشده یا شده).
+	 * @param array      $groups        گروه‌های انتخاب‌شده.
+	 * @param int        $base_position موقعیت شروع ویژگی‌ها.
+	 * @return array { attrs: WC_Product_Attribute[], taxonomies: string[], errors: string[] }
+	 */
+	private function build_variation_attributes( $product, $groups, $base_position = 0 ) {
+		$attrs      = array();
+		$taxonomies = array();
+		$errors     = array();
+		$position   = (int) $base_position;
+		foreach ( $groups as $group ) {
+			$titles = array();
+			foreach ( $group['items'] as $item ) {
+				$titles[] = $item['title'];
+			}
+			$built = $this->attributes->make_variation_attribute( $group['title'], $titles, $position );
+			if ( ! empty( $built['errors'] ) ) {
+				$errors = array_merge( $errors, $built['errors'] );
+			}
+			if ( ! empty( $built['attribute'] ) ) {
+				$attrs[]                    = $built['attribute'];
+				$taxonomies[ $group['title'] ] = array(
+					'taxonomy' => $built['taxonomy'],
+					'term_ids' => $built['term_ids'],
+				);
+			}
+			$position++;
+		}
+		return array(
+			'attrs'      => $attrs,
+			'taxonomies' => $taxonomies,
+			'errors'     => $errors,
+		);
+	}
+
+	/**
+	 * ساخت WC_Product_Variation برای همه‌ی ترکیب‌های انتخاب‌شده.
+	 *
+	 * @param int   $product_id شناسه‌ی محصول والد.
+	 * @param array $groups     گروه‌ها با نگاشت taxonomy/term_ids.
+	 * @param array $tax_map    خروجی build_variation_attributes.
+	 * @param int   $base_price قیمت پایه (پشتیبان).
+	 * @param string $base_sku  SKU پایه.
+	 * @return int تعداد variationهای ساخته‌شده.
+	 */
+	private function create_variations( $product_id, $groups, $tax_map, $base_price, $base_sku = '' ) {
+		if ( ! class_exists( 'WC_Product_Variation' ) || empty( $groups ) ) {
+			return 0;
+		}
+		// ترکیب دکارتی گزینه‌های گروه‌ها.
+		$combos = array( array() );
+		foreach ( $groups as $group ) {
+			$next = array();
+			foreach ( $combos as $combo ) {
+				foreach ( $group['items'] as $item ) {
+					$c              = $combo;
+					$c[ $group['title'] ] = $item;
+					$next[]         = $c;
+				}
+			}
+			$combos = $next;
+		}
+		$count = 0;
+		foreach ( $combos as $combo ) {
+			$variation = new WC_Product_Variation();
+			$variation->set_parent_id( $product_id );
+			$variation->set_status( 'publish' );
+			$attrs = array();
+			$price = 0;
+			$suffix = array();
+			foreach ( $combo as $gtitle => $item ) {
+				if ( empty( $tax_map[ $gtitle ] ) ) {
+					continue;
+				}
+				$taxonomy = $tax_map[ $gtitle ]['taxonomy'];
+				$term_id  = isset( $tax_map[ $gtitle ]['term_ids'][ $item['title'] ] ) ? (int) $tax_map[ $gtitle ]['term_ids'][ $item['title'] ] : 0;
+				if ( $term_id ) {
+					$term = get_term( $term_id, $taxonomy );
+					if ( $term && ! is_wp_error( $term ) ) {
+						$attrs[ $taxonomy ] = $term->slug;
+					}
+				}
+				if ( $item['price'] > 0 && 0 === $price ) {
+					$price = (int) $item['price'];
+				}
+				$suffix[] = $item['key'];
+			}
+			if ( empty( $attrs ) ) {
+				continue;
+			}
+			$variation->set_attributes( $attrs );
+			if ( 0 === $price ) {
+				$price = (int) $base_price;
+			}
+			if ( $price > 0 ) {
+				$variation->set_regular_price( (string) $price );
+			}
+			if ( '' !== $base_sku && ! empty( $suffix ) ) {
+				$variation->set_sku( $base_sku . '-' . implode( '-', $suffix ) );
+			}
+			if ( $variation->save() ) {
+				$count++;
+			}
+		}
+		if ( $count && class_exists( 'WC_Product_Variable' ) ) {
+			WC_Product_Variable::sync( $product_id );
+		}
+		return $count;
+	}
+
 	public function create_product( $data, $args = array() ) {
 		if ( ! class_exists( 'WC_Product_Simple' ) ) {
 			return new WP_Error( 'no_woocommerce', 'ووکامرس فعال نیست.' );
@@ -235,7 +416,12 @@ class Shoper_Product_Builder {
 			);
 		}
 
-		$product = new WC_Product_Simple();
+		// متغیرهای انتخاب‌شده‌ی کاربر: اگر دست‌کم یک گزینه تیک خورده باشد،
+		// محصول «متغیر» ساخته می‌شود؛ وگرنه مثل قبل محصول ساده است.
+		$selected_variants = $this->resolve_selected_variants( $data, $args );
+		$is_variable       = ! empty( $selected_variants ) && class_exists( 'WC_Product_Variable' );
+
+		$product = $is_variable ? new WC_Product_Variable() : new WC_Product_Simple();
 		$product->set_name( sanitize_text_field( $data['name1'] ) );
 		$product->set_status( in_array( $status, array( 'draft', 'publish', 'pending', 'private' ), true ) ? $status : 'draft' );
 		$product->set_catalog_visibility( 'visible' );
@@ -263,20 +449,41 @@ class Shoper_Product_Builder {
 			$product->set_sku( $sku );
 		}
 
-		if ( 'none' !== $price_mode && ! empty( $data['price'] ) ) {
+		if ( ! $is_variable && 'none' !== $price_mode && ! empty( $data['price'] ) ) {
 			$product->set_regular_price( (string) (int) $data['price'] );
 		}
 
 		// ویژگی‌ها (هر مشخصه یک attribute سراسری).
-		$attr_errors = array();
+		$attr_errors  = array();
+		$all_attrs    = array();
+		$var_tax_map  = array();
 		if ( ! empty( $data['specs'] ) && is_array( $data['specs'] ) ) {
 			$built = $this->attributes->build_attributes( $data['specs'] );
 			if ( ! empty( $built['attrs'] ) ) {
-				$product->set_attributes( $built['attrs'] );
+				$all_attrs = $built['attrs'];
 			}
 			if ( ! empty( $built['errors'] ) ) {
 				$attr_errors = $built['errors'];
 			}
+		}
+		if ( $is_variable ) {
+			$var_built = $this->build_variation_attributes( $product, $selected_variants, count( $all_attrs ) );
+			$var_tax_map = $var_built['taxonomies'];
+			if ( ! empty( $var_built['errors'] ) ) {
+				$attr_errors = array_merge( $attr_errors, $var_built['errors'] );
+			}
+			// مشخصه‌ای که خودش ویژگی متغیر شده (مثل «رنگ») دوباره ساده ثبت نمی‌شود.
+			$var_taxonomies = array();
+			foreach ( $var_tax_map as $info ) {
+				$var_taxonomies[] = $info['taxonomy'];
+			}
+			$all_attrs = array_values( array_filter( $all_attrs, function ( $attr ) use ( $var_taxonomies ) {
+				return ! in_array( $attr->get_name(), $var_taxonomies, true );
+			} ) );
+			$all_attrs = array_merge( $all_attrs, $var_built['attrs'] );
+		}
+		if ( ! empty( $all_attrs ) ) {
+			$product->set_attributes( $all_attrs );
 		}
 
 		$product_id = $product->save();
@@ -285,6 +492,24 @@ class Shoper_Product_Builder {
 		}
 
 		$this->save_source_meta( $product_id, $data );
+
+		// ساخت variationها با قیمت هر گزینه.
+		$variations_count = 0;
+		if ( $is_variable ) {
+			$base_sku = '';
+			if ( ! empty( $data['random_key'] ) ) {
+				$key      = (string) $data['random_key'];
+				$base_sku = ( 0 === strpos( $key, 'DKP-' ) || 0 === strpos( $key, 'TRB-' ) ) ? $key : ( 'TRB-' . $key );
+			}
+			$variations_count = $this->create_variations(
+				$product_id,
+				$selected_variants,
+				$var_tax_map,
+				! empty( $data['price'] ) ? (int) $data['price'] : 0,
+				$base_sku
+			);
+			update_post_meta( $product_id, '_shoper_variations_count', $variations_count );
+		}
 
 		// تصاویر: دانلود در کتابخانه‌ی رسانه با نام محصول + شماره.
 		// کاربر می‌تواند فقط برخی تصاویر و یک «تصویر اصلی» را انتخاب کرده باشد.
@@ -327,10 +552,12 @@ class Shoper_Product_Builder {
 		$this->save_seo_meta( $product_id, $seo_title, $seo_desc, $focus_kw, $ai_meta );
 
 		return array(
-			'product_id'    => $product_id,
-			'edit_link'     => get_edit_post_link( $product_id, 'url' ),
-			'view_link'     => get_permalink( $product_id ),
-			'image_info'    => $image_info,
+			'product_id'       => $product_id,
+			'product_type'     => $is_variable ? 'variable' : 'simple',
+			'variations_count' => $variations_count,
+			'edit_link'        => get_edit_post_link( $product_id, 'url' ),
+			'view_link'        => get_permalink( $product_id ),
+			'image_info'       => $image_info,
 			'filenames'     => ! empty( $image_info['filenames'] ) ? $image_info['filenames'] : array(),
 			'specs_count'   => ! empty( $data['specs'] ) ? count( $data['specs'] ) : 0,
 			'price'         => ! empty( $data['price'] ) ? (int) $data['price'] : 0,
@@ -378,7 +605,20 @@ class Shoper_Product_Builder {
 			$product->set_description( $this->build_description_html( $data ) );
 		}
 
-		if ( ! empty( $data['price'] ) && ! $product->get_regular_price() ) {
+		// متغیرهای انتخاب‌شده: نوع محصول به «متغیر» تبدیل و variation ساخته می‌شود.
+		$selected_variants = $this->resolve_selected_variants( $data, $args );
+		$is_variable       = ! empty( $selected_variants ) && class_exists( 'WC_Product_Variable' );
+		$variations_count  = 0;
+		$var_tax_map       = array();
+		if ( $is_variable && 'variable' !== $product->get_type() ) {
+			wp_set_object_terms( $post_id, 'variable', 'product_type' );
+			$reloaded = wc_get_product( $post_id );
+			if ( $reloaded ) {
+				$product = $reloaded;
+			}
+		}
+
+		if ( ! $is_variable && ! empty( $data['price'] ) && ! $product->get_regular_price() ) {
 			$product->set_regular_price( (string) (int) $data['price'] );
 		}
 
@@ -390,7 +630,38 @@ class Shoper_Product_Builder {
 			$attr_errors = $built['errors'];
 		}
 
+		if ( $is_variable ) {
+			$current   = $product->get_attributes();
+			$var_built = $this->build_variation_attributes( $product, $selected_variants, count( $current ) );
+			$var_tax_map = $var_built['taxonomies'];
+			if ( ! empty( $var_built['errors'] ) ) {
+				$attr_errors = array_merge( $attr_errors, $var_built['errors'] );
+			}
+			if ( ! empty( $var_built['attrs'] ) ) {
+				$product->set_attributes( $this->attributes->merge_attributes( $current, $var_built['attrs'] ) );
+			}
+		}
+
 		$product->save();
+
+		if ( $is_variable ) {
+			// variationهای قبلیِ ساخته‌شده با همین ویژگی‌ها جایگزین می‌شوند.
+			$children = get_children( array( 'post_parent' => $post_id, 'post_type' => 'product_variation', 'numberposts' => -1, 'fields' => 'ids' ) );
+			if ( is_array( $children ) ) {
+				foreach ( $children as $child_id ) {
+					wp_delete_post( $child_id, true );
+				}
+			}
+			$base_sku = (string) $product->get_sku();
+			$variations_count = $this->create_variations(
+				$post_id,
+				$selected_variants,
+				$var_tax_map,
+				! empty( $data['price'] ) ? (int) $data['price'] : 0,
+				$base_sku
+			);
+			update_post_meta( $post_id, '_shoper_variations_count', $variations_count );
+		}
 
 		$this->save_source_meta( $post_id, $data );
 		update_post_meta( $post_id, '_shoper_filled_at', current_time( 'mysql' ) );
@@ -435,8 +706,10 @@ class Shoper_Product_Builder {
 		$this->save_seo_meta( $post_id, $seo_title, $seo_desc, $focus_kw, $ai_meta );
 
 		return array(
-			'post_id'     => $post_id,
-			'specs_count' => ! empty( $data['specs'] ) ? count( $data['specs'] ) : 0,
+			'post_id'          => $post_id,
+			'product_type'     => $is_variable ? 'variable' : $product->get_type(),
+			'variations_count' => $variations_count,
+			'specs_count'      => ! empty( $data['specs'] ) ? count( $data['specs'] ) : 0,
 			'images'      => $image_info,
 			'filenames'   => ! empty( $image_info['filenames'] ) ? $image_info['filenames'] : array(),
 			'attr_errors' => $attr_errors,

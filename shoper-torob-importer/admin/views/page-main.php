@@ -240,6 +240,20 @@ $hf_token = get_option( 'shoper_hf_token', '' );
 				<button type="button" class="button button-primary" id="shoper-check-update">بررسی بروزرسانی</button>
 				<button type="button" class="button" id="shoper-do-update" style="display:none;">نصب بروزرسانی</button>
 				<div id="shoper-update-result" style="margin-top:10px;"></div>
+				<?php
+				$shoper_rollback = class_exists( 'Shoper_Updater' ) ? Shoper_Updater::rollback_info() : array( 'available' => false );
+				if ( ! empty( $shoper_rollback['available'] ) ) :
+					?>
+					<hr>
+					<h4>برگشت به نسخه‌ی قبلی</h4>
+					<p class="description">
+						قبل از بروزرسانی اخیر، از نسخه‌ی
+						<strong><?php echo esc_html( $shoper_rollback['version'] ); ?></strong>
+						نسخه‌ی پشتیبان گرفته شده است. اگر نسخه‌ی جدید مشکلی داشت، با این دکمه به همان نسخه برمی‌گردید.
+					</p>
+					<button type="button" class="button" id="shoper-rollback">↩️ برگشت به نسخه‌ی <?php echo esc_html( $shoper_rollback['version'] ); ?></button>
+					<div id="shoper-rollback-result" style="margin-top:10px;"></div>
+				<?php endif; ?>
 			</div>
 
 			<div class="shoper-card shoper-help">

@@ -30,6 +30,73 @@ class Shoper_Ajax {
 		add_action( 'wp_ajax_shoper_diagnostics', array( $this, 'diagnostics' ) );
 		add_action( 'wp_ajax_shoper_check_update', array( $this, 'check_update' ) );
 		add_action( 'wp_ajax_shoper_do_update', array( $this, 'do_update' ) );
+		add_action( 'wp_ajax_shoper_rollback', array( $this, 'rollback' ) );
+	}
+
+	/**
+	 * پاک‌سازی انتخاب متغیرهای کاربر از POST.
+	 *
+	 * ورودی JSON: [{group, key}] یا [{group, title}].
+	 *
+	 * @param mixed $raw مقدار خام.
+	 * @return array
+	 */
+	public static function parse_selected_variants( $raw ) {
+		if ( ! is_string( $raw ) || '' === $raw ) {
+			return array();
+		}
+		$dec = json_decode( $raw, true );
+		if ( ! is_array( $dec ) ) {
+			return array();
+		}
+		$out = array();
+		foreach ( $dec as $sel ) {
+			if ( ! is_array( $sel ) || empty( $sel['group'] ) ) {
+				continue;
+			}
+			$item = array( 'group' => sanitize_text_field( (string) $sel['group'] ) );
+			if ( ! empty( $sel['key'] ) ) {
+				$item['key'] = sanitize_text_field( (string) $sel['key'] );
+			}
+			if ( ! empty( $sel['title'] ) ) {
+				$item['title'] = sanitize_text_field( (string) $sel['title'] );
+			}
+			if ( empty( $item['key'] ) && empty( $item['title'] ) ) {
+				continue;
+			}
+			$out[] = $item;
+		}
+		return $out;
+	}
+
+	/**
+	 * برگشت افزونه به نسخه‌ی قبلی (از پشتیبان خودکار قبل از بروزرسانی).
+	 *
+	 * @return void
+	 */
+	public function rollback() {
+		$this->guard();
+
+		if ( ! current_user_can( 'update_plugins' ) ) {
+			wp_send_json_error( array( 'code' => 'forbidden', 'message' => 'دسترسی بروزرسانی افزونه‌ها را ندارید.' ), 403 );
+		}
+		if ( ! class_exists( 'Shoper_Updater' ) ) {
+			wp_send_json_error( array( 'code' => 'updater_missing', 'message' => 'ماژول بروزرسانی در دسترس نیست.' ), 500 );
+		}
+
+		$result = Shoper_Updater::perform_rollback();
+		if ( is_wp_error( $result ) ) {
+			$this->send_error( $result, 502 );
+		}
+
+		wp_send_json_success(
+			array(
+				'rolled_back'     => true,
+				'restored_version' => $result,
+				'current_version'  => SHOPER_VERSION,
+				'message'          => 'افزونه به نسخه‌ی ' . $result . ' برگشت. برای بارگذاری نسخه‌ی برگشتی، صفحه را تازه‌سازی کنید.',
+			)
+		);
 	}
 
 	/**
@@ -346,6 +413,10 @@ class Shoper_Ajax {
 			}
 		}
 
+		// متغیرهای انتخاب‌شده (رنگ/سایز با قیمت جدا) — JSON: [{group,key}] یا [{group,title}].
+		$variants_raw = isset( $_POST['selected_variants'] ) ? wp_unslash( $_POST['selected_variants'] ) : '';
+		$selected_variants = self::parse_selected_variants( $variants_raw );
+
 		// سئو.
 		$seo_title = isset( $_POST['seo_title'] ) ? sanitize_text_field( wp_unslash( $_POST['seo_title'] ) ) : '';
 		$seo_desc  = isset( $_POST['seo_desc'] ) ? sanitize_textarea_field( wp_unslash( $_POST['seo_desc'] ) ) : '';
@@ -410,6 +481,9 @@ class Shoper_Ajax {
 		}
 		if ( $selected ) {
 			$args['selected_images'] = $selected;
+		}
+		if ( $selected_variants ) {
+			$args['selected_variants'] = $selected_variants;
 		}
 		if ( $featured_raw >= 0 ) {
 			$args['featured_image'] = $featured_raw;
@@ -485,9 +559,15 @@ class Shoper_Ajax {
 			$this->send_error( $data );
 		}
 
+		$variants_raw      = isset( $_POST['selected_variants'] ) ? wp_unslash( $_POST['selected_variants'] ) : '';
+		$selected_variants = self::parse_selected_variants( $variants_raw );
+
 		$args = array();
 		if ( $selected ) {
 			$args['selected_images'] = $selected;
+		}
+		if ( $selected_variants ) {
+			$args['selected_variants'] = $selected_variants;
 		}
 		if ( $featured_raw >= 0 ) {
 			$args['featured_image'] = $featured_raw;
