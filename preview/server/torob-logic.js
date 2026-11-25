@@ -705,26 +705,32 @@ function normalizeDigikalaDetails(data) {
 	const price = rial >= 1000 && rial % 10 === 0 ? Math.round(rial / 10) : rial;
 	const variants = (() => {
 		// آینه‌ی Shoper_Digikala_Client::extract_variant_groups — ریال→تومان.
+		// بُعدها عمومی‌اند (هر کلیدِ گزینه‌مانند variant)، نه فقط رنگ/سایز.
+		const LABELS = { color: 'رنگ', 'رنگ': 'رنگ', size: 'سایز', 'سایز': 'سایز', 'اندازه': 'سایز', weight: 'وزن', volume: 'حجم', capacity: 'ظرفیت', model: 'مدل', shade: 'رنگ', number: 'شماره', pack: 'تعداد در بسته', count: 'تعداد', warranty: 'گارانتی', type: 'نوع', flavor: 'طعم', scent: 'رایحه' };
+		const DENY = new Set(['id', 'price', 'seller', 'sellers', 'status', 'images', 'image', 'url', 'uri', 'shipment_methods', 'rate', 'rating', 'statistics', 'lead_time', 'rank', 'is_fast_shipping', 'has_importer', 'market_price', 'dkp', 'mpn', 'barcode']);
 		const groups = {};
 		if (Array.isArray(product.variants)) {
 			for (const v of product.variants) {
 				if (!v || (v.status && v.status !== 'marketable')) continue;
 				const r = (v.price && v.price.selling_price) || 0;
 				const p = r >= 1000 && r % 10 === 0 ? Math.round(r / 10) : r;
-				for (const [gtitle, keys] of [['رنگ', ['color']], ['سایز', ['size']]]) {
-					for (const k of keys) {
-						const n = v[k];
-						const t = n && typeof n === 'object' ? String(n.title || n.title_fa || '').trim() : String(n || '').trim();
-						if (!t) continue;
-						if (!groups[gtitle]) groups[gtitle] = {};
-						if (!groups[gtitle][t] || (p > 0 && (!groups[gtitle][t].price || p < groups[gtitle][t].price))) {
-							groups[gtitle][t] = { key: 'v' + String((n && n.id) || Math.abs(t.split('').reduce((a, c) => a + c.charCodeAt(0), 0))), title: t, price: p };
-						}
+				for (const [k, n] of Object.entries(v)) {
+					if (DENY.has(k)) continue;
+					const isObj = n && typeof n === 'object' && (n.title || n.title_fa);
+					const isScalarDim = (typeof n === 'string' && n.trim()) && LABELS[k];
+					if (!isObj && !isScalarDim) continue;
+					const gtitle = LABELS[k] || k;
+					const t = isObj ? String(n.title || n.title_fa).trim() : String(n).trim();
+					if (!t) continue;
+					if (!groups[gtitle]) groups[gtitle] = {};
+					if (!groups[gtitle][t] || (p > 0 && (!groups[gtitle][t].price || p < groups[gtitle][t].price))) {
+						groups[gtitle][t] = { key: 'v' + String((isObj && n.id) || Math.abs(t.split('').reduce((a, c) => a + c.charCodeAt(0), 0))), title: t, price: p };
 					}
 				}
 			}
 		}
 		return Object.entries(groups).filter(([, items]) => Object.keys(items).length >= 2)
+			.slice(0, 3)
 			.map(([title, items]) => ({ title, items: Object.values(items), provider: 'digikala' }));
 	})();
 	const uri = (product.url && product.url.uri) || (id ? ('/product/dkp-' + id + '/') : '');
@@ -797,6 +803,47 @@ function baseTitle(titleFa) {
 	return t.replace(/\s+/g, ' ').trim();
 }
 
+function titleTokens(s) {
+	return latinDigitsFa(s).split(/\s+/).filter(Boolean);
+}
+
+function titleSimilarity(a, b) {
+	const ta = new Set(titleTokens(a));
+	const tb = new Set(titleTokens(b));
+	if (!ta.size || !tb.size) return 0;
+	let inter = 0;
+	for (const t of ta) if (tb.has(t)) inter++;
+	return inter / new Set([...ta, ...tb]).size;
+}
+
+function detectGenericDimension(pool) {
+	const rows = pool.map((item) => ({ item, tokens: titleTokens(item.name1) }));
+	if (rows.length < 2) return null;
+	let common = null;
+	for (const row of rows) common = common === null ? row.tokens.slice() : common.filter((t) => row.tokens.includes(t));
+	const values = {};
+	for (const row of rows) {
+		const diff = row.tokens.filter((t) => !(common || []).includes(t));
+		if (!diff.length) continue;
+		let label = diff.join(' ');
+		if (/^\d+(?:\.\d+)?$/.test(label)) {
+			for (const unit of ['میلی لیتر', 'میلی‌لیتر', 'گرم', 'کیلوگرم', 'عدد', 'میلی']) {
+				if (row.item.name1.includes(unit)) { label += ' ' + unit; break; }
+			}
+		}
+		const price = parseInt(row.item.price, 10) || 0;
+		if (!values[label] || (price > 0 && (!values[label].price || price < values[label].price))) {
+			values[label] = { key: row.item.random_key || label.slice(0, 8), title: label, price };
+		}
+	}
+	const items = Object.values(values);
+	if (items.length < 2 || items.length > 12) return null;
+	const hay = items.map((i) => i.title).join(' ') + ' ' + pool[0].name1;
+	const dim = /میلی/.test(hay) ? 'حجم' : (/گرم|کیلو/.test(hay) ? 'وزن' : (/سایز|XL|XXL/.test(hay) ? 'سایز' : (/عدد|بسته|پک/.test(hay) ? 'تعداد' : 'مدل')));
+	items.sort((a, b) => (a.price || Infinity) - (b.price || Infinity));
+	return { title: dim, items, provider: 'digikala', detected: true };
+}
+
 function detectSiblingVariants(current, siblings) {
 	if (!current || !current.name1 || !Array.isArray(siblings)) return [];
 	const base = baseTitle(current.name1);
@@ -807,7 +854,7 @@ function detectSiblingVariants(current, siblings) {
 		if (current.random_key && s.random_key && s.random_key === current.random_key) continue;
 		const sb = baseTitle(s.name1);
 		if (!sb) continue;
-		if (sb === base || (base.length >= 8 && sb.includes(base)) || (sb.length >= 8 && base.includes(sb))) pool.push(s);
+		if (sb === base || (base.length >= 8 && sb.includes(base)) || (sb.length >= 8 && base.includes(sb)) || titleSimilarity(current.name1, s.name1) >= 0.65) pool.push(s);
 	}
 	if (pool.length < 2) return [];
 	const groups = [];
@@ -826,6 +873,10 @@ function detectSiblingVariants(current, siblings) {
 		if (items.length < 2) continue;
 		items.sort((a, b) => (a.price || Infinity) - (b.price || Infinity));
 		groups.push({ title: dim, items, provider: 'digikala', detected: true });
+	}
+	if (!groups.length) {
+		const generic = detectGenericDimension(pool);
+		if (generic) groups.push(generic);
 	}
 	return groups;
 }

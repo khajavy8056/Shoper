@@ -590,7 +590,7 @@ class Shoper_Ajax {
 
 		wp_send_json_success(
 			array(
-				'message'     => 'محصول با موفقیت از ترب پر شد. برای ذخیره‌ی نهایی دکمه‌ی «به‌روزرسانی» را بزنید.',
+				'message'     => 'محصول با موفقیت از ترب پر شد. برای ذخیره‌ی نهایی دکمه‌ی «به‌روزرسانی» را بزنید.' . ( ! empty( $result['variant_warning'] ) ? ' ⚠️ ' . $result['variant_warning'] : '' ),
 				'post_id'     => $post_id,
 				'specs_count' => $result['specs_count'],
 				'images'      => $result['images'],

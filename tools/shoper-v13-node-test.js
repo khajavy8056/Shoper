@@ -23,7 +23,7 @@ const fixtureDir = path.join(__dirname, '../preview/fixtures');
 const searchRaw = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'search-samsung.json'), 'utf8'));
 const detailsRaw = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'details-9bcf3364.json'), 'utf8'));
 
-console.log('\nShoper 1.6.1 node tests\n');
+console.log('\nShoper 1.6.2 node tests\n');
 
 const search = logic.normalizeSearch(searchRaw);
 check('جستجوی fixture نرمال می‌شود', search.results && search.results.length > 0, search.results.length + ' نتیجه');
@@ -81,7 +81,7 @@ check('chooseSuggest لینک more_info را می‌فرستد', /preview\(it\.r
 check('fill هم product_json می‌فرستد', /shoper_fill[\s\S]{0,900}product_json/.test(pluginJs));
 
 const mainPhp = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/shoper-torob-importer.php'), 'utf8');
-check('plugin version 1.6.1', mainPhp.includes("define( 'SHOPER_VERSION', '1.6.1' )"));
+check('plugin version 1.6.2', mainPhp.includes("define( 'SHOPER_VERSION', '1.6.2' )"));
 check('کلاس تجمیع فروشنده بارگذاری می‌شود', mainPhp.includes('class-shoper-seller-aggregator.php'));
 
 check('digikala client required', mainPhp.includes('class-shoper-digikala-client.php') && mainPhp.includes('class-shoper-catalog.php'));
@@ -240,7 +240,7 @@ check('ajax update actions registered', ajax.includes('wp_ajax_shoper_check_upda
 check('admin.js update flow auto-installs after check', pluginJs.includes('checkUpdate') && pluginJs.includes('doUpdate') && pluginJs.includes("ajax('shoper_do_update'"));
 check('admin page has update button without any repo address', (() => { const v = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/admin/views/page-main.php'), 'utf8'); return v.includes('shoper-check-update') && !/github/i.test(v); })());
 
-// --- محصول متغیر + برگشت نسخه + آیینه‌ی ترب (1.6.1) ---
+// --- محصول متغیر + برگشت نسخه + آیینه‌ی ترب (1.6.0) ---
 const builderPhp = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/includes/class-shoper-product-builder.php'), 'utf8');
 const attrPhp = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/includes/class-shoper-attribute-handler.php'), 'utf8');
 check('builder resolves selected variants against source data', builderPhp.includes('function resolve_selected_variants'));
@@ -258,7 +258,7 @@ check('admin page shows rollback button only with backup', fs.readFileSync(path.
 check('admin.js rollback flow calls shoper_rollback', pluginJs.includes("ajax('shoper_rollback'"));
 check('torob mirror host api.torob.ir wired in PHP and JS', torobPhp.includes('api.torob.ir') && pluginJs.includes('torobSearchUrls') && pluginJs.includes('api.torob.ir'));
 
-// --- ممیزی ۱.۶.۱: ویژگی کامل ≠ متغیر + کشف از هم‌نام‌ها + آپدیت مستقیم ---
+// --- ممیزی 1.6.1: ویژگی کامل ≠ متغیر + کشف از هم‌نام‌ها + آپدیت مستقیم ---
 const dkSibSearch = logic.normalizeDigikalaSearch(JSON.parse(fs.readFileSync(path.join(fixtureDir, 'dk-search-s25.json'), 'utf8')));
 const dkSibCurrent = logic.normalizeDigikalaDetails(JSON.parse(fs.readFileSync(path.join(fixtureDir, 'dk-details-17918956.json'), 'utf8')));
 check('dk fixture search has S25 Ultra siblings', dkSibSearch.results.filter((r) => /S25 Ultra/.test(r.name1)).length >= 4, dkSibSearch.results.length + ' نتیجه');
@@ -279,6 +279,36 @@ check('variations are instock and parent transients cleared', builderPhp.include
 check('attribute slugs exist for region/storage-ram/configuration', attrPhp.includes("'ریجن'") && attrPhp.includes("'region'") && attrPhp.includes("'storage-ram'"));
 check('ui marks auto-detected variant groups', pluginJs.includes('group.detected') && pluginJs.includes('تشخیص خودکار'));
 check('updater always targets the LATEST release (direct jump, no stepping)', updaterPhp.includes('/releases/latest') && updaterPhp.includes('function perform_update') && updaterPhp.includes('is_newer( $release )'));
+
+// --- ایمن‌سازی متغیرها + عمومی‌سازی دسته‌ها (1.6.2) ---
+check('builder validates a variation plan before touching any product', builderPhp.includes('function plan_variations'));
+check('builder verifies every variation after creation', builderPhp.includes('function verify_variations'));
+check('builder rolls back to a healthy simple product on any mismatch', builderPhp.includes('function rollback_to_simple'));
+check('builder snapshots and restores previous variations in fill', builderPhp.includes('function snapshot_variations') && builderPhp.includes('function restore_variations'));
+check('builder deletes variations via CRUD (HPOS-safe)', builderPhp.includes('function delete_all_variations') && builderPhp.includes('->delete( true )'));
+check('create is double-guarded against duplicates (source meta + SKU)', builderPhp.includes('wc_get_product_id_by_sku'));
+check('variation combos are capped at the safe WooCommerce limit', builderPhp.includes('$expected > 50'));
+check('duplicate option titles are merged before variation creation', builderPhp.includes('$by_title'));
+check('variation creation happens last so a rollback cannot be undone by stale saves', builderPhp.indexOf('verify_variations( $product_id, $variant_plan') > builderPhp.indexOf('sideload_gallery'));
+check('php digikala reads variant dimensions generically (any category)', dkPhp.includes('function variant_dimension_nodes'));
+check('php sibling detection has a generic title-diff fallback', dkPhp.includes('function detect_generic_dimension') && dkPhp.includes('function title_similarity'));
+const cosGroups = logic.detectSiblingVariants(
+	{ name1: 'کرم مرطوب کننده آلوئه ورا حجم 250 میلی لیتر', name2: '', price: 500000, random_key: 'DKP-1' },
+	[
+		{ name1: 'کرم مرطوب کننده آلوئه ورا حجم 400 میلی لیتر', name2: '', price: 700000, random_key: 'DKP-2' },
+		{ name1: 'کرم مرطوب کننده آلوئه ورا حجم 250 میلی لیتر', name2: '', price: 480000, random_key: 'DKP-3' },
+		{ name1: 'شامپو بدن کودک بدون سولفات', name2: '', price: 200000, random_key: 'DKP-9' },
+	]
+);
+check('generic detection works for cosmetics (حجم 250/400)', cosGroups.length === 1 && cosGroups[0].title === 'حجم' && cosGroups[0].items.length === 2, JSON.stringify(cosGroups));
+check('generic detection takes cheapest price per value and excludes unrelated products', cosGroups.length === 1 && cosGroups[0].items.find((i) => i.title.indexOf('250') === 0).price === 480000);
+const nativeGeneric = logic.normalizeDigikalaDetails({ data: { product: { id: 77, title_fa: 'کرم تست', variants: [
+	{ status: 'marketable', volume: { id: 1, title: '250 میلی لیتر' }, price: { selling_price: 5000000 } },
+	{ status: 'marketable', volume: { id: 2, title: '400 میلی لیتر' }, price: { selling_price: 7000000 } },
+] } } });
+check('native digikala variants are read generically (volume, toman)', nativeGeneric.variants.length === 1 && nativeGeneric.variants[0].title === 'حجم' && nativeGeneric.variants[0].items[0].price === 500000, JSON.stringify(nativeGeneric.variants));
+check('ajax surfaces variant fallback warnings to the user', ajax.includes("variant_warning"));
+check('ui displays variant fallback warnings', pluginJs.includes('data.variant_warning'));
 
 console.log('\nنتیجه:', pass, 'موفق،', fail, 'ناموفق\n');
 process.exit(fail > 0 ? 1 : 0);

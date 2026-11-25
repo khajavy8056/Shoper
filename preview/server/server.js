@@ -53,10 +53,22 @@ function resolveVariantsSim(data, selected) {
 	const groups = [];
 	for (const g of data.variants) {
 		if (!g || !g.title || !Array.isArray(g.items) || !wanted[g.title]) continue;
-		const items = g.items.filter((it) => it && (wanted[g.title][it.key] || wanted[g.title][it.title]));
+		// حذف گزینه‌های هم‌عنوان (variation تکراری در ووکامرس ساخته نمی‌شود).
+		const byTitle = new Map();
+		for (const it of g.items) {
+			if (!it || !(wanted[g.title][it.key] || wanted[g.title][it.title])) continue;
+			if (!byTitle.has(it.title) || (it.price > 0 && (!byTitle.get(it.title).price || it.price < byTitle.get(it.title).price))) byTitle.set(it.title, it);
+		}
+		const items = [...byTitle.values()];
 		if (items.length) groups.push({ title: g.title, items });
+		if (groups.length >= 3) break;
 	}
 	if (!groups.length) return { groups: [], variations: [], product_type: 'simple' };
+	// سقف امن ترکیب‌ها — بیشتر از این یعنی داده ناهماهنگ؛ محصول ساده می‌ماند.
+	const expected = groups.reduce((n, g) => n * g.items.length, 1);
+	if (expected > 50) {
+		return { groups: [], variations: [], product_type: 'simple', variant_warning: 'تعداد ترکیب‌های متغیر (' + expected + ') از سقف امن بیشتر بود؛ محصول ساده ساخته شد.' };
+	}
 	let combos = [{}];
 	for (const g of groups) {
 		const next = [];
@@ -207,9 +219,9 @@ async function getDetails(prk, searchId, mode) {
 	if (String(prk || '').indexOf('DKP-') === 0 || /^\d{4,}$/.test(String(prk || ''))) {
 		const raw = await readFixture('dk-details-17918956.json');
 		const data = logic.normalizeDigikalaDetails(raw);
-		// آینه‌ی enrich_sibling_variants: متغیر صفحه کافی نیست → کشف از هم‌نام‌ها.
-		const nativeItems = (data.variants || []).reduce((n, g) => n + ((g.items || []).length), 0);
-		if (nativeItems < 2) {
+		// آینه‌ی enrich_sibling_variants: اول متغیر بومی صفحه، بعد کشف از
+		// هم‌نام‌ها فقط برای بُعدهایی که صفحه ندارد.
+		{
 			try {
 				const searchRaw = await readFixture('dk-search-s25.json');
 				const searchData = logic.normalizeDigikalaSearch(searchRaw);
@@ -580,6 +592,7 @@ const handlers = {
 			ok(res, {
 				simulated: true,
 				product_type: varSim.product_type,
+				variant_warning: varSim.variant_warning || '',
 				variations_count: varSim.variations.length,
 				product: {
 					name: data.name1,
@@ -699,6 +712,7 @@ const handlers = {
 				message: 'محصول با موفقیت از ترب پر شد. برای ذخیره‌ی نهایی دکمه‌ی «به‌روزرسانی» را بزنید.',
 				post_id: postId,
 				product_type: varSimFill.product_type,
+				variant_warning: varSimFill.variant_warning || '',
 				variations_count: varSimFill.variations.length,
 				specs_count: Object.keys(data.specs).length,
 				attr_errors: built.errors,
@@ -862,13 +876,13 @@ const server = http.createServer(async (req, res) => {
 	}
 
 	// --- دانلود آخرین نسخه‌ی افزونه (ZIP) ---
-	if (pathname === '/download/latest' || pathname === '/download/shoper-torob-importer-1.6.1.zip') {
-		const zip = path.join(ROOT, 'dist', 'shoper-torob-importer-1.6.1.zip');
+	if (pathname === '/download/latest' || pathname === '/download/shoper-torob-importer-1.6.2.zip') {
+		const zip = path.join(ROOT, 'dist', 'shoper-torob-importer-1.6.2.zip');
 		try {
 			const data = await fsp.readFile(zip);
 			res.writeHead(200, {
 				'Content-Type': 'application/zip',
-				'Content-Disposition': 'attachment; filename="shoper-torob-importer-1.6.1.zip"',
+				'Content-Disposition': 'attachment; filename="shoper-torob-importer-1.6.2.zip"',
 				'Content-Length': data.length,
 				'Cache-Control': 'no-store',
 			});

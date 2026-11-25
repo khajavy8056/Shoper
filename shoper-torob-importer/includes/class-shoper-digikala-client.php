@@ -432,6 +432,11 @@ class Shoper_Digikala_Client {
 			$same = ( $sb === $base )
 				|| ( mb_strlen( $base ) >= 8 && false !== mb_strpos( $sb, $base ) )
 				|| ( mb_strlen( $sb ) >= 8 && false !== mb_strpos( $base, $sb ) );
+			// برای دسته‌هایی که توکن متغیرشان را نمی‌شناسیم (آرایشی، مواد غذایی…)
+			// شباهت واژگانی عنوان‌ها هم نشانه‌ی هم‌خانواده بودن است.
+			if ( ! $same && self::title_similarity( $current['name1'], $s['name1'] ) >= 0.65 ) {
+				$same = true;
+			}
 			if ( $same ) {
 				$pool[] = $s;
 			}
@@ -474,7 +479,114 @@ class Shoper_Digikala_Client {
 				'detected' => true,
 			);
 		}
+		// هیچ بُعد شناخته‌شده‌ای پیدا نشد؟ یک بُعد عمومی از روی اختلاف
+		// واژه‌های عنوان هم‌نام‌ها بساز (حجم کرم، وزن، تعداد، سایز لباس…).
+		if ( empty( $groups ) ) {
+			$generic = self::detect_generic_dimension( $pool );
+			if ( $generic ) {
+				$groups[] = $generic;
+			}
+		}
 		return $groups;
+	}
+
+	/**
+	 * شباهت واژگانی (ژاکار) دو عنوان.
+	 *
+	 * @param string $a عنوان.
+	 * @param string $b عنوان.
+	 * @return float ۰ تا ۱.
+	 */
+	private static function title_similarity( $a, $b ) {
+		$ta = array_unique( preg_split( '/\s+/u', trim( self::latin_digits( $a ) ) ) );
+		$tb = array_unique( preg_split( '/\s+/u', trim( self::latin_digits( $b ) ) ) );
+		if ( empty( $ta ) || empty( $tb ) ) {
+			return 0.0;
+		}
+		$inter = count( array_intersect( $ta, $tb ) );
+		$union = count( array_unique( array_merge( $ta, $tb ) ) );
+		return $union ? $inter / $union : 0.0;
+	}
+
+	/**
+	 * بُعد عمومی از اختلاف واژه‌های عنوان محصولات هم‌خانواده.
+	 *
+	 * واژه‌هایی که در همه‌ی عنوان‌ها مشترک نیستند، مقدار متغیر هر محصول‌اند؛
+	 * عنوان بُعد از روی واحد/نشانه حدس زده می‌شود (میلی‌لیتر←حجم، گرم←وزن،
+	 * سایز، تعداد) وگرنه «مدل». فقط وقتی ساخته می‌شود که دست‌کم دو مقدار
+	 * متمایز واقعی وجود داشته باشد.
+	 *
+	 * @param array $pool محصولات هم‌خانواده (نرمال).
+	 * @return array|null
+	 */
+	private static function detect_generic_dimension( $pool ) {
+		$tokenized = array();
+		foreach ( $pool as $item ) {
+			$tokens = preg_split( '/\s+/u', trim( self::latin_digits( $item['name1'] ) ) );
+			$tokenized[] = array( 'item' => $item, 'tokens' => array_filter( $tokens, 'strlen' ) );
+		}
+		if ( count( $tokenized ) < 2 ) {
+			return null;
+		}
+		$common = null;
+		foreach ( $tokenized as $row ) {
+			$common = ( null === $common ) ? $row['tokens'] : array_intersect( $common, $row['tokens'] );
+		}
+		$common = array_values( (array) $common );
+		$values = array();
+		foreach ( $tokenized as $row ) {
+			$diff = array_values( array_diff( $row['tokens'], $common ) );
+			if ( empty( $diff ) ) {
+				continue;
+			}
+			$label = implode( ' ', $diff );
+			// مقدار صرفاً عددی؟ واحد را از عنوان کامل می‌چسبانیم (۲۵۰ ← ۲۵۰ میلی‌لیتر).
+			if ( preg_match( '/^\d+(?:\.\d+)?$/', $label ) ) {
+				foreach ( array( 'میلی لیتر', 'میلی‌لیتر', 'گرم', 'کیلوگرم', 'عدد', 'میلی' ) as $unit ) {
+					if ( false !== mb_strpos( $row['item']['name1'], $unit ) ) {
+						$label .= ' ' . $unit;
+						break;
+					}
+				}
+			}
+			$price = isset( $row['item']['price'] ) ? (int) $row['item']['price'] : 0;
+			if ( ! isset( $values[ $label ] )
+				|| ( $price > 0 && ( 0 === $values[ $label ]['price'] || $price < $values[ $label ]['price'] ) ) ) {
+				$values[ $label ] = array(
+					'key'   => ! empty( $row['item']['random_key'] ) ? (string) $row['item']['random_key'] : substr( md5( $label ), 0, 8 ),
+					'title' => $label,
+					'price' => $price,
+				);
+			}
+		}
+		if ( count( $values ) < 2 || count( $values ) > 12 ) {
+			return null;
+		}
+		// حدس عنوان بُعد.
+		$haystack = implode( ' ', array_keys( $values ) ) . ' ' . $pool[0]['name1'];
+		if ( preg_match( '/میلی/u', $haystack ) ) {
+			$dim = 'حجم';
+		} elseif ( preg_match( '/گرم|کیلو/u', $haystack ) ) {
+			$dim = 'وزن';
+		} elseif ( preg_match( '/سایز|XL|XXL|\bL\b|\bM\b|\bS\b/u', $haystack ) ) {
+			$dim = 'سایز';
+		} elseif ( preg_match( '/عدد|بسته|پک/u', $haystack ) ) {
+			$dim = 'تعداد';
+		} else {
+			$dim = 'مدل';
+		}
+		$items = array_values( $values );
+		usort( $items, function ( $a, $b ) {
+			$pa = $a['price'] > 0 ? $a['price'] : PHP_INT_MAX;
+			$pb = $b['price'] > 0 ? $b['price'] : PHP_INT_MAX;
+			return $pa <=> $pb;
+		} );
+		return array(
+			'title'    => $dim,
+			'items'    => $items,
+			'provider' => 'digikala',
+			'detected' => true,
+		);
 	}
 
 	/**
@@ -487,18 +599,14 @@ class Shoper_Digikala_Client {
 		if ( ! is_array( $normalized ) || empty( $normalized['name1'] ) || 'mock' === $this->source ) {
 			return $normalized;
 		}
-		$items = 0;
+		// اولویت همیشه با متغیرهای بومی خود صفحه است؛ کشف از هم‌نام‌ها فقط
+		// بُعدهایی را اضافه می‌کند که صفحه ندارد (عنوان تکراری ساخته نمی‌شود).
 		$titles = array();
 		foreach ( (array) ( isset( $normalized['variants'] ) ? $normalized['variants'] : array() ) as $g ) {
-			$items += isset( $g['items'] ) && is_array( $g['items'] ) ? count( $g['items'] ) : 0;
 			if ( ! empty( $g['title'] ) ) {
 				$titles[] = $g['title'];
 			}
 		}
-		if ( $items >= 2 ) {
-			return $normalized;
-		}
-		// از خود مشخصات فنی هم بُعدهای فعلی را می‌خوانیم تا با همان برچسب‌ها مقایسه شود.
 		$cache_key = 'shoper_dk_sib_' . md5( isset( $normalized['random_key'] ) ? $normalized['random_key'] : $normalized['name1'] );
 		if ( function_exists( 'get_transient' ) ) {
 			$cached = get_transient( $cache_key );
@@ -882,37 +990,30 @@ class Shoper_Digikala_Client {
 				$rial  = (int) $variant['price']['selling_price'];
 				$price = ( $rial >= 1000 && 0 === ( $rial % 10 ) ) ? (int) ( $rial / 10 ) : $rial;
 			}
-			$dimensions = array(
-				'رنگ'  => array( 'color', 'رنگ' ),
-				'سایز' => array( 'size', 'سایز', 'اندازه' ),
-			);
-			foreach ( $dimensions as $group_title => $keys ) {
-				foreach ( $keys as $key ) {
-					if ( empty( $variant[ $key ] ) ) {
-						continue;
-					}
-					$node  = $variant[ $key ];
-					$title = '';
-					$id    = '';
-					if ( is_array( $node ) ) {
-						$title = isset( $node['title'] ) ? (string) $node['title'] : ( isset( $node['title_fa'] ) ? (string) $node['title_fa'] : '' );
-						$id    = isset( $node['id'] ) ? (string) $node['id'] : '';
-					} elseif ( is_scalar( $node ) ) {
-						$title = (string) $node;
-					}
-					$title = trim( $title );
-					if ( '' === $title ) {
-						continue;
-					}
-					if ( ! isset( $groups[ $group_title ][ $title ] ) ) {
-						$groups[ $group_title ][ $title ] = array(
-							'key'   => '' !== $id ? ( 'v' . $id ) : ( 'v' . substr( md5( $group_title . '|' . $title ), 0, 10 ) ),
-							'title' => $title,
-							'price' => $price,
-						);
-					} elseif ( $price > 0 && ( 0 === $groups[ $group_title ][ $title ]['price'] || $price < $groups[ $group_title ][ $title ]['price'] ) ) {
-						$groups[ $group_title ][ $title ]['price'] = $price;
-					}
+			// بُعدهای متغیر به‌صورت عمومی از روی خود variant خوانده می‌شوند تا
+			// روی هر دسته‌ای جواب بدهد: پوشاک (رنگ/سایز)، آرایشی (رنگ/شماره/
+			// حجم)، لوازم خانگی (مدل/ظرفیت) و… — نه یک فهرست ثابت دو عضوی.
+			foreach ( self::variant_dimension_nodes( $variant ) as $group_title => $node ) {
+				$title = '';
+				$id    = '';
+				if ( is_array( $node ) ) {
+					$title = isset( $node['title'] ) ? (string) $node['title'] : ( isset( $node['title_fa'] ) ? (string) $node['title_fa'] : '' );
+					$id    = isset( $node['id'] ) ? (string) $node['id'] : '';
+				} elseif ( is_scalar( $node ) ) {
+					$title = (string) $node;
+				}
+				$title = trim( $title );
+				if ( '' === $title ) {
+					continue;
+				}
+				if ( ! isset( $groups[ $group_title ][ $title ] ) ) {
+					$groups[ $group_title ][ $title ] = array(
+						'key'   => '' !== $id ? ( 'v' . $id ) : ( 'v' . substr( md5( $group_title . '|' . $title ), 0, 10 ) ),
+						'title' => $title,
+						'price' => $price,
+					);
+				} elseif ( $price > 0 && ( 0 === $groups[ $group_title ][ $title ]['price'] || $price < $groups[ $group_title ][ $title ]['price'] ) ) {
+					$groups[ $group_title ][ $title ]['price'] = $price;
 				}
 			}
 		}
@@ -927,6 +1028,68 @@ class Shoper_Digikala_Client {
 				'items'    => array_values( $items ),
 				'provider' => 'digikala',
 			);
+			// ووکامرس و کاربر با حداکثر ۳ بُعد متغیر راحت‌اند؛ بیشترش را نمی‌سازیم.
+			if ( count( $out ) >= 3 ) {
+				break;
+			}
+		}
+		return $out;
+	}
+
+	/**
+	 * بُعدهای متغیر یک variant دیجی‌کالا به‌صورت عمومی.
+	 *
+	 * هر کلیدی از variant که مقدارش «یک گزینه‌ی قابل انتخاب» است (آرایه با
+	 * title یا مقدار اسکالر کوتاه) یک بُعد است؛ کلیدهای فنی (فروشنده، قیمت،
+	 * ارسال، امتیاز و…) با فهرست منع کنار گذاشته می‌شوند. برچسب فارسی برای
+	 * کلیدهای شناخته‌شده از نگاشت می‌آید و برای بقیه خود کلید استفاده می‌شود
+	 * تا دسته‌های تازه (آرایشی، پوشاک، خانگی…) بدون تغییر کد پوشش داده شوند.
+	 *
+	 * @param array $variant یک variant خام.
+	 * @return array label => node
+	 */
+	private static function variant_dimension_nodes( $variant ) {
+		$labels = array(
+			'color'    => 'رنگ',
+			'رنگ'      => 'رنگ',
+			'size'     => 'سایز',
+			'سایز'     => 'سایز',
+			'اندازه'   => 'سایز',
+			'weight'   => 'وزن',
+			'volume'   => 'حجم',
+			'capacity' => 'ظرفیت',
+			'model'    => 'مدل',
+			'shade'    => 'رنگ',
+			'number'   => 'شماره',
+			'pack'     => 'تعداد در بسته',
+			'count'    => 'تعداد',
+			'warranty' => 'گارانتی',
+			'type'     => 'نوع',
+			'flavor'   => 'طعم',
+			'scent'    => 'رایحه',
+		);
+		$deny = array(
+			'id', 'price', 'seller', 'sellers', 'status', 'images', 'image', 'url', 'uri',
+			'shipment_methods', 'rate', 'rating', 'statistics', 'lead_time', 'rank',
+			'is_fast_shipping', 'has_importer', 'market_price', 'dkp', 'mpn', 'barcode',
+		);
+		$out = array();
+		foreach ( (array) $variant as $key => $node ) {
+			if ( in_array( $key, $deny, true ) ) {
+				continue;
+			}
+			$is_option = false;
+			if ( is_array( $node ) && ( isset( $node['title'] ) || isset( $node['title_fa'] ) ) ) {
+				$is_option = true;
+			} elseif ( is_scalar( $node ) && '' !== trim( (string) $node ) && ! is_bool( $node ) ) {
+				// مقدار اسکالر فقط برای کلیدهای شناخته‌شده بُعد حساب می‌شود.
+				$is_option = isset( $labels[ $key ] );
+			}
+			if ( ! $is_option ) {
+				continue;
+			}
+			$label         = isset( $labels[ $key ] ) ? $labels[ $key ] : (string) $key;
+			$out[ $label ] = $node;
 		}
 		return $out;
 	}

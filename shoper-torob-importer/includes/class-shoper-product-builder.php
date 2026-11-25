@@ -253,6 +253,7 @@ class Shoper_Product_Builder {
 				continue;
 			}
 			$items = array();
+			$by_title = array();
 			foreach ( $group['items'] as $item ) {
 				if ( ! is_array( $item ) || empty( $item['title'] ) ) {
 					continue;
@@ -262,14 +263,29 @@ class Shoper_Product_Builder {
 				if ( ! isset( $wanted[ $gtitle ][ $key ] ) && ! isset( $wanted[ $gtitle ][ $title ] ) ) {
 					continue;
 				}
+				// دو گزینه‌ی هم‌عنوان یعنی دو variation یکسان در ووکامرس؛
+				// فقط ارزان‌ترین نگه داشته می‌شود تا variation تکراری ساخته نشود.
+				$price = isset( $item['price'] ) ? (int) $item['price'] : 0;
+				if ( isset( $by_title[ $title ] ) ) {
+					$idx = $by_title[ $title ];
+					if ( $price > 0 && ( 0 === $items[ $idx ]['price'] || $price < $items[ $idx ]['price'] ) ) {
+						$items[ $idx ]['price'] = $price;
+					}
+					continue;
+				}
+				$by_title[ $title ] = count( $items );
 				$items[] = array(
 					'key'   => '' !== $key ? $key : substr( md5( $title ), 0, 8 ),
 					'title' => $title,
-					'price' => isset( $item['price'] ) ? (int) $item['price'] : 0,
+					'price' => $price,
 				);
 			}
 			if ( ! empty( $items ) ) {
 				$out[] = array( 'title' => $gtitle, 'items' => $items );
+			}
+			// حداکثر ۳ بُعد متغیر.
+			if ( count( $out ) >= 3 ) {
+				break;
 			}
 		}
 		return $out;
@@ -456,6 +472,244 @@ class Shoper_Product_Builder {
 		}
 	}
 
+	/**
+	 * برنامه‌ی ساخت متغیر: قبل از دست‌کاری هر محصولی اعتبارسنجی کامل می‌شود.
+	 *
+	 * اگر هر بخشی هماهنگ نباشد (ویژگی ساخته نشود، termای گم شود، تعداد
+	 * ترکیب‌ها از سقف امن ووکامرس بگذرد) برنامه نامعتبر است و صداکننده باید
+	 * محصول را ساده بسازد — هرگز محصول متغیر نیمه‌کاره ساخته نمی‌شود.
+	 *
+	 * @param array $groups گروه‌های انتخاب‌شده.
+	 * @return array { ok, var_built, tax_map, expected, errors }
+	 */
+	private function plan_variations( $groups ) {
+		$plan = array(
+			'ok'        => false,
+			'var_built' => array( 'attrs' => array(), 'taxonomies' => array(), 'errors' => array() ),
+			'tax_map'   => array(),
+			'expected'  => 0,
+			'errors'    => array(),
+		);
+		if ( empty( $groups ) || count( $groups ) > 3 ) {
+			$plan['errors'][] = 'تعداد بُعدهای متغیر خارج از محدوده‌ی امن است.';
+			return $plan;
+		}
+		$expected = 1;
+		foreach ( $groups as $group ) {
+			$n = isset( $group['items'] ) && is_array( $group['items'] ) ? count( $group['items'] ) : 0;
+			if ( $n < 1 || $n > 50 ) {
+				$plan['errors'][] = 'تعداد گزینه‌های «' . $group['title'] . '» خارج از محدوده‌ی امن است.';
+				return $plan;
+			}
+			$expected *= $n;
+		}
+		// سقف عملی ساخت variation در ووکامرس؛ بیشتر از این یعنی داده ناهماهنگ است.
+		if ( $expected > 50 ) {
+			$plan['errors'][] = 'تعداد ترکیب‌های متغیر (' . $expected . ') از سقف امن ۵۰ بیشتر است.';
+			return $plan;
+		}
+		$var_built = $this->build_variation_attributes( null, $groups, 0 );
+		if ( ! empty( $var_built['errors'] ) || count( $var_built['attrs'] ) !== count( $groups ) ) {
+			$plan['errors'][] = 'ساخت ویژگی‌های متغیر کامل نشد.';
+			$plan['var_built'] = $var_built;
+			return $plan;
+		}
+		// برای تک‌تک گزینه‌ها باید term معتبر داشته باشیم.
+		foreach ( $groups as $group ) {
+			$info = isset( $var_built['taxonomies'][ $group['title'] ] ) ? $var_built['taxonomies'][ $group['title'] ] : null;
+			if ( ! $info || empty( $info['taxonomy'] ) ) {
+				$plan['errors'][] = 'taxonomy ویژگی «' . $group['title'] . '» ساخته نشد.';
+				return $plan;
+			}
+			foreach ( $group['items'] as $item ) {
+				if ( empty( $info['term_ids'][ $item['title'] ] ) ) {
+					$plan['errors'][] = 'term گزینه‌ی «' . $item['title'] . '» ساخته نشد.';
+					return $plan;
+				}
+			}
+		}
+		$plan['ok']        = true;
+		$plan['var_built'] = $var_built;
+		$plan['tax_map']   = $var_built['taxonomies'];
+		$plan['expected']  = $expected;
+		return $plan;
+	}
+
+	/**
+	 * راستی‌آزمایی بعد از ساخت: دقیقاً به تعداد مورد انتظار variation سالم هست؟
+	 *
+	 * @param int   $product_id شناسه.
+	 * @param int   $expected   تعداد مورد انتظار.
+	 * @param array $tax_map    نگاشت taxonomyها.
+	 * @return bool
+	 */
+	private function verify_variations( $product_id, $expected, $tax_map ) {
+		if ( ! function_exists( 'wc_get_product' ) ) {
+			return false;
+		}
+		$parent = wc_get_product( $product_id );
+		if ( ! $parent || 'variable' !== $parent->get_type() ) {
+			return false;
+		}
+		$children = $parent->get_children();
+		if ( count( $children ) !== (int) $expected ) {
+			return false;
+		}
+		$taxonomies = array();
+		foreach ( (array) $tax_map as $info ) {
+			if ( ! empty( $info['taxonomy'] ) ) {
+				$taxonomies[] = $info['taxonomy'];
+			}
+		}
+		foreach ( $children as $child_id ) {
+			$variation = wc_get_product( $child_id );
+			if ( ! $variation || 'variation' !== $variation->get_type() ) {
+				return false;
+			}
+			$attrs = $variation->get_attributes();
+			foreach ( $taxonomies as $taxonomy ) {
+				if ( empty( $attrs[ $taxonomy ] ) ) {
+					return false;
+				}
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * حذف همه‌ی variationهای یک محصول با متد CRUD (سازگار با HPOS).
+	 *
+	 * @param int $product_id شناسه.
+	 * @return void
+	 */
+	private function delete_all_variations( $product_id ) {
+		$ids = array();
+		if ( function_exists( 'wc_get_product' ) ) {
+			$parent = wc_get_product( $product_id );
+			if ( $parent && method_exists( $parent, 'get_children' ) ) {
+				$ids = $parent->get_children();
+			}
+		}
+		if ( empty( $ids ) ) {
+			$ids = get_children( array( 'post_parent' => $product_id, 'post_type' => 'product_variation', 'numberposts' => -1, 'fields' => 'ids' ) );
+		}
+		foreach ( (array) $ids as $child_id ) {
+			$child = function_exists( 'wc_get_product' ) ? wc_get_product( $child_id ) : null;
+			if ( $child && method_exists( $child, 'delete' ) ) {
+				$child->delete( true );
+			} else {
+				wp_delete_post( $child_id, true );
+			}
+		}
+	}
+
+	/**
+	 * شبکه‌ی امنیت: برگرداندن محصول به «ساده» وقتی ساخت متغیر کامل نشد.
+	 *
+	 * variationهای احتمالاً ساخته‌شده پاک، نوع محصول ساده، ویژگی‌های متغیر
+	 * به حالت نمایشی ساده برمی‌گردند و قیمت پایه ثبت می‌شود — محصول هیچ‌وقت
+	 * به‌صورت والدِ متغیرِ بدون variation رها نمی‌شود و محصول دومی هم
+	 * ساخته نمی‌شود؛ همان محصول واحد به شکل سالم ساده ادامه می‌دهد.
+	 *
+	 * @param int   $product_id شناسه.
+	 * @param array $data       داده‌ی منبع (قیمت پایه).
+	 * @param array $var_taxonomies taxonomyهای متغیر.
+	 * @return void
+	 */
+	private function rollback_to_simple( $product_id, $data, $var_taxonomies = array() ) {
+		$this->delete_all_variations( $product_id );
+		wp_set_object_terms( $product_id, 'simple', 'product_type' );
+		if ( ! function_exists( 'wc_get_product' ) ) {
+			return;
+		}
+		$product = wc_get_product( $product_id );
+		if ( ! $product ) {
+			return;
+		}
+		$attrs = $product->get_attributes();
+		$dirty = false;
+		foreach ( $attrs as $attr ) {
+			if ( is_object( $attr ) && in_array( $attr->get_name(), (array) $var_taxonomies, true ) && $attr->get_variation() ) {
+				$attr->set_variation( false );
+				$dirty = true;
+			}
+		}
+		if ( $dirty ) {
+			$product->set_attributes( $attrs );
+		}
+		if ( ! empty( $data['price'] ) && ! $product->get_regular_price() ) {
+			$product->set_regular_price( (string) (int) $data['price'] );
+		}
+		$product->save();
+		if ( function_exists( 'wc_delete_product_transients' ) ) {
+			wc_delete_product_transients( $product_id );
+		}
+	}
+
+	/**
+	 * عکس‌برداری از variationهای فعلی (برای restore در صورت خطای بازسازی).
+	 *
+	 * @param int $product_id شناسه.
+	 * @return array
+	 */
+	private function snapshot_variations( $product_id ) {
+		$out = array();
+		if ( ! function_exists( 'wc_get_product' ) ) {
+			return $out;
+		}
+		$parent = wc_get_product( $product_id );
+		if ( ! $parent || ! method_exists( $parent, 'get_children' ) ) {
+			return $out;
+		}
+		foreach ( $parent->get_children() as $child_id ) {
+			$v = wc_get_product( $child_id );
+			if ( ! $v ) {
+				continue;
+			}
+			$out[] = array(
+				'attributes'    => $v->get_attributes(),
+				'regular_price' => $v->get_regular_price(),
+				'sku'           => $v->get_sku(),
+				'status'        => $v->get_status(),
+			);
+		}
+		return $out;
+	}
+
+	/**
+	 * بازگرداندن variationها از روی عکس‌برداری.
+	 *
+	 * @param int   $product_id شناسه.
+	 * @param array $snapshot   خروجی snapshot_variations.
+	 * @return int تعداد.
+	 */
+	private function restore_variations( $product_id, $snapshot ) {
+		$count = 0;
+		foreach ( (array) $snapshot as $row ) {
+			if ( empty( $row['attributes'] ) || ! class_exists( 'WC_Product_Variation' ) ) {
+				continue;
+			}
+			$variation = new WC_Product_Variation();
+			$variation->set_parent_id( $product_id );
+			$variation->set_status( ! empty( $row['status'] ) ? $row['status'] : 'publish' );
+			$variation->set_attributes( $row['attributes'] );
+			$variation->set_stock_status( 'instock' );
+			if ( ! empty( $row['regular_price'] ) ) {
+				$variation->set_regular_price( (string) $row['regular_price'] );
+			}
+			if ( ! empty( $row['sku'] ) ) {
+				$variation->set_sku( (string) $row['sku'] );
+			}
+			if ( $variation->save() ) {
+				$count++;
+			}
+		}
+		if ( $count && class_exists( 'WC_Product_Variable' ) ) {
+			WC_Product_Variable::sync( $product_id );
+		}
+		return $count;
+	}
+
 	public function create_product( $data, $args = array() ) {
 		if ( ! class_exists( 'WC_Product_Simple' ) ) {
 			return new WP_Error( 'no_woocommerce', 'ووکامرس فعال نیست.' );
@@ -471,8 +725,14 @@ class Shoper_Product_Builder {
 
 		$data = $this->enrich( $data );
 
-		// بررسی تکراری.
+		// بررسی تکراری (دو لایه: متای منبع + SKU) تا در یک اجرا هرگز دو
+		// محصول از یک منبع ساخته نشود؛ همه‌ی متغیرها داخل همان یک محصول می‌روند.
 		$existing = $this->find_existing( $data['random_key'] );
+		if ( ! $existing && ! empty( $data['random_key'] ) && function_exists( 'wc_get_product_id_by_sku' ) ) {
+			$key = (string) $data['random_key'];
+			$sku = ( 0 === strpos( $key, 'DKP-' ) || 0 === strpos( $key, 'TRB-' ) ) ? $key : ( 'TRB-' . $key );
+			$existing = (int) wc_get_product_id_by_sku( $sku );
+		}
 		if ( $existing ) {
 			return new WP_Error(
 				'duplicate',
@@ -484,10 +744,21 @@ class Shoper_Product_Builder {
 			);
 		}
 
-		// متغیرهای انتخاب‌شده‌ی کاربر: اگر دست‌کم یک گزینه تیک خورده باشد،
-		// محصول «متغیر» ساخته می‌شود؛ وگرنه مثل قبل محصول ساده است.
+		// متغیرهای انتخاب‌شده‌ی کاربر: اول «برنامه» اعتبارسنجی می‌شود؛ فقط
+		// اگر همه‌چیز هماهنگ بود محصول متغیر ساخته می‌شود، وگرنه همان یک
+		// محصول به‌صورت ساده و سالم ساخته می‌شود (با هشدار شفاف به کاربر).
 		$selected_variants = $this->resolve_selected_variants( $data, $args );
-		$is_variable       = ! empty( $selected_variants ) && class_exists( 'WC_Product_Variable' );
+		$variant_plan      = null;
+		$variant_warning   = '';
+		$is_variable       = false;
+		if ( ! empty( $selected_variants ) && class_exists( 'WC_Product_Variable' ) ) {
+			$variant_plan = $this->plan_variations( $selected_variants );
+			if ( $variant_plan['ok'] ) {
+				$is_variable = true;
+			} else {
+				$variant_warning = 'متغیرها به‌صورت کامل و هماهنگ ساخته نشدند (' . implode( ' ', $variant_plan['errors'] ) . ')؛ برای جلوگیری از محصول خراب، محصول به‌صورت ساده ساخته شد.';
+			}
+		}
 
 		$product = $is_variable ? new WC_Product_Variable() : new WC_Product_Simple();
 		$product->set_name( sanitize_text_field( $data['name1'] ) );
@@ -555,24 +826,10 @@ class Shoper_Product_Builder {
 
 		$this->save_source_meta( $product_id, $data );
 
-		// ساخت variationها با قیمت هر گزینه.
+		// ساخت variationها عمداً در انتهای ساخت محصول انجام می‌شود (پایین‌تر)
+		// تا اگر راستی‌آزمایی رد شد و محصول به ساده برگشت، هیچ ذخیره‌ی بعدی
+		// با آبجکت قدیمی آن را دوباره متغیر نکند.
 		$variations_count = 0;
-		if ( $is_variable ) {
-			$this->attach_variation_terms( $product_id, $all_attrs );
-			$base_sku = '';
-			if ( ! empty( $data['random_key'] ) ) {
-				$key      = (string) $data['random_key'];
-				$base_sku = ( 0 === strpos( $key, 'DKP-' ) || 0 === strpos( $key, 'TRB-' ) ) ? $key : ( 'TRB-' . $key );
-			}
-			$variations_count = $this->create_variations(
-				$product_id,
-				$selected_variants,
-				$var_tax_map,
-				! empty( $data['price'] ) ? (int) $data['price'] : 0,
-				$base_sku
-			);
-			update_post_meta( $product_id, '_shoper_variations_count', $variations_count );
-		}
 
 		// تصاویر: دانلود در کتابخانه‌ی رسانه با نام محصول + شماره.
 		// کاربر می‌تواند فقط برخی تصاویر و یک «تصویر اصلی» را انتخاب کرده باشد.
@@ -614,10 +871,41 @@ class Shoper_Product_Builder {
 		}
 		$this->save_seo_meta( $product_id, $seo_title, $seo_desc, $focus_kw, $ai_meta );
 
+		// ساخت variationها با قیمت هر گزینه + راستی‌آزمایی نهایی؛ اگر دقیقاً
+		// به تعداد مورد انتظار ساخته نشد، همه‌چیز به محصول ساده‌ی سالم برمی‌گردد.
+		if ( $is_variable && $variant_plan ) {
+			$this->attach_variation_terms( $product_id, $all_attrs );
+			$base_sku = '';
+			if ( ! empty( $data['random_key'] ) ) {
+				$key      = (string) $data['random_key'];
+				$base_sku = ( 0 === strpos( $key, 'DKP-' ) || 0 === strpos( $key, 'TRB-' ) ) ? $key : ( 'TRB-' . $key );
+			}
+			$variations_count = $this->create_variations(
+				$product_id,
+				$selected_variants,
+				$var_tax_map,
+				! empty( $data['price'] ) ? (int) $data['price'] : 0,
+				$base_sku
+			);
+			if ( ! $this->verify_variations( $product_id, $variant_plan['expected'], $var_tax_map ) ) {
+				$var_taxonomies = array();
+				foreach ( $var_tax_map as $info ) {
+					$var_taxonomies[] = $info['taxonomy'];
+				}
+				$this->rollback_to_simple( $product_id, $data, $var_taxonomies );
+				$variations_count = 0;
+				$is_variable      = false;
+				$variant_warning  = 'ساخت متغیرها در راستی‌آزمایی نهایی کامل نشد؛ برای جلوگیری از محصول متغیر خراب، همان محصول به‌صورت ساده و سالم ساخته شد.';
+			} else {
+				update_post_meta( $product_id, '_shoper_variations_count', $variations_count );
+			}
+		}
+
 		return array(
 			'product_id'       => $product_id,
 			'product_type'     => $is_variable ? 'variable' : 'simple',
 			'variations_count' => $variations_count,
+			'variant_warning'  => $variant_warning,
 			'edit_link'        => get_edit_post_link( $product_id, 'url' ),
 			'view_link'        => get_permalink( $product_id ),
 			'image_info'       => $image_info,
@@ -668,12 +956,27 @@ class Shoper_Product_Builder {
 			$product->set_description( $this->build_description_html( $data ) );
 		}
 
-		// متغیرهای انتخاب‌شده: نوع محصول به «متغیر» تبدیل و variation ساخته می‌شود.
+		// متغیرهای انتخاب‌شده: اول برنامه اعتبارسنجی می‌شود؛ اگر هماهنگ نبود
+		// اصلاً دست به نوع محصول و variationهای فعلی نمی‌زنیم.
 		$selected_variants = $this->resolve_selected_variants( $data, $args );
-		$is_variable       = ! empty( $selected_variants ) && class_exists( 'WC_Product_Variable' );
+		$variant_plan      = null;
+		$variant_warning   = '';
+		$want_variable     = false;
+		if ( ! empty( $selected_variants ) && class_exists( 'WC_Product_Variable' ) ) {
+			$variant_plan = $this->plan_variations( $selected_variants );
+			if ( $variant_plan['ok'] ) {
+				$want_variable = true;
+			} else {
+				$variant_warning = 'متغیرها کامل و هماهنگ نبودند (' . implode( ' ', $variant_plan['errors'] ) . ')؛ محصول بدون تغییر در بخش متغیرها پر شد.';
+			}
+		}
+		$is_variable       = $want_variable;
 		$variations_count  = 0;
 		$var_tax_map       = array();
-		if ( $is_variable && 'variable' !== $product->get_type() ) {
+		$was_variable      = ( 'variable' === $product->get_type() );
+		// از variationهای فعلی عکس می‌گیریم تا اگر بازسازی کامل نشد عیناً برگردند.
+		$old_snapshot      = ( $want_variable && $was_variable ) ? $this->snapshot_variations( $post_id ) : array();
+		if ( $want_variable && ! $was_variable ) {
 			wp_set_object_terms( $post_id, 'variable', 'product_type' );
 			$reloaded = wc_get_product( $post_id );
 			if ( $reloaded ) {
@@ -681,7 +984,7 @@ class Shoper_Product_Builder {
 			}
 		}
 
-		if ( ! $is_variable && ! empty( $data['price'] ) && ! $product->get_regular_price() ) {
+		if ( ! $want_variable && ! empty( $data['price'] ) && ! $product->get_regular_price() ) {
 			$product->set_regular_price( (string) (int) $data['price'] );
 		}
 
@@ -693,7 +996,7 @@ class Shoper_Product_Builder {
 			$attr_errors = $built['errors'];
 		}
 
-		if ( $is_variable ) {
+		if ( $want_variable ) {
 			$current   = $product->get_attributes();
 			$var_built = $this->build_variation_attributes( $product, $selected_variants, count( $current ) );
 			$var_tax_map = $var_built['taxonomies'];
@@ -709,15 +1012,10 @@ class Shoper_Product_Builder {
 
 		$product->save();
 
-		if ( $is_variable ) {
+		if ( $want_variable && $variant_plan ) {
 			$this->attach_variation_terms( $post_id, $product->get_attributes() );
-			// variationهای قبلیِ ساخته‌شده با همین ویژگی‌ها جایگزین می‌شوند.
-			$children = get_children( array( 'post_parent' => $post_id, 'post_type' => 'product_variation', 'numberposts' => -1, 'fields' => 'ids' ) );
-			if ( is_array( $children ) ) {
-				foreach ( $children as $child_id ) {
-					wp_delete_post( $child_id, true );
-				}
-			}
+			// variationهای قبلی جایگزین می‌شوند (عکسشان را برای برگشت داریم).
+			$this->delete_all_variations( $post_id );
 			$base_sku = (string) $product->get_sku();
 			$variations_count = $this->create_variations(
 				$post_id,
@@ -726,7 +1024,27 @@ class Shoper_Product_Builder {
 				! empty( $data['price'] ) ? (int) $data['price'] : 0,
 				$base_sku
 			);
-			update_post_meta( $post_id, '_shoper_variations_count', $variations_count );
+			if ( $this->verify_variations( $post_id, $variant_plan['expected'], $var_tax_map ) ) {
+				update_post_meta( $post_id, '_shoper_variations_count', $variations_count );
+			} else {
+				// شبکه‌ی امنیت: یا variationهای قبلی عیناً برمی‌گردند، یا محصول
+				// به ساده‌ی سالم برمی‌گردد — هرگز والد متغیرِ خالی نمی‌ماند.
+				$this->delete_all_variations( $post_id );
+				$variations_count = 0;
+				$restored = ! empty( $old_snapshot ) ? $this->restore_variations( $post_id, $old_snapshot ) : 0;
+				if ( $restored && count( $old_snapshot ) === $restored ) {
+					$variant_warning = 'ساخت متغیرهای تازه کامل نشد؛ متغیرهای قبلی محصول سر جایشان برگشتند.';
+				} else {
+					$this->delete_all_variations( $post_id );
+					$var_taxonomies = array();
+					foreach ( $var_tax_map as $info ) {
+						$var_taxonomies[] = $info['taxonomy'];
+					}
+					$this->rollback_to_simple( $post_id, $data, $var_taxonomies );
+					$is_variable     = false;
+					$variant_warning = 'ساخت متغیرها کامل نشد؛ برای جلوگیری از محصول خراب، محصول به‌صورت ساده و سالم درآمد.';
+				}
+			}
 		}
 
 		$this->save_source_meta( $post_id, $data );
@@ -773,8 +1091,9 @@ class Shoper_Product_Builder {
 
 		return array(
 			'post_id'          => $post_id,
-			'product_type'     => $is_variable ? 'variable' : $product->get_type(),
+			'product_type'     => ( $fresh_product = wc_get_product( $post_id ) ) ? $fresh_product->get_type() : ( $is_variable ? 'variable' : 'simple' ),
 			'variations_count' => $variations_count,
+			'variant_warning'  => $variant_warning,
 			'specs_count'      => ! empty( $data['specs'] ) ? count( $data['specs'] ) : 0,
 			'images'      => $image_info,
 			'filenames'   => ! empty( $image_info['filenames'] ) ? $image_info['filenames'] : array(),

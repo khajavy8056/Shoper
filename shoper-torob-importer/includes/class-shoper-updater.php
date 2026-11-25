@@ -86,7 +86,7 @@ class Shoper_Updater {
 	 * نشانی بسته‌ی نصب داخل درخت برچسب انتشار (fallback وقتی فایل پیوست
 	 * انتشار موجود نیست).
 	 *
-	 * @param string $tag     برچسب انتشار مثل v1.6.1.
+	 * @param string $tag     برچسب انتشار مثل v1.6.2.
 	 * @param string $version نسخه بدون v.
 	 * @return string
 	 */
