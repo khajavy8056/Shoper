@@ -23,7 +23,7 @@ const fixtureDir = path.join(__dirname, '../preview/fixtures');
 const searchRaw = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'search-samsung.json'), 'utf8'));
 const detailsRaw = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'details-9bcf3364.json'), 'utf8'));
 
-console.log('\nShoper 1.5.8 node tests\n');
+console.log('\nShoper 1.5.9 node tests\n');
 
 const search = logic.normalizeSearch(searchRaw);
 check('جستجوی fixture نرمال می‌شود', search.results && search.results.length > 0, search.results.length + ' نتیجه');
@@ -81,7 +81,7 @@ check('chooseSuggest لینک more_info را می‌فرستد', /preview\(it\.r
 check('fill هم product_json می‌فرستد', /shoper_fill[\s\S]{0,900}product_json/.test(pluginJs));
 
 const mainPhp = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/shoper-torob-importer.php'), 'utf8');
-check('plugin version 1.5.8', mainPhp.includes("define( 'SHOPER_VERSION', '1.5.8' )"));
+check('plugin version 1.5.9', mainPhp.includes("define( 'SHOPER_VERSION', '1.5.9' )"));
 check('کلاس تجمیع فروشنده بارگذاری می‌شود', mainPhp.includes('class-shoper-seller-aggregator.php'));
 
 check('digikala client required', mainPhp.includes('class-shoper-digikala-client.php') && mainPhp.includes('class-shoper-catalog.php'));
@@ -226,6 +226,19 @@ check('catalog ingest detects dk widgets', catalogPhp.includes("isset( $raw['dat
 check('catalog combines provider errors', catalogPhp.includes('all_providers_failed'));
 const torobPhp = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/includes/class-shoper-torob-client.php'), 'utf8');
 check('torob backs off 30min after 490', torobPhp.includes("set_transient( 'shoper_direct_blocked', 1, 30 * MINUTE_IN_SECONDS )"));
+
+// --- بروزرسانی داخل افزونه (1.5.9) ---
+const updaterPhp = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/includes/class-shoper-updater.php'), 'utf8');
+check('updater hooks into WP update transient', updaterPhp.includes('pre_set_site_transient_update_plugins') && updaterPhp.includes('function inject_update'));
+check('updater serves plugins_api without external url', updaterPhp.includes('function plugin_info') && updaterPhp.includes("$obj->url            = '';"));
+check('updater caches release 12h / fail 1h', updaterPhp.includes('const CACHE_TTL = 43200;') && updaterPhp.includes('const FAIL_TTL = 3600;'));
+check('updater requires update_plugins for install', updaterPhp.includes("current_user_can( 'update_plugins' )") && updaterPhp.includes('Plugin_Upgrader'));
+check('updater picks release asset zip then dist fallback', updaterPhp.includes('browser_download_url') && updaterPhp.includes('fallback_package') && updaterPhp.includes("'/dist/'"));
+check('updater normalizes extracted source folder', updaterPhp.includes('function source_selection'));
+check('main plugin boots updater before WooCommerce check', mainPhp.includes('class-shoper-updater.php') && mainPhp.indexOf('class-shoper-updater.php') < mainPhp.indexOf('is_woocommerce_active()') + 500);
+check('ajax update actions registered', ajax.includes('wp_ajax_shoper_check_update') && ajax.includes('wp_ajax_shoper_do_update'));
+check('admin.js update flow auto-installs after check', pluginJs.includes('checkUpdate') && pluginJs.includes('doUpdate') && pluginJs.includes("ajax('shoper_do_update'"));
+check('admin page has update button without any repo address', (() => { const v = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/admin/views/page-main.php'), 'utf8'); return v.includes('shoper-check-update') && !/github/i.test(v); })());
 
 console.log('\nنتیجه:', pass, 'موفق،', fail, 'ناموفق\n');
 process.exit(fail > 0 ? 1 : 0);

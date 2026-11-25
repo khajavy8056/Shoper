@@ -28,6 +28,8 @@ class Shoper_Ajax {
 		add_action( 'wp_ajax_shoper_ai_probe', array( $this, 'ai_probe' ) );
 		add_action( 'wp_ajax_shoper_test_connection', array( $this, 'test_connection' ) );
 		add_action( 'wp_ajax_shoper_diagnostics', array( $this, 'diagnostics' ) );
+		add_action( 'wp_ajax_shoper_check_update', array( $this, 'check_update' ) );
+		add_action( 'wp_ajax_shoper_do_update', array( $this, 'do_update' ) );
 	}
 
 	/**
@@ -539,6 +541,67 @@ class Shoper_Ajax {
 		$message = 'دیجی‌کالا: ' . ( isset( $dk_result['message'] ) ? $dk_result['message'] : 'ناموفق' ) . ' | ترب: ' . ( isset( $result['message'] ) ? $result['message'] : 'ناموفق' );
 		$error   = new WP_Error( $code, $message );
 		$this->send_error( $error );
+	}
+
+	/**
+	 * بررسی بروزرسانی افزونه (فوری، بدون کش).
+	 *
+	 * پاسخ فقط وضعیت و شماره‌ی نسخه‌هاست؛ هیچ نشانی‌ای برنمی‌گردد.
+	 *
+	 * @return void
+	 */
+	public function check_update() {
+		$this->guard();
+
+		if ( ! class_exists( 'Shoper_Updater' ) ) {
+			wp_send_json_error( array( 'code' => 'updater_missing', 'message' => 'ماژول بروزرسانی در دسترس نیست.' ), 500 );
+		}
+
+		$result = Shoper_Updater::check( true );
+		if ( empty( $result['ok'] ) ) {
+			wp_send_json_error(
+				array(
+					'code'            => 'check_failed',
+					'message'         => $result['message'],
+					'current_version' => $result['current_version'],
+				),
+				502
+			);
+		}
+		wp_send_json_success( $result );
+	}
+
+	/**
+	 * دانلود و نصب آخرین نسخه از داخل افزونه.
+	 *
+	 * علاوه بر guard عمومی، دسترسی update_plugins هم لازم است.
+	 *
+	 * @return void
+	 */
+	public function do_update() {
+		$this->guard();
+
+		if ( ! current_user_can( 'update_plugins' ) ) {
+			wp_send_json_error( array( 'code' => 'forbidden', 'message' => 'دسترسی بروزرسانی افزونه‌ها را ندارید.' ), 403 );
+		}
+		if ( ! class_exists( 'Shoper_Updater' ) ) {
+			wp_send_json_error( array( 'code' => 'updater_missing', 'message' => 'ماژول بروزرسانی در دسترس نیست.' ), 500 );
+		}
+
+		$result = Shoper_Updater::perform_update();
+		if ( is_wp_error( $result ) ) {
+			$this->send_error( $result, 502 );
+		}
+
+		wp_send_json_success(
+			array(
+				'updated'         => true,
+				// ثابت نسخه در همین درخواست هنوز نسخه‌ی قبلی است؛ نسخه‌ی نصب‌شده از خود انتشار خوانده شده.
+				'new_version'     => $result,
+				'current_version' => SHOPER_VERSION,
+				'message'         => 'افزونه به نسخه‌ی ' . $result . ' بروزرسانی شد. برای بارگذاری نسخه‌ی جدید، صفحه را تازه‌سازی کنید.',
+			)
+		);
 	}
 
 	/**

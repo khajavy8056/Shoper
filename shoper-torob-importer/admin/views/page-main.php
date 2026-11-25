@@ -228,6 +228,18 @@ $hf_token = get_option( 'shoper_hf_token', '' );
 				<button type="button" class="button" id="shoper-diagnostics-btn">🔍 عیب‌یابی کامل</button>
 				<div id="shoper-conn-result" style="margin-top:10px;"></div>
 				<div id="shoper-diagnostics" style="margin-top:12px;display:none;"></div>
+
+				<hr>
+
+				<h3>بروزرسانی افزونه</h3>
+				<p class="description">
+					نسخه‌ی فعلی: <strong><?php echo esc_html( SHOPER_VERSION ); ?></strong>
+					بررسی نسخه‌ی جدید در پس‌زمینه انجام می‌شود؛ اگر نسخه‌ی بالاتری منتشر شده باشد، با همین دکمه دانلود و نصب می‌شود.
+					اعلان نسخه‌ی جدید در صفحه‌ی «افزونه‌ها»ی وردپرس هم به‌صورت خودکار نمایش داده می‌شود.
+				</p>
+				<button type="button" class="button button-primary" id="shoper-check-update">بررسی بروزرسانی</button>
+				<button type="button" class="button" id="shoper-do-update" style="display:none;">نصب بروزرسانی</button>
+				<div id="shoper-update-result" style="margin-top:10px;"></div>
 			</div>
 
 			<div class="shoper-card shoper-help">
