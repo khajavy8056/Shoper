@@ -152,7 +152,8 @@ class Shoper_Catalog {
 		if ( 'dk_details' === $kind || ( 'details' === $kind && is_array( $raw ) && ( isset( $raw['data']['product'] ) || ( isset( $raw['product']['specifications'] ) ) ) ) ) {
 			$normalized = $this->digikala->ingest_details( $raw );
 			if ( is_array( $normalized ) ) {
-				// متغیرهای صفحه کافی نبود؟ از هم‌نام‌های جستجو کشفشان کن.
+				// اول متغیرهای بومی صفحه، بعد همیشه کشف هوشمند از هم‌نام‌ها
+				// (بُعد/مقدار تازه اگر پیدا شد کنار بومی‌ها برای انتخاب کاربر).
 				$normalized = $this->digikala->enrich_sibling_variants( $normalized );
 			}
 			return $normalized;

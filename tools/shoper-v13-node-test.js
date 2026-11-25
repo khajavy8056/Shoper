@@ -23,7 +23,7 @@ const fixtureDir = path.join(__dirname, '../preview/fixtures');
 const searchRaw = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'search-samsung.json'), 'utf8'));
 const detailsRaw = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'details-9bcf3364.json'), 'utf8'));
 
-console.log('\nShoper 1.6.4 node tests\n');
+console.log('\nShoper 1.6.5 node tests\n');
 
 const search = logic.normalizeSearch(searchRaw);
 check('جستجوی fixture نرمال می‌شود', search.results && search.results.length > 0, search.results.length + ' نتیجه');
@@ -81,7 +81,7 @@ check('chooseSuggest لینک more_info را می‌فرستد', /preview\(it\.r
 check('fill هم product_json می‌فرستد', /shoper_fill[\s\S]{0,900}product_json/.test(pluginJs));
 
 const mainPhp = fs.readFileSync(path.join(__dirname, '../shoper-torob-importer/shoper-torob-importer.php'), 'utf8');
-check('plugin version 1.6.4', mainPhp.includes("define( 'SHOPER_VERSION', '1.6.4' )"));
+check('plugin version 1.6.5', mainPhp.includes("define( 'SHOPER_VERSION', '1.6.5' )"));
 check('کلاس تجمیع فروشنده بارگذاری می‌شود', mainPhp.includes('class-shoper-seller-aggregator.php'));
 
 check('digikala client required', mainPhp.includes('class-shoper-digikala-client.php') && mainPhp.includes('class-shoper-catalog.php'));
@@ -272,6 +272,27 @@ check('sibling prices are cheapest per value and in toman', !!storageGroup && st
 check('FE sibling (different base) is excluded', detected.every((g) => g.items.every((i) => !/FE/.test(i.key || ''))) && logic.baseTitle(dkSibSearch.results.find((r) => /FE/.test(r.name1)).name1) !== logic.baseTitle(dkSibCurrent.name1));
 check('php digikala has sibling detection (pure + enrich)', dkPhp.includes('function detect_sibling_variants') && dkPhp.includes('function enrich_sibling_variants') && dkPhp.includes('title_dimensions'));
 check('catalog enriches browser dk payloads with siblings', catalogPhp.includes('enrich_sibling_variants'));
+
+// --- ترتیب بومی ← هوشمند: هر دو همیشه (1.6.5) ---
+// بومی اول می‌ماند، یافته‌ی هوشمند در همان بُعد ادغام و بُعد تازه اضافه می‌شود.
+const mergedData = {
+	name1: 'تست',
+	variants: [
+		{ title: 'حافظه داخلی', items: [{ key: 'a', title: '256 گیگابایت', price: 0 }, { key: 'b', title: '۵۱۲ گیگابایت', price: 100 }] },
+		{ title: 'رنگ', items: [{ key: 'c', title: 'مشکی', price: 50 }] },
+	],
+};
+logic.applyDetectedGroups(mergedData, [
+	{ title: 'حافظه داخلی', detected: true, items: [{ key: 'x', title: '256 گیگابایت', price: 90 }, { key: 'y', title: '1 ترابایت', price: 300 }] },
+	{ title: 'ریجن', detected: true, items: [{ key: 'r1', title: 'ویتنام', price: 90 }, { key: 'r2', title: 'کره', price: 95 }] },
+]);
+check('smart findings merge INTO an existing native dimension (no drop)', mergedData.variants[0].items.length === 3 && mergedData.variants[0].enriched === true, JSON.stringify(mergedData.variants[0].items.map((i) => i.title)));
+check('merged-in option is flagged detected for the UI badge', mergedData.variants[0].items[2].detected === true && mergedData.variants[0].items[2].title === '1 ترابایت');
+check('native option keeps priority; detected price only fills an empty price', mergedData.variants[0].items[0].price === 90 && mergedData.variants[0].items[1].price === 100);
+check('new smart dimension is appended AFTER native groups', mergedData.variants.length === 3 && mergedData.variants[2].title === 'ریجن' && mergedData.variants[1].title === 'رنگ');
+check('no smart findings => native variants untouched', (() => { const d = { variants: [{ title: 'رنگ', items: [{ key: 'c', title: 'مشکی', price: 1 }] }] }; logic.applyDetectedGroups(d, []); return d.variants.length === 1 && !d.variants[0].enriched; })());
+check('php merges detected values into native groups instead of dropping them', dkPhp.includes('function apply_detected_groups') && dkPhp.includes("['enriched'] = true") && dkPhp.includes('function variant_label_key') && !dkPhp.includes('! in_array( $g[\'title\'], $titles, true )'));
+check('ui badges merged smart options so the user can choose', pluginJs.includes('group.enriched') && pluginJs.includes('item.detected'));
 check('builder merges variation into same-taxonomy spec attribute (no spec dropped)', builderPhp.includes('function merge_variation_into_attributes') && !builderPhp.includes('array_filter( $all_attrs'));
 check('fill upgrades existing attribute to variation instead of dropping it', builderPhp.includes('merge_variation_into_attributes( $current, $var_built'));
 check('builder attaches variation terms to parent product', builderPhp.includes('function attach_variation_terms') && builderPhp.includes('wp_set_object_terms( $product_id, $options'));
@@ -318,7 +339,7 @@ check('resilient download uses long timeout and validates the ZIP', updaterPhp.i
 check('download failure message is Persian and address-free', updaterPhp.includes('shoper_download_failed') && !/shoper_download_failed[\s\S]{0,400}https?:\/\//.test(updaterPhp.split('shoper_download_failed')[1] || ''));
 check('source selection finds the plugin inside a repo archive', updaterPhp.includes('function source_selection') && updaterPhp.includes('GLOB_ONLYDIR'));
 
-// --- فعال ماندن افزونه بعد از بروزرسانی (1.6.4) ---
+// --- فعال ماندن افزونه بعد از بروزرسانی (1.6.5) ---
 check('updater remembers active state before any update', updaterPhp.includes('function remember_active_state') && updaterPhp.includes("'upgrader_pre_install'"));
 check('updater safety-net reactivates after upgrader completes', updaterPhp.includes('function ensure_reactivated') && updaterPhp.includes("'upgrader_process_complete'"));
 check('reactivation only happens when the plugin was active', updaterPhp.includes('function reactivate_if_needed') && updaterPhp.includes('activate_plugin( SHOPER_PLUGIN_BASENAME'));

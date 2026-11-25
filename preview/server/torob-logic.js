@@ -881,6 +881,47 @@ function detectSiblingVariants(current, siblings) {
 	return groups;
 }
 
+function variantLabelKey(label) {
+	return latinDigitsFa(label).replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+// آینه‌ی apply_detected_groups در PHP: یافته‌های هوشمند همیشه بعد از
+// بومی‌ها می‌آیند؛ بُعد تازه گروه جدا، مقدار تازه در بُعد موجود ادغام.
+function applyDetectedGroups(data, detected) {
+	if (!data || !Array.isArray(detected) || !detected.length) return data;
+	if (!Array.isArray(data.variants)) data.variants = [];
+	const index = new Map();
+	data.variants.forEach((g, i) => { if (g && g.title && !index.has(g.title)) index.set(g.title, i); });
+	for (const g of detected) {
+		if (!g || !g.title || !Array.isArray(g.items) || !g.items.length) continue;
+		if (!index.has(g.title)) {
+			data.variants.push(g);
+			index.set(g.title, data.variants.length - 1);
+			continue;
+		}
+		const group = data.variants[index.get(g.title)];
+		if (!Array.isArray(group.items)) group.items = [];
+		const seen = new Map();
+		group.items.forEach((item, ii) => { if (item && item.title) seen.set(variantLabelKey(item.title), ii); });
+		let added = false;
+		for (const item of g.items) {
+			if (!item || !item.title) continue;
+			const key = variantLabelKey(item.title);
+			const price = parseInt(item.price, 10) || 0;
+			if (seen.has(key)) {
+				const existing = group.items[seen.get(key)];
+				if (price > 0 && !existing.price) existing.price = price;
+				continue;
+			}
+			group.items.push({ ...item, detected: true });
+			seen.set(key, group.items.length - 1);
+			added = true;
+		}
+		if (added) group.enriched = true;
+	}
+	return data;
+}
+
 function detectCategory(hay, specs) {
 	const t = String(hay || '').toLowerCase();
 	if (/گوشی|موبایل|galaxy|iphone|redmi|poco|xiaomi|سامسونگ/.test(t)) return 'phone';
@@ -1443,6 +1484,7 @@ module.exports = {
 	normalizeDigikalaSearch,
 	normalizeDigikalaDetails,
 	detectSiblingVariants,
+	applyDetectedGroups,
 	titleDimensions,
 	baseTitle,
 	aggregate,
